@@ -1,0 +1,9 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.1"}
+        com.github.clojure-finance/edgarjure {:mvn/version "0.4.1"}}
+ :aliases
+ {:run {:main-opts ["-m" "edgar2.core"]}
+  :download {:exec-fn edgar2.core/download
+             :exec-args {:ticker "XOM" :years 5}}
+  :report {:exec-fn edgar2.core/report
+           :exec-args {:ticker "XOM" :years 5}}}}
