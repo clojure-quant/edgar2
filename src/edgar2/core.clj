@@ -3,6 +3,8 @@
             [edgar.api :as e]
             [edgar.download :as dl]
             [tech.v3.dataset :as ds])
+  (:import [java.time LocalDate]
+           [java.time.temporal ChronoUnit])
   (:gen-class))
 
 (def default-ticker "XOM")
@@ -41,20 +43,60 @@
       (boolean (re-find (re-pattern (str "-" fye-mm "-")) s))
       true)))
 
-(defn last-n-annual-rows
-  [wide-ds n fiscal-year-end]
-  (let [ends* (map :end (ds/mapseq-reader wide-ds))
+(defn parse-date
+  [d]
+  (when d
+    (try (LocalDate/parse (str d))
+         (catch Exception _ nil))))
+
+(defn period-days
+  [start end]
+  (when-let [s (parse-date start)]
+    (when-let [e (parse-date end)]
+      (.between ChronoUnit/DAYS s e))))
+
+(defn annual-duration?
+  "True for ~12-month periods. 10-Ks also repeat the last quarter
+  (same :end, :fp FY) — those are ~90 days and must be dropped."
+  [row]
+  (when-let [days (period-days (:start row) (:end row))]
+    (<= 300 days 400)))
+
+(defn latest-filed
+  [rows]
+  (->> rows
+       (group-by #(str (:end %)))
+       vals
+       (map (fn [rs] (apply max-key #(str (:filed %)) rs)))))
+
+(defn annual-line-values
+  "Map of period-end string → value for one income-statement line item."
+  [rows line-item]
+  (->> rows
+       (filter #(= line-item (:line-item %)))
+       latest-filed
+       (map (juxt #(str (:end %)) :val))
+       (into {})))
+
+(defn annual-income
+  "Last `n` full-year rows: revenue, gross profit, net income."
+  [cik n fiscal-year-end]
+  (let [rows (ds/mapseq-reader (e/income cik :form "10-K" :view :standardized))
         mm (or (fye-month fiscal-year-end)
-               (fye-month (some->> ends* (map str) sort last)))
-        ends (->> ends*
-                  (filter #(fiscal-period-end? % mm))
-                  (map str)
-                  distinct
-                  sort
-                  reverse
-                  (take n)
-                  set)]
-    (ds/filter-column wide-ds :end #(contains? ends (str %)))))
+               (fye-month (some->> rows (map :end) (map str) sort last)))
+        annual (->> rows
+                    (filter annual-duration?)
+                    (filter #(fiscal-period-end? (:end %) mm)))
+        rev (annual-line-values annual "Revenue")
+        gp (annual-line-values annual "Gross Profit")
+        ni (annual-line-values annual "Net Income")
+        ends (->> (keys rev) sort reverse (take n))]
+    (for [end ends]
+      {:year (parse-long (subs end 0 4))
+       :end end
+       :revenue (get rev end)
+       :gross-profit (get gp end)
+       :net-profit (get ni end)})))
 
 (defn strip-html
   [html]
@@ -134,41 +176,31 @@
      (ensure-identity!)
      (let [cik (resolve-filer ticker)
            meta (e/company-metadata cik)
-           income (last-n-annual-rows
-                   (e/income cik :form "10-K" :shape :wide :view :standardized)
-                   n
-                   (:fiscal-year-end meta))
-           by-year (->> (e/filings cik :form "10-K" :limit n)
-                        (map extract-purchases)
-                        (filter :year)
-                        (into {} (map (juxt :year identity))))
-           rows (for [row (ds/mapseq-reader income)
-                      :let [year (parse-long (subs (str (:end row)) 0 4))
-                            extra (get by-year year {})]]
-                  {:year year
-                   :end (str (:end row))
-                   :revenue (get row "Revenue")
-                   :gross-profit (or (get row "Gross Profit")
-                                     (:gross-profit extra))
-                   :net-profit (get row "Net Income")})
-           ds (-> (ds/->dataset rows)
-                  (ds/select-columns [:year :end :revenue :gross-profit :net-profit])
-                  (ds/sort-by-column :year >))]
-       (println "\nAnnual financials (USD). Gross profit is derived as")
-       (println "Sales and other operating revenue − Crude oil and product purchases")
-       (println "(Exxon does not tag GrossProfit or CostOfRevenue in XBRL).")
+           base (annual-income cik n (:fiscal-year-end meta))
+           need-gp? (some (comp nil? :gross-profit) base)
+           by-year (if need-gp?
+                     (->> (e/filings cik :form "10-K" :limit n)
+                          (map extract-purchases)
+                          (filter :year)
+                          (into {} (map (juxt :year identity))))
+                     {})
+           rows (for [row base
+                      :let [extra (get by-year (:year row) {})]]
+                  (assoc row :gross-profit (or (:gross-profit row)
+                                               (:gross-profit extra))))
+           ds (ds/->dataset
+              (for [row (sort-by :year > rows)]
+                {:year (:year row)
+                 :end (:end row)
+                 :revenue (some-> (:revenue row) (/ 1.0e6) long)
+                 :gross-profit (some-> (:gross-profit row) (/ 1.0e6) long)
+                 :net-profit (some-> (:net-profit row) (/ 1.0e6) long)})
+              {:dataset-name (str ticker " annual ($ millions)")})]
+       (when need-gp?
+         (println "Gross profit is derived as sales − crude oil and product purchases")
+         (println "(this filer does not tag GrossProfit in XBRL)."))
        (println)
        (println ds)
-       (println)
-       (println "Same figures in $ millions:")
-       (println
-        (ds/->dataset
-         (for [row (ds/mapseq-reader ds)]
-           {:year (:year row)
-            :revenue (some-> (:revenue row) (/ 1.0e6) long)
-            :gross-profit (some-> (:gross-profit row) (/ 1.0e6) long)
-            :net-profit (some-> (:net-profit row) (/ 1.0e6) long)})
-         {:dataset-name (str ticker " annual ($ millions)")}))
        ds))))
 
 (defn -main
