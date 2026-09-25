@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [edgar.download :as dl]
+            [clojure.pprint :as pprint]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]
            [java.time.temporal ChronoUnit])
@@ -69,6 +70,16 @@
        vals
        (map (fn [rs] (apply max-key #(str (:filed %)) rs)))))
 
+(defn annual-statement-rows
+  "Full-year income-statement fact rows (quarterly repeats removed)."
+  [cik fiscal-year-end]
+  (let [rows (ds/mapseq-reader (e/income cik :form "10-K" :view :standardized))
+        mm (or (fye-month fiscal-year-end)
+               (fye-month (some->> rows (map :end) (map str) sort last)))]
+    (->> rows
+         (filter annual-duration?)
+         (filter #(fiscal-period-end? (:end %) mm)))))
+
 (defn annual-line-values
   "Map of period-end string → value for one income-statement line item."
   [rows line-item]
@@ -79,15 +90,11 @@
        (into {})))
 
 (defn annual-income
-  "Last `n` full-year rows: revenue, gross profit, net income."
+  "Last `n` full-year rows: revenue, cogs, gross profit, net income."
   [cik n fiscal-year-end]
-  (let [rows (ds/mapseq-reader (e/income cik :form "10-K" :view :standardized))
-        mm (or (fye-month fiscal-year-end)
-               (fye-month (some->> rows (map :end) (map str) sort last)))
-        annual (->> rows
-                    (filter annual-duration?)
-                    (filter #(fiscal-period-end? (:end %) mm)))
+  (let [annual (annual-statement-rows cik fiscal-year-end)
         rev (annual-line-values annual "Revenue")
+        cogs (annual-line-values annual "Cost of Revenue")
         gp (annual-line-values annual "Gross Profit")
         ni (annual-line-values annual "Net Income")
         ends (->> (keys rev) sort reverse (take n))]
@@ -95,6 +102,7 @@
       {:year (parse-long (subs end 0 4))
        :end end
        :revenue (get rev end)
+       :cogs (get cogs end)
        :gross-profit (get gp end)
        :net-profit (get ni end)})))
 
@@ -167,7 +175,7 @@
        results))))
 
 (defn report
-  "Print revenue, derived gross profit, and net profit for the last `:years`.
+  "Print revenue, cogs, gross profit, and net profit for the last `:years`.
 
   Usage: clj -X:report :ticker XOM :years 5"
   ([] (report {}))
@@ -177,30 +185,104 @@
      (let [cik (resolve-filer ticker)
            meta (e/company-metadata cik)
            base (annual-income cik n (:fiscal-year-end meta))
-           need-gp? (some (comp nil? :gross-profit) base)
-           by-year (if need-gp?
+           need-fallback? (some #(or (nil? (:gross-profit %)) (nil? (:cogs %))) base)
+           by-year (if need-fallback?
                      (->> (e/filings cik :form "10-K" :limit n)
                           (map extract-purchases)
                           (filter :year)
                           (into {} (map (juxt :year identity))))
                      {})
            rows (for [row base
-                      :let [extra (get by-year (:year row) {})]]
-                  (assoc row :gross-profit (or (:gross-profit row)
-                                               (:gross-profit extra))))
+                      :let [extra (get by-year (:year row) {})
+                            cogs (or (:cogs row) (:purchases extra))
+                            gp (or (:gross-profit row) (:gross-profit extra))
+                            cogs (or cogs (when (and (:revenue row) gp)
+                                            (- (:revenue row) gp)))
+                            gp (or gp (when (and (:revenue row) cogs)
+                                        (- (:revenue row) cogs)))]]
+                  (assoc row :cogs cogs :gross-profit gp))
            ds (ds/->dataset
               (for [row (sort-by :year > rows)]
                 {:year (:year row)
                  :end (:end row)
                  :revenue (some-> (:revenue row) (/ 1.0e6) long)
+                 :cogs (some-> (:cogs row) (/ 1.0e6) long)
                  :gross-profit (some-> (:gross-profit row) (/ 1.0e6) long)
                  :net-profit (some-> (:net-profit row) (/ 1.0e6) long)})
               {:dataset-name (str ticker " annual ($ millions)")})]
-       (when need-gp?
-         (println "Gross profit is derived as sales − crude oil and product purchases")
-         (println "(this filer does not tag GrossProfit in XBRL)."))
+       (when need-fallback?
+         (println "COGS / gross profit filled from sales − crude oil and product purchases")
+         (println "(this filer does not tag those lines in XBRL)."))
        (println)
        (println ds)
+       ds))))
+
+(def pl-column-order
+  ["Revenue"
+   "Cost of Revenue"
+   "Gross Profit"
+   "R&D Expense"
+   "Selling and Marketing Expense"
+   "General and Administrative Expense"
+   "SG&A Expense"
+   "Operating Expenses"
+   "Operating Income"
+   "Interest Expense"
+   "Non-Operating Income"
+   "Pre-Tax Income"
+   "Income Tax Expense"
+   "Net Income"
+   "EPS Basic"
+   "EPS Diluted"
+   "Shares Basic"
+   "Shares Diluted"])
+
+(defn pl-scale
+  "USD and share counts → millions. EPS stays in dollars."
+  [line-item val]
+  (when val
+    (if (re-find #"(?i)eps|per share" (str line-item))
+      (double val)
+      (long (/ val 1.0e6)))))
+
+(defn pl
+  "Print every standardized income-statement line for the last `:years`.
+
+  Usage: clj -X:pl :ticker MSFT :years 20"
+  ([] (pl {}))
+  ([m]
+   (let [{:keys [ticker n]} (opts m)]
+     (ensure-identity!)
+     (let [cik (resolve-filer ticker)
+           meta (e/company-metadata cik)
+           annual (annual-statement-rows cik (:fiscal-year-end meta))
+           items (vec (distinct (map :line-item annual)))
+           by-item (into {} (for [item items]
+                              [item (annual-line-values annual item)]))
+           ends (->> (or (keys (by-item "Revenue"))
+                         (map #(str (:end %)) annual))
+                     distinct
+                     sort
+                     reverse
+                     (take n)
+                     sort)
+           year-cols (mapv #(subs (str %) 0 4) ends)
+           print-cols (into [:field] year-cols)
+           item-order (concat (filter (set items) pl-column-order)
+                              (sort (remove (set pl-column-order) items)))
+           rows (map (fn [item]
+                       (into {:field item}
+                             (map (fn [end year]
+                                    [year (pl-scale item (get (by-item item) end))])
+                                  ends
+                                  year-cols)))
+                     item-order)
+           ds (ds/->dataset rows
+                            {:dataset-name (str ticker " P&L ($ millions; EPS in $)")
+                             :column-order print-cols})]
+       (println)
+       (println (str ticker " P&L ($ millions; EPS in $)"))
+       (pprint/print-table print-cols rows)
        ds))))
 
 (defn -main

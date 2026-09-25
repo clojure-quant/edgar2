@@ -18,4 +18,10 @@ Print Apple’s last three years of annual income-statement figures:
 clj -X:report :ticker AAPL :years 3
 ```
 
-`:ticker` and `:years` work on both aliases. `:n` is accepted as a synonym for `:years`.
+Print every income-statement line for Microsoft (last 20 fiscal years):
+
+```bash
+clj -X:pl :ticker MSFT :years 20
+```
+
+`:ticker` and `:years` work on all aliases. `:n` is accepted as a synonym for `:years`.

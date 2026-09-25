@@ -6,4 +6,6 @@
   :download {:exec-fn edgar2.core/download
              :exec-args {:ticker "XOM" :years 5}}
   :report {:exec-fn edgar2.core/report
-           :exec-args {:ticker "XOM" :years 5}}}}
+           :exec-args {:ticker "XOM" :years 5}}
+  :pl {:exec-fn edgar2.core/pl
+       :exec-args {:ticker "XOM" :years 5}}}}
