@@ -245,6 +245,34 @@
       (double val)
       (long (/ val 1.0e6)))))
 
+(defn derived-operating-expenses
+  "When filers (esp. E&P) do not tag OperatingExpenses: pretax ≈
+  revenue − cogs − opex − interest + other income + asset gains."
+  [by-item end]
+  (let [g (fn [item] (get (by-item item) end))
+        rev (g "Revenue")
+        pretax (g "Pre-Tax Income")]
+    (when (and rev pretax)
+      (- (+ rev
+            (or (g "Non-Operating Income") 0)
+            (or (g "Gain (Loss) on Sale of Assets") 0))
+         pretax
+         (or (g "Cost of Revenue") 0)
+         (or (g "Interest Expense") 0)))))
+
+(defn with-derived-opex
+  [by-item ends]
+  (let [existing (or (by-item "Operating Expenses") {})
+        filled (reduce (fn [m end]
+                         (if (get m end)
+                           m
+                           (if-let [v (derived-operating-expenses by-item end)]
+                             (assoc m end v)
+                             m)))
+                       existing
+                       ends)]
+    (assoc by-item "Operating Expenses" filled)))
+
 (defn pl
   "Print every standardized income-statement line for the last `:years`.
 
@@ -257,15 +285,19 @@
            meta (e/company-metadata cik)
            annual (annual-statement-rows cik (:fiscal-year-end meta))
            items (vec (distinct (map :line-item annual)))
-           by-item (into {} (for [item items]
-                              [item (annual-line-values annual item)]))
-           ends (->> (or (keys (by-item "Revenue"))
+           by-item* (into {} (for [item items]
+                               [item (annual-line-values annual item)]))
+           ends (->> (or (keys (by-item* "Revenue"))
                          (map #(str (:end %)) annual))
                      distinct
                      sort
                      reverse
                      (take n)
                      sort)
+           by-item (with-derived-opex by-item* ends)
+           items (cond-> items
+                   (seq (by-item "Operating Expenses"))
+                   (as-> xs (vec (distinct (conj xs "Operating Expenses")))))
            year-cols (mapv #(subs (str %) 0 4) ends)
            print-cols (into [:field] year-cols)
            item-order (concat (filter (set items) pl-column-order)
@@ -284,6 +316,113 @@
        (println (str ticker " P&L ($ millions; EPS in $)"))
        (pprint/print-table print-cols rows)
        ds))))
+
+(defn pl-fields
+  "Print last-year income-statement tags: line, XBRL concept, value.
+
+  Usage: clj -X:pl-fields :ticker OXY"
+  ([] (pl-fields {}))
+  ([m]
+   (let [{:keys [ticker]} (opts m)]
+     (ensure-identity!)
+     (let [cik (resolve-filer ticker)
+           meta (e/company-metadata cik)
+           fye (:fiscal-year-end meta)
+           reported (ds/mapseq-reader (e/income cik :form "10-K" :view :as-reported))
+           mm (or (fye-month fye)
+                  (fye-month (some->> reported (map :end) (map str) sort last)))
+           annual (->> reported
+                       (filter annual-duration?)
+                       (filter #(fiscal-period-end? (:end %) mm)))
+           latest-end (->> annual (map #(str (:end %))) sort last)
+           line-by-concept (->> (annual-statement-rows cik fye)
+                                (filter #(= latest-end (str (:end %))))
+                                (map (juxt :concept :line-item))
+                                (into {}))
+           fields (->> annual
+                       (filter #(= latest-end (str (:end %))))
+                       (group-by :concept)
+                       vals
+                       (map (fn [rs] (apply max-key #(str (:filed %)) rs)))
+                       (map (fn [r]
+                              (let [usd? (= "USD" (:unit r))]
+                                {:line (or (line-by-concept (:concept r))
+                                           (:label r))
+                                 :tag (:concept r)
+                                 :value (when-let [v (:val r)]
+                                          (if usd?
+                                            (long (/ v 1.0e6))
+                                            v))
+                                 :unit (if usd? "USD millions" (:unit r))})))
+                       (sort-by (fn [{:keys [line tag]}]
+                                  (let [i (.indexOf pl-column-order (str line))]
+                                    [(if (neg? i) 1 0) (if (neg? i) 99 i) (str line) (str tag)]))))]
+       (println (format "%s  ticker=%s  CIK=%s  period=%s"
+                        (:name meta) ticker cik latest-end))
+       (println "Income-statement tags (as reported; USD in millions)")
+       (println)
+       (pprint/print-table [:line :tag :value :unit] fields)
+       (ds/->dataset fields
+                     {:dataset-name (str ticker " P&L fields " latest-end)
+                      :column-order [:line :tag :value :unit]})))))
+
+(def business-start-re
+  #"(?i)items?\s+1(?:\s+and\s+2)?[\s.:,—-]+business")
+
+(def business-end-re
+  #"(?i)item\s+1a[\s.:,—-]+risk factors")
+
+(defn last-re-start
+  [re s]
+  (loop [m (re-matcher re s) idx nil]
+    (if (.find m)
+      (recur m (.start m))
+      idx)))
+
+(defn extract-business-text
+  "Item 1 Business from the latest 10-K.
+
+  e/item \"1\" often binds to Item 1C (Cybersecurity). Many E&P filers
+  also title the section ITEMS 1 AND 2. BUSINESS AND PROPERTIES."
+  [filing]
+  (let [text (e/text filing)
+        start (last-re-start business-start-re text)]
+    (when start
+      (let [tail (subs text start)
+            end-m (re-matcher business-end-re tail)
+            body (if (.find end-m)
+                   (subs tail 0 (.start end-m))
+                   tail)]
+        {:title "Item 1. Business"
+         :text (str/trim body)
+         :method :item-1-heading}))))
+
+(defn business
+  "Print Item 1 (Business) from the latest 10-K.
+
+  Usage: clj -X:business :ticker OXY"
+  ([] (business {}))
+  ([m]
+   (let [{:keys [ticker]} (opts m)]
+     (ensure-identity!)
+     (let [cik (resolve-filer ticker)
+           meta (e/company-metadata cik)
+           f (e/filing cik :form "10-K")
+           item (extract-business-text f)]
+       (println (format "%s  ticker=%s  CIK=%s"
+                        (:name meta) ticker cik))
+       (println (format "10-K  period=%s  filed=%s  accession=%s"
+                        (:reportDate f) (:filingDate f) (:accessionNumber f)))
+       (when-let [url (:url f)]
+         (println url))
+       (println)
+       (if item
+         (do
+           (println (:title item))
+           (println)
+           (println (:text item)))
+         (println "Could not extract Item 1 (Business) from this 10-K."))
+       item))))
 
 (defn -main
   [& _]

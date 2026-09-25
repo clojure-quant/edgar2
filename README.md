@@ -24,4 +24,16 @@ Print every income-statement line for Microsoft (last 20 fiscal years):
 clj -X:pl :ticker MSFT :years 20
 ```
 
+Print last year’s income-statement lines with XBRL tags:
+
+```bash
+clj -X:pl-fields :ticker OXY
+```
+
+Print the latest 10-K Item 1 business description:
+
+```bash
+clj -X:business :ticker OXY
+```
+
 `:ticker` and `:years` work on all aliases. `:n` is accepted as a synonym for `:years`.

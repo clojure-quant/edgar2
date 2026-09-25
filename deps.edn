@@ -8,4 +8,8 @@
   :report {:exec-fn edgar2.core/report
            :exec-args {:ticker "XOM" :years 5}}
   :pl {:exec-fn edgar2.core/pl
-       :exec-args {:ticker "XOM" :years 5}}}}
+       :exec-args {:ticker "XOM" :years 5}}
+  :pl-fields {:exec-fn edgar2.core/pl-fields
+              :exec-args {:ticker "XOM"}}
+  :business {:exec-fn edgar2.core/business
+             :exec-args {:ticker "XOM"}}}}
