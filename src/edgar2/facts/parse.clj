@@ -27,18 +27,25 @@
   (format "%010d" (Long/parseLong (str cik))))
 
 (defn concept-observations
+  "Fact rows with :unit taken from the companyfacts units key (USD, JPY, COP, shares)."
   [facts taxonomy tag]
-  (mapcat val (get-in facts [taxonomy tag :units])))
+  (mapcat (fn [[unit obs]]
+            (let [u (if (keyword? unit) (name unit) (str unit))]
+              (map #(assoc % :unit u) obs)))
+          (get-in facts [taxonomy tag :units])))
 
-(defn most-recent-val
-  "Latest :val by :filed (then :end) across the given [taxonomy tag] pairs."
+(defn most-recent-obs
+  "Latest observation by :filed (then :end) across the given [taxonomy tag] pairs."
   [facts tag-pairs]
   (some->> tag-pairs
            (mapcat (fn [[tax tag]] (concept-observations facts tax tag)))
            seq
            (sort-by #(str (:filed %) "|" (:end %)))
-           last
-           :val))
+           last))
+
+(defn most-recent-val
+  [facts tag-pairs]
+  (:val (most-recent-obs facts tag-pairs)))
 
 (defn reporting-standard
   "us-gaap, ifrs-full, and/or ffd (filing-fee disclosure)."
@@ -51,14 +58,17 @@
 
 (defn compact-company-facts
   [data]
-  (let [facts (:facts data)]
+  (let [facts (:facts data)
+        rev (most-recent-obs facts revenue-tags)]
     (cond-> {:cik (when (:cik data) (pad-cik (:cik data)))
              :entityName (:entityName data)
              :shares-outstanding (most-recent-val facts share-tags)
-             :revenue (most-recent-val facts revenue-tags)
+             :revenue (:val rev)
              :reporting-standard (reporting-standard facts)}
-      (contains? facts :ffd)
-      (assoc :note "filing-fee disclosure"))))
+      (:unit rev) (assoc :revenue-unit (:unit rev))
+      (:form rev) (assoc :revenue-form (:form rev))
+      (:fp rev) (assoc :revenue-fp (:fp rev))
+      (contains? facts :ffd) (assoc :note "filing-fee disclosure"))))
 
 (defn etf-name?
   "True when the entity name is an ETF / ETF Trust / Trust ETF (word-boundary)."
@@ -153,12 +163,16 @@
                    (sort-by :cik)
                    vec)
          with-shares (count (filter :shares-outstanding rows))
-         with-rev (count (filter :revenue rows))]
+         with-rev (count (filter :revenue rows))
+         by-unit (frequencies (keep :revenue-unit rows))
+         by-form (frequencies (keep :revenue-form rows))]
      (save-facts! rows)
      (println)
      (pprint/print-table
-      [:cik :entityName :shares-outstanding :revenue :reporting-standard]
+      [:cik :entityName :revenue :revenue-unit :revenue-form :revenue-fp]
       (take 12 (remove #(str/blank? (str (:cik %))) rows)))
      (println (format "Wrote %s  (%d entities; dropped %d empty/ETF/filing-fee; shares=%d  revenue=%d)"
                       facts-path (count rows) dropped with-shares with-rev))
+     (println "revenue-unit" (sort-by val > by-unit))
+     (println "revenue-form" (sort-by val > by-form))
      rows)))
