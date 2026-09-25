@@ -12,4 +12,7 @@
   :pl-fields {:exec-fn edgar2.core/pl-fields
               :exec-args {:ticker "XOM"}}
   :business {:exec-fn edgar2.core/business
-             :exec-args {:ticker "XOM"}}}}
+             :exec-args {:ticker "XOM"}}
+  :filers {:exec-fn edgar2.core/filers}
+  :filer-info {:exec-fn edgar2.core/filer-info}
+  :facts-all {:exec-fn edgar2.facts.parse/facts-all}}}

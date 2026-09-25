@@ -36,4 +36,24 @@ Print the latest 10-K Item 1 business description:
 clj -X:business :ticker OXY
 ```
 
+Print the SEC listed-filer directory (one main ticker per CIK) and write `data/filers.csv`:
+
+```bash
+clj -X:filers
+```
+
+Build a fast all-filer overview (`data/filer-info.edn`) from a few SEC **bulk** files (latest FSDS quarters + the exchange list) — not one HTTP call per company. Full statements and 10-K text stay on the per-ticker aliases.
+
+```bash
+clj -X:filer-info
+clj -X:filer-info :limit 10
+```
+
+Download the nightly `companyfacts.zip` (progress printed) and write a compact `data/facts.edn` (ETF / ETF Trust / Trust ETF names with no revenue are omitted):
+
+```bash
+clj -X:facts-all
+clj -X:facts-all :force true
+```
+
 `:ticker` and `:years` work on all aliases. `:n` is accepted as a synonym for `:years`.
