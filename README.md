@@ -36,10 +36,10 @@ Print the latest 10-K Item 1 business description:
 clj -X:business :ticker OXY
 ```
 
-Print the SEC listed-filer directory (one main ticker per CIK) and write `data/filers.csv`:
+Download the SEC listed-ticker directory (one main ticker per CIK) and write `data/tickers.edn`:
 
 ```bash
-clj -X:filers
+clj -X:download-tickers
 ```
 
 Build a fast all-filer overview (`data/filer-info.edn`) from a few SEC **bulk** files (latest FSDS quarters + the exchange list) — not one HTTP call per company. Full statements and 10-K text stay on the per-ticker aliases.

@@ -13,6 +13,6 @@
               :exec-args {:ticker "XOM"}}
   :business {:exec-fn edgar2.core/business
              :exec-args {:ticker "XOM"}}
-  :filers {:exec-fn edgar2.core/filers}
+  :download-tickers {:exec-fn edgar2.tickers/download-tickers}
   :filer-info {:exec-fn edgar2.core/filer-info}
   :facts-all {:exec-fn edgar2.facts.parse/facts-all}}}

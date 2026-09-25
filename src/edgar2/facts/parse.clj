@@ -71,10 +71,20 @@
          (re-find #"(?i)\bETFS\b" s)
          (re-find #"(?i)\bETF\s*(?:II|III)?\s*[.,]?\s*$" s)))))
 
+(defn empty-facts?
+  "True when companyfacts.json had no taxonomies (facts: {})."
+  [{:keys [reporting-standard revenue shares-outstanding note]}]
+  (and (nil? reporting-standard)
+       (nil? revenue)
+       (nil? shares-outstanding)
+       (nil? note)))
+
 (defn keep-fact?
-  "Drop ETF / Trust ETF names and filing-fee-only rows that have no revenue."
-  [{:keys [entityName revenue note]}]
-  (not (or (and (nil? revenue) (etf-name? entityName))
+  "Drop ETF / Trust ETF names, filing-fee-only rows with no revenue,
+  and CIKs whose companyfacts file is empty."
+  [{:keys [entityName revenue note] :as row}]
+  (not (or (empty-facts? row)
+           (and (nil? revenue) (etf-name? entityName))
            (and (nil? revenue) (= note "filing-fee disclosure")))))
 
 (defn zip-json-names
@@ -149,6 +159,6 @@
      (pprint/print-table
       [:cik :entityName :shares-outstanding :revenue :reporting-standard]
       (take 12 (remove #(str/blank? (str (:cik %))) rows)))
-     (println (format "Wrote %s  (%d entities; dropped %d ETF/Trust or filing-fee with no revenue; shares=%d  revenue=%d)"
+     (println (format "Wrote %s  (%d entities; dropped %d empty/ETF/filing-fee; shares=%d  revenue=%d)"
                       facts-path (count rows) dropped with-shares with-rev))
      rows)))

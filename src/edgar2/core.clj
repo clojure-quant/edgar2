@@ -6,7 +6,7 @@
             [clojure.pprint :as pprint]
             [edgar.core :as edgar]
             [edgar.fsds :as fsds]
-            [jsonista.core :as json]
+            [edgar2.tickers :as tickers]
             [tech.v3.dataset :as ds])
   (:import [java.io BufferedReader InputStreamReader]
            [java.nio.charset StandardCharsets]
@@ -431,75 +431,7 @@
          (println "Could not extract Item 1 (Business) from this 10-K."))
        item))))
 
-(def tickers-url
-  "https://www.sec.gov/files/company_tickers.json")
-
-(def filers-path "data/filers.csv")
-
-(defn pad-cik
-  [cik]
-  (format "%010d" (Long/parseLong (str cik))))
-
-(defn fetch-filers
-  "SEC company_tickers.json → seq of {:ticker :cik :name}."
-  []
-  (let [client (java.net.http.HttpClient/newHttpClient)
-        req (-> (java.net.http.HttpRequest/newBuilder)
-                (.uri (java.net.URI/create tickers-url))
-                (.header "User-Agent" identity-header)
-                (.header "Accept" "application/json")
-                (.GET)
-                (.build))
-        resp (.send client req (java.net.http.HttpResponse$BodyHandlers/ofString))
-        status (.statusCode resp)]
-    (when-not (= 200 status)
-      (throw (ex-info (str "SEC tickers fetch failed: HTTP " status)
-                      {:status status :body (.body resp)})))
-    (->> (json/read-value (.body resp) json/keyword-keys-object-mapper)
-         vals
-         (map (fn [{:keys [ticker cik_str title]}]
-                {:ticker ticker
-                 :cik (pad-cik cik_str)
-                 :name title}))
-         (sort-by :ticker))))
-
-(defn ticker-rank
-  "Lower rank is closer to common stock (no hyphen, shorter symbol)."
-  [ticker]
-  [(if (str/includes? (str ticker) "-") 1 0)
-   (count (str ticker))
-   (str ticker)])
-
-(defn filter-primary-filers
-  "Keep the main ticker for each CIK (drop units, warrants, preferred)."
-  [filers]
-  (->> filers
-       (group-by :cik)
-       vals
-       (map (fn [rows] (first (sort-by (comp ticker-rank :ticker) rows))))
-       (sort-by :ticker)))
-
-(defn filers
-  "Print and save the SEC ticker/CIK directory (one main ticker per CIK).
-
-  Usage: clj -X:filers"
-  ([] (filers {}))
-  ([_]
-   (ensure-identity!)
-   (let [all (vec (fetch-filers))
-         rows (vec (filter-primary-filers all))
-         ds (ds/->dataset rows
-                          {:dataset-name "SEC filers (company_tickers.json)"
-                           :column-order [:ticker :cik :name]})]
-     (.mkdirs (java.io.File. "data"))
-     (ds/write! ds filers-path)
-     (println (format "SEC listed filers: %d tickers → %d primary (from %s)"
-                      (count all) (count rows) tickers-url))
-     (println (format "Wrote %s" filers-path))
-     (println)
-     (pprint/print-table [:ticker :cik :name] (take 25 rows))
-     (println (format "... %d more (see %s)" (max 0 (- (count rows) 25)) filers-path))
-     ds)))
+(def pad-cik tickers/pad-cik)
 
 (def filer-info-path "data/filer-info.edn")
 (def fsds-dir "data/fsds")
@@ -623,17 +555,9 @@
    "99" "Nonclassifiable"})
 
 (defn load-primary-filers
-  "Rows from data/filers.csv, or a fresh SEC download if that file is missing."
+  "Rows from data/tickers.edn, or a fresh SEC download if that file is missing."
   []
-  (if (.exists (io/file filers-path))
-    (->> (ds/mapseq-reader (ds/->dataset filers-path))
-         (map (fn [r]
-                (let [g (fn [k] (or (get r k) (get r (name k))))]
-                  {:ticker (str (g :ticker))
-                   :cik (pad-cik (g :cik))
-                   :name (str (g :name))})))
-         vec)
-    (vec (filter-primary-filers (fetch-filers)))))
+  (tickers/load-tickers))
 
 (defn save-filer-info!
   [rows]
