@@ -1,0 +1,201 @@
+Cheap growth
+  bottom 30% PE (n=2273, PE <= 13.5, positive only)
+  top 30% sales-growth-yoy (7y mean YoY; n=5175, >= 28.2%)
+  top 50% return-on-capital (n=5850, >= 0.04%)
+  135 names
+
+
+| :ticker |                                              :entityName |  :price | :price-earnings | :sales-growth-yoy | :return-on-capital |
+|---------+----------------------------------------------------------+---------+-----------------+-------------------+--------------------|
+|    PEVM |                                       Phoenix Motor Inc. |     0.0 |             0.0 |             854.0 |             0.1378 |
+|    NIVF |                                  NEWGENIVF GROUP LIMITED |    0.56 |             0.0 |            1753.2 |             0.3019 |
+|    ATHS |                                       ATHENE HOLDING LTD |   24.35 |             0.0 |              58.6 |             0.0061 |
+|    KSPI |                             Joint Stock Company Kaspi.kz |   95.67 |             0.0 |              46.6 |             0.0963 |
+|   CRESY |                                              Cresud Inc. |   12.71 |             0.0 |              77.1 |             0.0441 |
+|    LOMA | LOMA NEGRA COMPANIA INDUSTRIALARGENTINA SOCIEDAD ANONIMA |    9.35 |             0.0 |              71.3 |             0.1091 |
+|     HPK |                                    HighPeak Energy, Inc. |    7.56 |             0.1 |             576.3 |             5.9006 |
+|    SEAT |                                         Vivid Seats Inc. |     3.7 |             0.1 |             250.9 |             1.2657 |
+|     IRS |                IRSA Investments and Representations Inc. |   14.75 |             0.1 |              76.2 |             0.0583 |
+|    AFYA |                                             AFYA LIMITED |    13.0 |             0.1 |              44.8 |             0.0821 |
+|     EDN |                                                   EDENOR |   21.32 |             0.1 |              71.1 |             0.0684 |
+|     IVF |                                     INVO Fertility, Inc. |    0.94 |             0.1 |             111.2 |             1.1535 |
+|     GWH |                                           ESS Tech, Inc. |    0.21 |             0.1 |             217.3 |             1.2397 |
+|     OWL |                                    BLUE OWL CAPITAL INC. |    9.32 |             0.2 |              49.7 |             0.0245 |
+|    MYSZ |                                            MY SIZE, INC. |    1.72 |             0.2 |             585.0 |             0.5735 |
+|    CEPU |                                      Central Puerto S.A. |   13.18 |             0.3 |              87.9 |              0.023 |
+|    TPHS |                              TRINITY PLACE HOLDINGS INC. |    0.03 |             0.4 |             200.4 |             1.5034 |
+|    WKSP |                                            Worksport Ltd |    0.44 |             0.4 |             271.7 |             0.5242 |
+|    PSHG |                                Performance Shipping Inc. |    1.77 |             0.4 |              83.1 |             0.0893 |
+|    UWMC |                                 UWM HOLDINGS CORPORATION |    1.22 |             0.5 |              43.2 |             0.0144 |
+|      BZ |                                          KANZHUN LIMITED |   14.11 |             0.5 |              47.9 |             0.1113 |
+|    PAAI |                           THE ARENA GROUP HOLDINGS, INC. |    1.75 |             0.7 |             142.9 |             1.1088 |
+|      KG |                                        Kestrel Group Ltd |    5.04 |             0.8 |             785.1 |             0.0463 |
+|    BWMX |                    BETTERWARE DE MEXICO, S.A.P.I. DE C.V |   16.74 |             0.9 |              34.6 |             0.0681 |
+|     TKC |                         TURKCELL ILETISIM HIZMETLERI A S |    5.17 |             0.9 |              42.2 |             0.0507 |
+|    TRAW |                                       Traws Pharma, Inc. |    0.56 |             0.9 |             160.1 |             0.8637 |
+|      YB |                                             Yuanbao Inc. |   12.22 |             1.0 |              46.9 |             0.2809 |
+|    CHRS |                                   Coherus Oncology, Inc. |    1.13 |             1.0 |             270.6 |             0.6504 |
+|    SLQT |                                        SelectQuote, Inc. |     0.4 |             1.1 |              28.5 |             0.0483 |
+|     BNT |                         BROOKFIELD WEALTH SOLUTIONS LTD. |   36.82 |             1.1 |             102.0 |             0.0113 |
+|    INTR |                                         Inter & Co, Inc. |    5.11 |             1.2 |              58.0 |             0.0127 |
+|    PROP |                                    Prairie Operating Co. |    0.43 |             1.5 |             495.1 |             0.0339 |
+|    UNIT |                                         Uniti Group Inc. |    8.91 |             1.7 |              46.5 |             0.1084 |
+|    NTRP |                                           NextTrip, Inc. |    1.93 |             1.8 |             110.6 |             1.2425 |
+|     CHA |                                     Chagee Holdings Ltd. |   11.41 |             1.9 |              85.7 |             0.1022 |
+|      NA |                                            Nano Labs Ltd |    2.38 |             2.0 |             794.7 |              0.121 |
+|    AFRM |                                    Affirm Holdings, Inc. |   71.52 |             2.2 |              50.5 |             0.1222 |
+|    ANTA |                        Antalpha Platform Holding Company |    2.84 |             2.2 |             194.4 |             0.0102 |
+|    COHN |                                          Cohen & Co Inc. |   10.11 |             2.3 |              62.1 |             0.0206 |
+|    RIGL |                              RIGEL PHARMACEUTICALS, INC. |   48.18 |             2.5 |              35.6 |             0.7146 |
+|      XP |                                                  XP Inc. |   20.51 |             2.5 |              31.1 |              0.013 |
+|      IH |                                              iHuman Inc. |    1.15 |             2.6 |              38.9 |             0.0697 |
+|    EVFM |                                 EVOFEM BIOSCIENCES, INC. |    0.01 |             2.6 |             374.3 |             0.0193 |
+|     MSB |                                             MESABI TRUST |   19.12 |             2.7 |              85.5 |             0.9169 |
+|    ATRA |                              ATARA BIOTHERAPEUTICS, INC. |    8.81 |             2.7 |             437.1 |             1.6154 |
+|    YALA |                                      YALLA GROUP LIMITED |    5.48 |             2.7 |              41.2 |             0.1653 |
+|     RLX |                                      RLX Technology Inc. |    1.68 |             2.8 |             192.5 |             0.0514 |
+|     DEC |                               Diversified Energy Company |   13.79 |             2.9 |              43.1 |             0.0553 |
+|     TWG |                             Top Wealth Group Holding Ltd |    0.16 |             2.9 |            4094.8 |             0.1084 |
+|    AUNA |                                                Auna S.A. |     5.1 |             3.0 |              41.6 |             0.0175 |
+|    DEFT |                                   DEFI TECHNOLOGIES INC. |     0.5 |             3.1 |             215.5 |             0.0757 |
+|    ESEA |                                            EUROSEAS LTD. |    69.7 |             3.6 |              34.8 |             0.1955 |
+|    VRRM |                               VERRA MOBILITY CORPORATION |    3.24 |             3.6 |              42.4 |              0.083 |
+|     GCT |                                 GIGACLOUD TECHNOLOGY INC |   53.98 |             3.7 |              37.7 |             0.1142 |
+|    AREC |                           AMERICAN RESOURCES CORPORATION |     1.9 |             3.7 |              93.3 |             0.3279 |
+|    SNWV |                                    SANUWAVE Health, Inc. |    5.04 |             3.7 |              88.0 |             0.3163 |
+|    CRMD |                                            CORMEDIX INC. |    7.85 |             3.8 |            9553.5 |             0.1974 |
+|    OMSE |                             OMS Energy Technologies Inc. |    4.36 |             3.9 |             108.9 |             0.2755 |
+|    NVAX |                                              NOVAVAX INC |   10.63 |             4.0 |             371.5 |             0.3742 |
+|    TOYO |                                            TOYO Co., Ltd |    4.47 |             4.1 |             162.6 |             0.0898 |
+|    EDRY |                                             EuroDry Ltd. |   48.16 |             4.2 |              48.0 |             0.1681 |
+|     WTM |                     WHITE MOUNTAINS INSURANCE GROUP, LTD | 2028.62 |             4.4 |              56.0 |             0.0899 |
+|     PDD |                                        PDD Holdings Inc. |   77.57 |             4.5 |              68.9 |             0.1553 |
+|    IMPP |                 Imperial Petroleum Inc./Marshall Islands |    5.07 |             4.5 |              95.9 |             0.0913 |
+|     PMT |                       PennyMac Mortgage Investment Trust |    8.33 |             4.8 |              28.5 |              0.004 |
+|     AII |                 American Integrity Insurance Group, Inc. |   25.19 |             5.0 |              35.3 |             0.0813 |
+|     RNR |                               RENAISSANCERE HOLDINGS LTD |   325.6 |             5.0 |              34.6 |             0.0499 |
+|     GEG |                                    GREAT ELM GROUP, INC. |    2.16 |             5.2 |              28.3 |             0.0837 |
+|     VIP |                     VULCAN INFRASTRUCTURE AND POWER INC. |    1.63 |             5.6 |              67.6 |             0.0987 |
+|    REPX |                          Riley Exploration Permian, Inc. |   40.55 |             5.6 |             910.9 |             0.1375 |
+|     LPA |                      Logistic Properties of the Americas |    2.91 |             5.7 |              30.4 |              0.023 |
+|    DUOL |                                           Duolingo, Inc. |  143.51 |             5.8 |              45.1 |             0.2078 |
+|    HSAI |                                              Hesai Group |   16.25 |             5.8 |            1519.7 |             0.0387 |
+|    NXTT |                             Next Technology Holding Inc. |    5.67 |             5.8 |             109.8 |             0.2731 |
+|    VCIG |                                       VCI Global Limited |     1.7 |             5.9 |              92.8 |             0.0828 |
+|    JCAP |                             Jefferson Capital, Inc. / DE |   19.46 |             5.9 |              37.8 |               0.09 |
+|    LKFT |                                             GALAPAGOS NV |   29.38 |             6.0 |              61.0 |             0.0942 |
+|    SLDE |                           Slide Insurance Holdings, Inc. |    23.1 |             6.1 |              36.5 |             0.1521 |
+|    HPAI |                                       Helport AI Limited |    0.31 |             6.3 |             175.8 |               0.05 |
+|    CGEN |                                             COMPUGEN LTD |    2.38 |             6.4 |             711.0 |             0.2257 |
+|    SPNT |                                         SIRIUSPOINT LTD. |   25.38 |             6.4 |              49.4 |             0.0366 |
+|    VITL |                                        Vital Farms, Inc. |    9.95 |             6.4 |              32.7 |             0.1278 |
+|    KNTK |                                    KINETIK HOLDINGS INC. |   51.21 |             6.4 |              66.3 |             0.0741 |
+|    GLRE |                              GREENLIGHT CAPITAL RE, LTD. |   14.89 |             6.5 |              33.0 |             0.0345 |
+|     ABG |                            ASBURY AUTOMOTIVE GROUP, INC. |  185.15 |             6.8 |             127.0 |             0.0423 |
+|     TGS |                        GAS TRANSPORTER OF THE SOUTH INC. |   26.62 |             7.2 |              83.0 |             0.0623 |
+|    FEDU |                     Four Seasons Education (Cayman) Inc. |    10.0 |             7.3 |              37.0 |             0.0416 |
+|    ATTT |                                  RAYTECH HOLDING LIMITED |    2.73 |             7.5 |              49.0 |             0.0773 |
+|    AUPH |                             Aurinia Pharmaceuticals Inc. |   16.44 |             7.6 |            2271.3 |             0.3821 |
+|    PTCT |                                   PTC Therapeutics, Inc. |   62.67 |             7.7 |              35.1 |             0.2356 |
+|    PETZ |                                       TDH Holdings, Inc. |    1.35 |             7.7 |           10646.3 |             0.0447 |
+|    ZVRA |                                 Zevra Therapeutics, Inc. |   11.04 |             7.9 |              93.6 |             0.2923 |
+|    SUNS |                               SUNRISE REALTY TRUST, INC. |    7.19 |             8.0 |             103.0 |             0.0391 |
+|     FOR |                                      FORESTAR GROUP INC. |   26.49 |             8.0 |              64.5 |             0.0535 |
+|    BYRN |                                  BYRNA TECHNOLOGIES INC. |    3.49 |             8.2 |             322.5 |             0.1147 |
+|    ATAT |                         Atour Lifestyle Holdings Limited |   32.23 |             8.2 |              47.8 |             0.1768 |
+|    IGIC |            International General Insurance Holdings Ltd. |   24.61 |             8.3 |            5929.2 |             0.0605 |
+|    BCRX |                           BIOCRYST PHARMACEUTICALS, INC. |    8.59 |             8.3 |             154.3 |             0.5132 |
+|    SPRO |                                 Spero Therapeutics, Inc. |    1.23 |             8.4 |              96.7 |             0.1244 |
+|     BCG |                                Binah Capital Group, Inc. |    1.15 |             8.5 |            9307.2 |             0.0329 |
+|    SMTI |                                      SANARA MEDTECH INC. |   35.06 |             8.6 |              53.3 |              0.515 |
+|    NRIM |                                   Northrim BanCorp, Inc. |   24.98 |             8.6 |             373.3 |             0.0196 |
+|     WAL |                          WESTERN ALLIANCE BANCORPORATION |   77.61 |             8.7 |              52.4 |             0.0104 |
+|    QTTB |                                             Q32 Bio Inc. |    8.77 |             8.8 |             108.8 |             0.4824 |
+|     GTM |                               ZoomInfo Technologies Inc. |    3.75 |             8.8 |              40.5 |             0.0193 |
+|    TBBK |                                        THE BANCORP, INC. |   50.58 |             9.0 |             180.1 |             0.0244 |
+|     NMM |                            NAVIOS MARITIME PARTNERS L.P. |   91.51 |             9.2 |              41.9 |             0.0481 |
+|     CRK |                                 COMSTOCK RESOURCES, INC. |   13.12 |             9.7 |              60.7 |             0.0565 |
+|    VTOL |                                       Bristow Group Inc. |   42.62 |             9.8 |              71.4 |             0.0558 |
+|    CLSK |                                         CleanSpark, Inc. |   13.95 |             9.8 |             213.9 |             0.1145 |
+|    WLFC |                                WILLIS LEASE FINANCE CORP |   54.33 |            10.1 |              64.0 |              0.029 |
+|    WTRG |                                Essential Utilities, Inc. |   39.53 |            10.1 |              32.2 |             0.0571 |
+|    QNST |                                         QuinStreet, Inc. |   14.41 |            10.1 |              34.9 |             0.1126 |
+|    GROW |                                 U S GLOBAL INVESTORS INC |    2.98 |            10.2 |              51.3 |             0.0636 |
+|    FRSH |                                          Freshworks Inc. |   12.54 |            10.5 |              30.8 |             0.1146 |
+|    MNOV |                                         MEDICINOVA, INC. |    2.58 |            10.6 |              89.6 |             0.2631 |
+|    SIGA |                                    Siga Technologies INC |    3.45 |            10.6 |              36.6 |             0.1061 |
+|     CCL |                                Carnival Corporation Ltd. |   22.25 |            11.0 |              72.7 |             0.0534 |
+|     EXE |                                       EXPAND ENERGY Corp |   86.84 |            11.1 |              36.1 |             0.0643 |
+|    CYRX |                                           CRYOPORT, INC. |   17.41 |            11.3 |              53.0 |             0.1024 |
+|    BAER |                   BRIDGER AEROSPACE GROUP HOLDINGS, INC. |    0.79 |            11.3 |              38.7 |             0.0125 |
+|    MNSB |                              MainStreet Bancshares, Inc. |   24.83 |            11.3 |             901.4 |             0.0071 |
+|    SRTA |                            STRATA CRITICAL MEDICAL, INC. |    5.33 |            11.4 |              55.6 |              0.127 |
+|     AXR |                                              AMREP CORP. |   22.37 |            11.5 |              28.4 |             0.0717 |
+|    RJET |                           Republic Airways Holdings Inc. |    18.7 |            11.5 |              47.9 |             0.0233 |
+|    ATLC |                                 Atlanticus Holdings Corp |    92.5 |            11.6 |              93.2 |             0.0158 |
+|    ACMR |                                       ACM Research, Inc. |    77.3 |            11.6 |              43.5 |             0.0328 |
+|      CI |                                          The Cigna Group |  272.01 |            12.1 |              39.8 |             0.0377 |
+|     MNR |                                Mach Natural Resources LP |    10.4 |            12.1 |              42.1 |             0.0379 |
+|    STNG |                                     Scorpio Tankers Inc. |   81.49 |            12.3 |             771.1 |             0.0879 |
+|    BANC |                                 BANC OF CALIFORNIA, INC. |   17.94 |            12.4 |            5059.0 |             0.0066 |
+|    SMCI |                               Super Micro Computer, Inc. |   43.26 |            12.7 |              45.7 |             0.0745 |
+|    HIPO |                                      HIPPO HOLDINGS INC. |   30.61 |            12.9 |              57.3 |             0.0329 |
+|    IIPR |                   Innovative Industrial Properties, Inc. |   55.52 |            12.9 |              67.4 |             0.0499 |
+|    VIST |                             Vista Energy, S.A.B. de C.V. |   67.43 |            13.5 |              56.1 |             0.1128 |
+
+High revenue growth
+  50 names with the highest 7-year mean YoY sales-growth
+
+
+| :ticker |                           :entityName | :price | :sales-growth-yoy |
+|---------+---------------------------------------+--------+-------------------|
+|    FRQN |                FREQUENCY HOLDINGS INC |        |         3775066.8 |
+|    TOGI |                     TURNONGREEN, INC. |        |         3686885.2 |
+|    FRGT |            Freight Technologies, Inc. |   0.35 |          496350.5 |
+|    ZBAO |                Zhibao Technology Inc. |   0.09 |          450939.5 |
+|    DTCX |                     Datacentrex, Inc. |   1.91 |          234890.1 |
+|    NIXX |                           NIXXY, INC. |   0.34 |          233186.3 |
+|    ITXP |     INDEPENDENCE POWER HOLDINGS, INC. |        |          219558.0 |
+|    FSTJ |   First America Resources Corporation |        |          103313.8 |
+|    CIRC |                    CIRCLE8 GROUP INC. |   0.34 |          102017.4 |
+|    LDSN | APHOENITY INTERNATIONAL HOLDINGS INC. |        |           89155.4 |
+|    OPXS |          OPTEX SYSTEMS HOLDINGS, INC. |  10.42 |           86758.5 |
+|    SPRY |             ARS Pharmaceuticals, Inc. |   4.08 |           74221.0 |
+|    SNTL |                 SENTINEL HOLDINGS LTD |        |           68409.7 |
+|    NIHK |            VIDEO RIVER NETWORKS, INC. |        |           67601.1 |
+|    SNBH |         SENTIENT BRANDS HOLDINGS INC. |        |           66743.2 |
+|    SUIG |            SUI GROUP HOLDINGS LIMITED |   1.59 |           54977.7 |
+|     VHC |           VirnetX Holding Corporation |  10.36 |           51277.2 |
+|    GRCE |              Grace Therapeutics, Inc. |   2.12 |           50920.4 |
+|    GYRE |               Gyre Therapeutics, Inc. |   7.35 |           50025.3 |
+|    NEGG |                 Newegg Commerce, Inc. |  13.52 |           39160.8 |
+|    FDMT |       4D Molecular Therapeutics, Inc. |  14.47 |           38450.3 |
+|    BEAM |                Beam Therapeutics Inc. |  24.27 |           36087.4 |
+|     GNE |                     Genie Energy Ltd. |  15.92 |           26488.5 |
+|    SKYX |                  SKYX PLATFORMS CORP. |   1.23 |           26222.9 |
+|      TE |                        T1 Energy Inc. |   3.78 |           25572.8 |
+|    GXAI |                         Gaxos.ai Inc. |   0.57 |           24687.4 |
+|    CRSP |                CRISPR THERAPEUTICS AG |  54.23 |           23832.9 |
+|    CBIO |              CRESCENT BIOPHARMA, INC. |  13.99 |           23262.8 |
+|    PSQH |                    PSQ Holdings, Inc. |    5.3 |           22319.3 |
+|    QWTR |              QUEST WATER GLOBAL, INC. |        |           21705.8 |
+|    BGDE |              Big Digital Energy, Inc. |   5.76 |           21279.1 |
+|     CCG |                     Cheche Group Inc. |   11.3 |           20274.7 |
+|    ABTC |                American Bitcoin Corp. |    9.1 |           20094.8 |
+|    JOBY |                   Joby Aviation, Inc. |   6.32 |           19548.1 |
+|    HUBC |               HUB Cyber Security Ltd. |    1.9 |           19410.6 |
+|     RYM |                           RYTHM, Inc. |  21.76 |           19227.1 |
+|    MDEX |        MADISON     TECHNOLOGIES, INC. |        |           18648.1 |
+|    APCX |                AppTech Payments Corp. |        |           18188.6 |
+|    TGNT |                      TOTALIGENT, INC. |        |           17645.8 |
+|    GWAV |  GREENWAVE TECHNOLOGY SOLUTIONS, INC. |   2.39 |           16641.8 |
+|    NORD |         NORDICUS PARTNERS CORPORATION |        |           15977.8 |
+|    GSUN |   Golden Sun Technology Group Limited |   0.23 |           14496.0 |
+|    MVCO |                       METAVESCO, INC. |        |           14294.7 |
+|     UPC |          Universe Pharmaceuticals INC |   4.75 |           13394.2 |
+|     URG |                        UR-ENERGY INC. |   1.13 |           13271.5 |
+|    CRSF |                   Crisp Momentum Inc. |        |           12924.3 |
+|     NIO |                              NIO Inc. |   3.58 |           12160.2 |
+|    TKLF |             Tokyo Lifestyle Co., Ltd. |   1.64 |           11598.2 |
+|      UG |                 UNITED-GUARDIAN, INC. |   7.08 |           11512.5 |
+|    GCAN |         TRAFALGAR INTERNATIONAL, INC. |        |           11485.6 |

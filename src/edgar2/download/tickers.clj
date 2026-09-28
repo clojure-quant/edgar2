@@ -1,4 +1,4 @@
-(ns edgar2.tickers
+(ns edgar2.download.tickers
   "SEC company_tickers.json → listed ticker / CIK / name directory."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]

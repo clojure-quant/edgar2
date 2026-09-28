@@ -1,4 +1,4 @@
-(ns edgar2.facts.download
+(ns edgar2.download.facts
   (:require [clojure.java.io :as io])
   (:import [java.io FileOutputStream]
            [java.net URI]

@@ -1,24 +1,17 @@
 (ns edgar2.fsds
-  "SEC Financial Statement Data Sets (FSDS) — bulk 10-K overview."
+  "Analyze FSDS quarter zips into a bulk 10-K filer overview."
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
-            [edgar.core :as edgar]
-            [edgar.fsds :as dera]
-            [edgar2.tickers :as tickers])
+            [edgar2.download.fsds :as dl]
+            [edgar2.download.ticker-exchange :as exchanges]
+            [edgar2.download.tickers :as tickers])
   (:import [java.io BufferedReader InputStreamReader]
            [java.nio.charset StandardCharsets]
-           [java.time LocalDate]
            [java.util.zip ZipFile]))
 
-(def identity-header
-  (or (System/getenv "EDGAR_IDENTITY")
-      "clojure-quant edgar2 research@clojure-quant.org"))
-
 (def filer-info-path "data/filer-info.edn")
-(def fsds-dir "data/fsds")
-(def exchange-url "https://www.sec.gov/files/company_tickers_exchange.json")
 
 (def revenue-tags
   ["RevenueFromContractWithCustomerExcludingAssessedTax"
@@ -184,33 +177,6 @@
         (afs-labels (str/upper-case (last (str/split (str afs) #"-"))))
         (str afs))))
 
-(defn recent-quarters
-  "Calendar quarters newest-first, starting at the current quarter."
-  [n]
-  (let [today (LocalDate/now)]
-    (loop [y (.getYear today)
-           q (inc (quot (dec (.getMonthValue today)) 3))
-           acc []]
-      (if (>= (count acc) n)
-        acc
-        (recur (if (= q 1) (dec y) y)
-               (if (= q 1) 4 (dec q))
-               (conj acc [y q]))))))
-
-(defn download-fsds-quarter
-  [year quarter]
-  (let [path (str (io/file fsds-dir (str year "q" quarter ".zip")))]
-    (if (.exists (io/file path))
-      (do (println (format "  have %dq%d" year quarter))
-          path)
-      (try
-        (println (format "  download %dq%d …" year quarter))
-        (flush)
-        (dera/download-quarter! year quarter fsds-dir)
-        (catch Exception ex
-          (println (format "  skip %dq%d (%s)" year quarter (.getMessage ex)))
-          nil)))))
-
 (defn reduce-zip-tsv
   [zip-path entry-name rf init]
   (with-open [zf (ZipFile. (str zip-path))]
@@ -312,16 +278,6 @@
   (or (fact-val facts adsh tags qtrs)
       (fact-val facts adsh tags nil)))
 
-(defn fetch-exchanges
-  "ticker → exchange from company_tickers_exchange.json (one request)."
-  []
-  (let [payload (edgar/edgar-get exchange-url)
-        fields (mapv keyword (:fields payload))]
-    (into {}
-          (for [row (:data payload)
-                :let [m (zipmap fields row)]]
-            [(str/upper-case (str (:ticker m))) (:exchange m)]))))
-
 (defn build-filer-info-row
   [filer sub facts exchange]
   (let [adsh (:adsh sub)
@@ -350,7 +306,7 @@
          clj -X:filer-info :limit 10"
   ([] (filer-info {}))
   ([{:keys [limit]}]
-   (e/init! identity-header)
+   (e/init! dl/identity-header)
    (e/enable-disk-cache! :dir "data/edgar-cache")
    (let [all (tickers/load-tickers)
          filers (vec (cond->> all limit (take (long limit))))
@@ -359,20 +315,15 @@
      (println (format "filer-info  overview from FSDS bulk files  %d filers  → %s"
                       n filer-info-path))
      (println "Downloading recent FSDS quarters (cached after the first run)…")
-     (let [zips (loop [qs (recent-quarters 8) acc []]
-                  (cond
-                    (or (>= (count acc) 4) (empty? qs)) acc
-                    :else
-                    (let [path (apply download-fsds-quarter (first qs))]
-                      (recur (rest qs) (cond-> acc path (conj path))))))]
+     (let [zips (dl/ensure-quarters!)]
        (when (empty? zips)
-         (throw (ex-info "No FSDS quarter zips available" {:dir fsds-dir})))
+         (throw (ex-info "No FSDS quarter zips available" {:dir dl/fsds-dir})))
        (println (format "Using %d quarter zip(s)" (count zips)))
        (let [subs (collect-10k-subs zips)
              facts (collect-overview-facts zips subs)
              exchanges (do (println "  fetch company_tickers_exchange.json")
                            (flush)
-                           (fetch-exchanges))
+                           (exchanges/fetch-exchanges))
              rows (mapv (fn [filer]
                           (build-filer-info-row
                            filer
