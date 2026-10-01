@@ -11,7 +11,7 @@
            [java.nio.charset StandardCharsets]
            [java.util.zip ZipFile]))
 
-(def filer-info-path "data/filer-info.edn")
+(def filer-info-path "data/fsds-universe.edn")
 
 (def revenue-tags
   ["RevenueFromContractWithCustomerExcludingAssessedTax"
@@ -29,6 +29,8 @@
 (def shares-tags ["EntityCommonStockSharesOutstanding"
                   "CommonStockSharesOutstanding"
                   "WeightedAverageNumberOfSharesOutstandingBasic"])
+
+(def adr-ratio-tags ["EntityListingDepositoryReceiptRatio"])
 
 (def overview-tags
   (set (concat revenue-tags employee-tags float-tags shares-tags)))
@@ -197,32 +199,37 @@
   [a b]
   (pos? (compare (str (:filed a)) (str (:filed b)))))
 
-(defn collect-10k-subs
-  "Latest 10-K submission per CIK from FSDS SUB tables."
+(def annual-forms #{"10-K" "20-F"})
+
+(defn collect-annual-subs
+  "Latest 10-K and 20-F per CIK from FSDS SUB tables.
+  Returns {\"10-K\" {cik sub} \"20-F\" {cik sub}}."
   [zip-paths]
   (reduce
-   (fn [by-cik zip-path]
+   (fn [by-form zip-path]
      (println (format "  parse SUB %s" (.getName (io/file zip-path))))
      (flush)
      (reduce-zip-tsv
       zip-path "sub.txt"
       (fn [acc row]
-        (if (or (not= "10-K" (str (:form row)))
-                (str/blank? (str (:cik row))))
-          acc
-          (let [cik (tickers/pad-cik (:cik row))
-                sub {:cik cik
-                     :adsh (:adsh row)
-                     :sic (sic-code (:sic row))
-                     :afs (:afs row)
-                     :fye (pad-fye (:fye row))
-                     :period (str (:period row))
-                     :filed (str (:filed row))}]
-            (if (or (nil? (get acc cik)) (newer-sub? sub (get acc cik)))
-              (assoc acc cik sub)
-              acc))))
-      by-cik))
-   {}
+        (let [form (str (:form row))]
+          (if (or (not (annual-forms form))
+                  (str/blank? (str (:cik row))))
+            acc
+            (let [cik (tickers/pad-cik (:cik row))
+                  sub {:cik cik
+                       :adsh (:adsh row)
+                       :sic (sic-code (:sic row))
+                       :afs (:afs row)
+                       :fye (pad-fye (:fye row))
+                       :period (str (:period row))
+                       :filed (str (:filed row))}]
+              (if (or (nil? (get-in acc [form cik]))
+                      (newer-sub? sub (get-in acc [form cik])))
+                (assoc-in acc [form cik] sub)
+                acc)))))
+      by-form))
+   {"10-K" {} "20-F" {}}
    zip-paths))
 
 (defn better-fact
@@ -241,10 +248,16 @@
       :else prev)))
 
 (defn collect-overview-facts
-  "NUM facts for the latest-10-K accessions only."
-  [zip-paths subs-by-cik]
-  (let [period-by-adsh (into {} (map (juxt :adsh :period) (vals subs-by-cik)))
-        wanted (set (keys period-by-adsh))]
+  "NUM facts for the latest 10-K accessions, plus the ADR ratio from the
+  latest 20-F. Segmented facts are skipped, so a class-specific ratio does
+  not replace the cover-page ratio."
+  [zip-paths tenk-by-cik twentyf-by-cik]
+  (let [period-by-adsh (into {} (map (juxt :adsh :period)
+                                     (concat (vals tenk-by-cik)
+                                             (vals twentyf-by-cik))))
+        tenk-adsh (set (map :adsh (vals tenk-by-cik)))
+        twentyf-adsh (set (map :adsh (vals twentyf-by-cik)))
+        adr-tags (set adr-ratio-tags)]
     (reduce
      (fn [facts zip-path]
        (println (format "  parse NUM %s" (.getName (io/file zip-path))))
@@ -253,9 +266,10 @@
         zip-path "num.txt"
         (fn [acc row]
           (let [adsh (:adsh row)
-                tag (:tag row)]
-            (if (or (not (wanted adsh))
-                    (not (overview-tags tag))
+                tag (:tag row)
+                wanted (or (and (tenk-adsh adsh) (overview-tags tag))
+                           (and (twentyf-adsh adsh) (adr-tags tag)))]
+            (if (or (not wanted)
                     (not (str/blank? (str (:coreg row))))
                     (not (str/blank? (str (:segments row)))))
               acc
@@ -279,7 +293,7 @@
       (fact-val facts adsh tags nil)))
 
 (defn build-filer-info-row
-  [filer sub facts exchange]
+  [filer sub twentyf facts exchange]
   (let [adsh (:adsh sub)
         sic (:sic sub)]
     {:ticker (:ticker filer)
@@ -296,7 +310,8 @@
      :last-10k-revenue (fact-val* facts adsh revenue-tags 4)
      :employees (some-> (fact-val* facts adsh employee-tags 0) long)
      :public-float (fact-val* facts adsh float-tags 0)
-     :shares-outstanding (some-> (fact-val* facts adsh shares-tags 0) long)}))
+     :shares-outstanding (some-> (fact-val* facts adsh shares-tags 0) long)
+     :adr-ratio (fact-val* facts (:adsh twentyf) adr-ratio-tags 0)}))
 
 (defn filer-info
   "Build an overview of all primary filers from a few SEC bulk files
@@ -319,20 +334,23 @@
        (when (empty? zips)
          (throw (ex-info "No FSDS quarter zips available" {:dir dl/fsds-dir})))
        (println (format "Using %d quarter zip(s)" (count zips)))
-       (let [subs (collect-10k-subs zips)
-             facts (collect-overview-facts zips subs)
+       (let [subs (collect-annual-subs zips)
+             tenk (get subs "10-K")
+             twentyf (get subs "20-F")
+             facts (collect-overview-facts zips tenk twentyf)
              exchanges (do (println "  fetch company_tickers_exchange.json")
                            (flush)
                            (exchanges/fetch-exchanges))
              rows (mapv (fn [filer]
                           (build-filer-info-row
                            filer
-                           (get subs (:cik filer))
+                           (get tenk (:cik filer))
+                           (get twentyf (:cik filer))
                            facts
                            (get exchanges (:ticker filer))))
                         filers)]
          (doseq [[i row] (map-indexed vector rows)]
-           (println (format "%d/%d  %s  %s  %s  10-K=%s  period=%s  rev=%s  sic=%s  %s  shares=%s  emp=%s"
+           (println (format "%d/%d  %s  %s  %s  10-K=%s  period=%s  rev=%s  sic=%s  %s  shares=%s  emp=%s  adr=%s"
                             (inc i) (or limit total)
                             (:ticker row) (:cik row) (:name row)
                             (or (:last-10k-date row) "-")
@@ -341,13 +359,15 @@
                             (or (:sic row) "-")
                             (or (:exchange row) "-")
                             (or (:shares-outstanding row) "-")
-                            (or (:employees row) "-")))
+                            (or (:employees row) "-")
+                            (or (:adr-ratio row) "-")))
            (flush))
          (save-filer-info! rows)
          (when (.exists (io/file "data/filer-info.log.edn"))
            (io/delete-file "data/filer-info.log.edn" true))
-         (println (format "Wrote %s  (%d filers, %d with a 10-K in the FSDS window)"
+         (println (format "Wrote %s  (%d filers, %d with a 10-K, %d with an ADR ratio from a 20-F)"
                           filer-info-path
                           (count rows)
-                          (count (filter :last-10k-date rows))))
+                          (count (filter :last-10k-date rows))
+                          (count (filter :adr-ratio rows))))
          rows)))))

@@ -71,37 +71,50 @@
        (take n)
        vec))
 
+(defn cap-name
+  [s]
+  (let [s (str s)]
+    (if (> (count s) 30) (subs s 0 30) s)))
+
+(defn millions
+  [x]
+  (when (number? x)
+    (Math/round (/ (double x) 1.0e6))))
+
 (defn table-row
-  [r ks]
-  (cond-> (select-keys r (into [:ticker :entityName :price] ks))
+  [r]
+  (cond-> {:ticker (:ticker r)
+           :entityName (cap-name (:entityName r))}
     (number? (:price r))
-    (update :price #(->> % double (format "%.2f") Double/parseDouble))
-    (number? (:price-earnings r)) (update :price-earnings stats/round1)
-    (number? (:sales-growth-yoy r)) (update :sales-growth-yoy stats/round1)
-    (number? (:return-on-capital r)) (update :return-on-capital stats/round4)))
+    (assoc :price (->> (:price r) double (format "%.2f") Double/parseDouble))
+    (number? (:marketcap r)) (assoc :mc (millions (:marketcap r)))
+    (number? (:price-earnings r)) (assoc :pe (stats/round1 (:price-earnings r)))
+    (number? (:sales-growth-yoy r)) (assoc :s-yoy (stats/round1 (:sales-growth-yoy r)))
+    (number? (:return-on-capital r)) (assoc :roc (stats/round4 (:return-on-capital r)))
+    (number? (:dividend-yield r))
+    (assoc :dyld (format "%.1f" (double (:dividend-yield r))))))
 
 (defn print-screen
   [rows]
   (let [cheap (cheap-growth rows)
         growth (high-revenue-growth rows 50)
-        cheap-cols [:ticker :entityName :price
-                    :price-earnings :sales-growth-yoy :return-on-capital]
-        growth-cols [:ticker :entityName :price :sales-growth-yoy]]
+        cheap-cols [:ticker :entityName :price :mc :pe :s-yoy :roc :dyld]
+        growth-cols [:ticker :entityName :price :mc :s-yoy :dyld]]
     (println "Cheap growth")
     (println (format "  bottom 30%% PE (n=%d, PE <= %.1f, positive only)"
                      (:n-pe cheap) (double (:pe-cut cheap))))
-    (println (format "  top 30%% sales-growth-yoy (7y mean YoY; n=%d, >= %.1f%%)"
+    (println (format "  top 30%% s-yoy (7y mean YoY; n=%d, >= %.1f%%)"
                      (:n-growth cheap) (double (:growth-cut cheap))))
-    (println (format "  top 50%% return-on-capital (n=%d, >= %.2f%%)"
+    (println (format "  top 50%% roc (n=%d, >= %.2f%%)"
                      (:n-roc cheap) (* 100.0 (double (:roc-cut cheap)))))
     (println (format "  %d names" (count (:rows cheap))))
     (println)
-    (pprint/print-table cheap-cols (map #(table-row % cheap-cols) (:rows cheap)))
+    (pprint/print-table cheap-cols (map table-row (:rows cheap)))
     (println)
     (println "High revenue growth")
     (println "  50 names with the highest 7-year mean YoY sales-growth")
     (println)
-    (pprint/print-table growth-cols (map #(table-row % growth-cols) growth))))
+    (pprint/print-table growth-cols (map table-row growth))))
 
 (defn screen
   "Write screen.txt from data/stats.edn.

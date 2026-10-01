@@ -21,13 +21,26 @@
 
 (def filing-dir "data/filings")
 
+(def annual-form-names
+  ["10-K" "20-F" "40-F"])
+
+(defn annual-form
+  "10-K, or 20-F / 40-F when that is the annual report."
+  [cik]
+  (or (some (fn [form]
+              (when (seq (e/filings cik :form form :limit 1))
+                form))
+            annual-form-names)
+      "10-K"))
+
 (defn resolve-filer
   [ticker]
   (let [mapped (e/cik ticker)
-        annuals (e/filings mapped :form "10-K" :limit 1)]
-    (if (seq annuals)
-      mapped
-      operating-cik)))
+        t (str/upper-case (str ticker))]
+    (cond
+      (some #(seq (e/filings mapped :form % :limit 1)) annual-form-names) mapped
+      (= t "XOM") operating-cik
+      :else mapped)))
 
 (defn fye-month
   "Month (\"06\", \"12\") from SEC :fiscal-year-end (\"0630\") or an :end date."
@@ -72,12 +85,26 @@
 
 (defn annual-statement-rows
   "Full-year income-statement fact rows (quarterly repeats removed)."
-  [cik fiscal-year-end]
-  (let [rows (ds/mapseq-reader (e/income cik :form "10-K" :view :standardized))
+  ([cik fiscal-year-end]
+   (annual-statement-rows cik fiscal-year-end "10-K"))
+  ([cik fiscal-year-end form]
+   (let [rows (ds/mapseq-reader (e/income cik :form form :view :standardized))
+         mm (or (fye-month fiscal-year-end)
+                (fye-month (some->> rows (map :end) (map str) sort last)))]
+     (->> rows
+          (filter annual-duration?)
+          (filter #(fiscal-period-end? (:end %) mm))))))
+
+(defn annual-balance-rows
+  "Year-end balance-sheet fact rows (instant FY / annual form)."
+  [cik fiscal-year-end form]
+  (let [rows (ds/mapseq-reader (e/balance cik :form form :view :standardized))
         mm (or (fye-month fiscal-year-end)
-               (fye-month (some->> rows (map :end) (map str) sort last)))]
+               (fye-month (some->> rows (map :end) (map str) sort last)))
+        forms #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"}]
     (->> rows
-         (filter annual-duration?)
+         (filter #(or (= "FY" (:fp %))
+                      (forms (str (:form %)))))
          (filter #(fiscal-period-end? (:end %) mm)))))
 
 (defn annual-line-values
@@ -237,6 +264,25 @@
    "Shares Basic"
    "Shares Diluted"])
 
+(def bs-column-order
+  "Main balance-sheet lines only."
+  ["Cash and Equivalents"
+   "Accounts Receivable"
+   "Inventory"
+   "Current Assets"
+   "PP&E Net"
+   "Total Assets"
+   "Accounts Payable"
+   "Current Debt"
+   "Current Portion of Long-Term Debt"
+   "Short-Term Borrowings"
+   "Current Liabilities"
+   "Long-Term Debt"
+   "Total Liabilities"
+   "Stockholders Equity"
+   "Total Equity"
+   "Total Liabilities and Equity"])
+
 (defn pl-scale
   "USD and share counts → millions. EPS stays in dollars."
   [line-item val]
@@ -273,47 +319,61 @@
                        ends)]
     (assoc by-item "Operating Expenses" filled)))
 
-(defn pl
-  "Print every standardized income-statement line for the last `:years`.
+(defn field-row
+  [item by-item ends year-cols]
+  (into {:field item}
+        (map (fn [end year]
+               [year (pl-scale item (get (by-item item) end))])
+             ends
+             year-cols)))
 
-  Usage: clj -X:pl :ticker MSFT :years 20"
-  ([] (pl {}))
+(defn financials
+  "Print standardized P&L and main balance-sheet lines for the last `:years`.
+
+  Usage: clj -X:financials :ticker IMPP :years 20"
+  ([] (financials {}))
   ([m]
    (let [{:keys [ticker n]} (opts m)]
      (ensure-identity!)
      (let [cik (resolve-filer ticker)
            meta (e/company-metadata cik)
-           annual (annual-statement-rows cik (:fiscal-year-end meta))
+           form (annual-form cik)
+           annual (annual-statement-rows cik (:fiscal-year-end meta) form)
+           bs (annual-balance-rows cik (:fiscal-year-end meta) form)
            items (vec (distinct (map :line-item annual)))
-           by-item* (into {} (for [item items]
-                               [item (annual-line-values annual item)]))
-           ends (->> (or (keys (by-item* "Revenue"))
+           by-pl* (into {} (for [item items]
+                             [item (annual-line-values annual item)]))
+           by-bs (into {} (for [item (distinct (map :line-item bs))]
+                            [item (annual-line-values bs item)]))
+           ends (->> (or (keys (by-pl* "Revenue"))
+                         (keys (by-bs "Total Assets"))
                          (map #(str (:end %)) annual))
                      distinct
                      sort
                      reverse
                      (take n)
                      sort)
-           by-item (with-derived-opex by-item* ends)
+           by-pl (with-derived-opex by-pl* ends)
            items (cond-> items
-                   (seq (by-item "Operating Expenses"))
+                   (seq (by-pl "Operating Expenses"))
                    (as-> xs (vec (distinct (conj xs "Operating Expenses")))))
            year-cols (mapv #(subs (str %) 0 4) ends)
            print-cols (into [:field] year-cols)
-           item-order (concat (filter (set items) pl-column-order)
-                              (sort (remove (set pl-column-order) items)))
-           rows (map (fn [item]
-                       (into {:field item}
-                             (map (fn [end year]
-                                    [year (pl-scale item (get (by-item item) end))])
-                                  ends
-                                  year-cols)))
-                     item-order)
+           pl-items (concat (filter (set items) pl-column-order)
+                            (sort (remove (set pl-column-order) items)))
+           bs-items (filter (fn [item]
+                              (some #(get (by-bs item) %) ends))
+                            bs-column-order)
+           blank (into {:field ""} (map (fn [year] [year nil]) year-cols))
+           rows (concat (map #(field-row % by-pl ends year-cols) pl-items)
+                        [blank]
+                        (map #(field-row % by-bs ends year-cols) bs-items))
            ds (ds/->dataset rows
-                            {:dataset-name (str ticker " P&L ($ millions; EPS in $)")
+                            {:dataset-name (str ticker " financials ($ millions; EPS in $)")
                              :column-order print-cols})]
        (println)
-       (println (str ticker " P&L ($ millions; EPS in $)"))
+       (println (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
+                        ticker (:name meta) cik form))
        (pprint/print-table print-cols rows)
        ds))))
 

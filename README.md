@@ -18,10 +18,10 @@ Print Apple’s last three years of annual income-statement figures:
 clj -X:report :ticker AAPL :years 3
 ```
 
-Print every income-statement line for Microsoft (last 20 fiscal years):
+Print P&L and main balance-sheet lines (last 20 fiscal years; 10-K, 20-F, or 40-F):
 
 ```bash
-clj -X:pl :ticker MSFT :years 20
+clj -X:financials :ticker IMPP :years 20
 ```
 
 Print last year’s income-statement lines with XBRL tags:
@@ -48,7 +48,7 @@ Download listing venue per ticker (`data/ticker-exchange.edn`, one main ticker p
 clj -X:download-exchanges
 ```
 
-Build a fast all-filer overview (`data/filer-info.edn`) from a few SEC **bulk** files (latest FSDS quarters + the exchange list) — not one HTTP call per company. Full statements and 10-K text stay on the per-ticker aliases.
+Build a fast all-filer overview (`data/fsds-universe.edn`) from a few SEC **bulk** files (latest FSDS quarters + the exchange list) — not one HTTP call per company. Each row includes `:adr-ratio` from the latest 20-F when that filing tagged `EntityListingDepositoryReceiptRatio` (ordinary shares per ADR). Full statements and 10-K text stay on the per-ticker aliases.
 
 ```bash
 clj -X:filer-info
@@ -62,7 +62,7 @@ clj -X:universe
 clj -X:universe :force true
 ```
 
-From `universe.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on capital (Net Income / assets), `:shares`, `:price`, `:marketcap` (price × shares), `:price-sales` (market cap / revenue), and `:price-earnings` (market cap / Net Income).
+From `universe.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on capital (Net Income / assets), `:shares`, `:price`, `:marketcap` (price × shares), `:price-sales` (USD market cap / USD revenue), `:price-earnings` (USD price / USD EPS, else USD market cap / USD Net Income), and `:dividend-yield` (USD dividend per share / price, %).
 
 ```bash
 clj -X:stats

@@ -28,11 +28,20 @@
   [cik]
   (format "%010d" (Long/parseLong (str cik))))
 
+(defn unit-name
+  "Keep USD/shares as USD/shares; jsonista turns that key into a namespaced keyword."
+  [unit]
+  (cond
+    (string? unit) unit
+    (and (keyword? unit) (namespace unit)) (str (namespace unit) "/" (name unit))
+    (keyword? unit) (name unit)
+    :else (str unit)))
+
 (defn concept-observations
-  "Fact rows with :unit taken from the companyfacts units key (USD, JPY, COP, shares)."
+  "Fact rows with :unit taken from the companyfacts units key (USD, JPY, COP, USD/shares)."
   [facts taxonomy tag]
   (mapcat (fn [[unit obs]]
-            (let [u (if (keyword? unit) (name unit) (str unit))]
+            (let [u (unit-name unit)]
               (map #(assoc % :unit u) obs)))
           (get-in facts [taxonomy tag :units])))
 

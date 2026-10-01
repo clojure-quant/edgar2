@@ -17,18 +17,55 @@
 
 (def exchanges-path "data/ticker-exchange.edn")
 
+(def category-words
+  "Fund, Trust, and Preferred. The rightmost match in the name wins, so
+  \"Preferred Income Fund\" is a Fund and \"Funds Trust\" is a Trust."
+  [["Fund" #"(?i)\bFunds?\b"]
+   ["Trust" #"(?i)\bTrust\b"]
+   ["Preferred" #"(?i)\bPreferred\b"]])
+
+(defn name-category
+  "ADR, ETF, Trust, Fund, or Preferred from the SEC registrant name.
+  Nil when the name says none of those.
+
+  `/ADR` (also `/ ADR` and `/ADR/`) is an ADR even when the issuer is a trust.
+  The word ETF is an ETF, including \"Trust ETF\" and \"ETF Trust\"."
+  [name]
+  (let [s (str name)]
+    (cond
+      (re-find #"(?i)/\s*ADR\b" s) "ADR"
+      (re-find #"(?i)\bETF\b" s) "ETF"
+      :else
+      (->> category-words
+           (keep (fn [[label re]]
+                   (let [m (re-matcher re s)]
+                     (when (.find m)
+                       [(.start m) label]))))
+           (sort-by first)
+           last
+           second))))
+
+(defn with-category
+  [{:keys [ticker cik name exchange]}]
+  {:ticker ticker
+   :cik cik
+   :name name
+   :category (name-category name)
+   :exchange exchange})
+
 (defn fetch-exchange-rows
-  "SEC company_tickers_exchange.json → seq of {:ticker :cik :name :exchange}."
+  "SEC company_tickers_exchange.json → seq of {:ticker :cik :name :category :exchange}."
   []
   (let [payload (edgar/edgar-get exchange-url)
         fields (mapv keyword (:fields payload))]
     (->> (:data payload)
          (map (fn [row]
                 (let [m (zipmap fields row)]
-                  {:ticker (str/upper-case (str (:ticker m)))
-                   :cik (tickers/pad-cik (:cik m))
-                   :name (:name m)
-                   :exchange (:exchange m)})))
+                  (with-category
+                    {:ticker (str/upper-case (str (:ticker m)))
+                     :cik (tickers/pad-cik (:cik m))
+                     :name (:name m)
+                     :exchange (:exchange m)}))))
          (sort-by :ticker)
          vec)))
 
@@ -85,6 +122,7 @@
      (println (format "SEC ticker exchanges: %d symbols → %d listed primary (from %s)"
                       (count all) (count rows) exchange-url))
      (println "venues" (sort-by val > by-ex))
+     (println "categories" (sort-by val > (frequencies (map :category rows))))
      (println (format "Wrote %s" exchanges-path))
      (println)
      (pprint/print-table [:ticker :cik :name :exchange] (take 25 rows))

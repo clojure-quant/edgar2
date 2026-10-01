@@ -22,6 +22,19 @@
    [:ifrs-full :ProfitLoss]
    [:ifrs-full :ProfitLossAttributableToOwnersOfParent]])
 
+(def eps-tags
+  [[:us-gaap :EarningsPerShareDiluted]
+   [:us-gaap :EarningsPerShareBasic]
+   [:ifrs-full :DilutedEarningsLossPerShare]
+   [:ifrs-full :BasicEarningsLossPerShare]
+   [:ifrs-full :BasicAndDilutedEarningsLossPerShare]])
+
+(def dps-tags
+  [[:us-gaap :CommonStockDividendsPerShareDeclared]
+   [:us-gaap :CommonStockDividendsPerShareCashPaid]
+   [:us-gaap :CommonStockDividendsPerShare]
+   [:ifrs-full :DividendsPaidOrdinaryShares]])
+
 (def asset-tags
   [[:us-gaap :Assets]
    [:ifrs-full :Assets]])
@@ -135,11 +148,41 @@
   (when (and (number? num) (number? den) (not (zero? (double den))))
     (/ (double num) (double den))))
 
+(defn usd-unit?
+  "True for USD or USD/shares (US listing price is in dollars)."
+  [u]
+  (let [s (str/upper-case (str u))]
+    (or (= s "USD")
+        (str/starts-with? s "USD/"))))
+
+(defn latest-obs
+  [series]
+  (when (seq series)
+    (last series)))
+
+(defn annual-eps
+  "Latest annual diluted/basic EPS series (do not force the revenue unit)."
+  [facts]
+  (let [flows (first-annual-flows facts eps-tags nil)]
+    (if (seq flows)
+      flows
+      (annual-stocks facts eps-tags nil))))
+
+(defn annual-dps
+  "Latest annual common dividend per share."
+  [facts]
+  (let [flows (first-annual-flows facts dps-tags nil)]
+    (if (seq flows)
+      flows
+      (annual-stocks facts dps-tags nil))))
+
 (defn company-stats
   [facts {:keys [revenue-unit] :as row}]
   (let [rev (annual-flows facts universe/revenue-tags revenue-unit)
         ni (first-annual-flows facts net-income-tags revenue-unit)
         assets (annual-stocks facts asset-tags revenue-unit)
+        eps (latest-obs (annual-eps facts))
+        dps (latest-obs (annual-dps facts))
         growth (avg-sales-growth rev sales-growth-window)
         margin (latest-aligned ni rev)
         roc (latest-aligned ni assets)]
@@ -155,7 +198,15 @@
       roc
       (assoc :return-on-capital (ratio (:num roc) (:den roc))
              :assets (:den roc)
-             :roc-end (:end roc)))))
+             :roc-end (:end roc))
+      (and eps (number? (:val eps)))
+      (assoc :eps (:val eps)
+             :eps-unit (:unit eps)
+             :eps-end (:end eps))
+      (and dps (number? (:val dps)))
+      (assoc :dps (:val dps)
+             :dps-unit (:unit dps)
+             :dps-end (:end dps)))))
 
 (defn load-price-by-ticker
   "ticker → close from data/prices.edn."
@@ -166,22 +217,35 @@
              (price/load-prices))))
 
 (defn with-valuation
-  "Add :shares (from universe), :price (from prices.edn), :marketcap,
-  :price-sales (market cap / revenue), and :price-earnings (market cap / Net Income)."
+  "Add :shares, :price, :marketcap, :price-sales, and :price-earnings.
+  PE is price / USD EPS, else USD market cap / USD Net Income — never mix
+  a dollar price with ARS/JPY/etc. earnings."
   [st price-by-ticker shares]
   (let [price (get price-by-ticker (str/upper-case (str (:ticker st))))
         mcap (when (and price (number? shares))
                (* (double price) (double shares)))
         rev (when (number? (:revenue st)) (:revenue st))
-        ni (when (number? (:net-profit st)) (:net-profit st))]
+        ni (when (number? (:net-profit st)) (:net-profit st))
+        eps (when (number? (:eps st)) (:eps st))
+        usd-eps? (usd-unit? (:eps-unit st))
+        usd-pl? (usd-unit? (:revenue-unit st))
+        dps (when (number? (:dps st)) (:dps st))
+        usd-dps? (usd-unit? (:dps-unit st))
+        pe (cond
+             (and price (number? eps) usd-eps? (not (zero? (double eps))))
+             (/ (double price) (double eps))
+             (and mcap usd-pl? (number? ni) (not (zero? (double ni))))
+             (/ mcap (double ni)))
+        dy (when (and price (pos? (double price)) (number? dps) usd-dps?)
+             (* 100.0 (/ (double dps) (double price))))]
     (cond-> st
       (number? shares) (assoc :shares shares)
       price (assoc :price price)
       mcap (assoc :marketcap mcap)
-      (and mcap rev (not (zero? (double rev))))
+      (and mcap usd-pl? rev (not (zero? (double rev))))
       (assoc :price-sales (/ mcap (double rev)))
-      (and mcap ni (not (zero? (double ni))))
-      (assoc :price-earnings (/ mcap (double ni))))))
+      pe (assoc :price-earnings pe)
+      dy (assoc :dividend-yield dy))))
 
 (defn load-universe
   []
@@ -203,10 +267,12 @@
    :shares :marketcap
    :revenue :revenue-unit
    :net-profit
+   :eps
    :assets
    :sales-growth-yoy
    :return-on-capital
-   :price-earnings])
+   :price-earnings
+   :dividend-yield])
 
 (defn select-fields
   "Map with `ks` first (present keys only); remaining keys last, sorted."
@@ -243,7 +309,7 @@
   "From data/universe.edn + companyfacts.zip + prices.edn, write data/stats.edn
   with 7-year mean YoY sales growth (%), profit margin, return on capital
   (Net Income / assets), plus :shares, :price, :marketcap, :price-sales,
-  and :price-earnings (market cap / Net Income).
+  and :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income).
 
   Usage: clj -X:stats
          clj -X:stats :limit 25"
