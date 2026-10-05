@@ -1,9 +1,9 @@
-(ns edgar2.screen
+(ns edgar2.report.screen
   "Text screens from data/stats.edn → screen.txt."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.pprint :as pprint]
-            [edgar2.stats :as stats]))
+            [edgar2.report.stats :as stats]))
 
 (def screen-path "screen.txt")
 

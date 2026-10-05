@@ -1,4 +1,4 @@
-(ns edgar2.core
+(ns edgar2.filing
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [edgar.download :as dl]

@@ -1,4 +1,4 @@
-(ns edgar2.universe
+(ns edgar2.download.custom.universe
   "Companyfacts extract joined to listed ticker / exchange by CIK."
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]

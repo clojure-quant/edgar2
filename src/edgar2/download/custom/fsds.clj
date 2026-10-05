@@ -1,4 +1,4 @@
-(ns edgar2.fsds
+(ns edgar2.download.custom.fsds
   "Analyze FSDS quarter zips into a bulk 10-K filer overview."
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
@@ -11,7 +11,7 @@
            [java.nio.charset StandardCharsets]
            [java.util.zip ZipFile]))
 
-(def filer-info-path "data/fsds-universe.edn")
+(def filer-info-path "data/universe-fsds.edn")
 
 (def revenue-tags
   ["RevenueFromContractWithCustomerExcludingAssessedTax"

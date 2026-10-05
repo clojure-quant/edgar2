@@ -1,4 +1,4 @@
-(ns edgar2.stats
+(ns edgar2.report.stats
   "Universe fundamentals from companyfacts.zip: sales growth, margin, ROC."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
@@ -8,7 +8,7 @@
             [edgar.api :as e]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
-            [edgar2.universe :as universe]
+            [edgar2.download.custom.universe :as universe]
             [jsonista.core :as json])
   (:import [java.time LocalDate]
            [java.time.temporal ChronoUnit]

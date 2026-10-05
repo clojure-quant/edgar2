@@ -2,24 +2,24 @@
  :deps {org.clojure/clojure {:mvn/version "1.12.1"}
         com.github.clojure-finance/edgarjure {:mvn/version "0.4.1"}}
  :aliases
- {:run {:main-opts ["-m" "edgar2.core"]}
-  :download {:exec-fn edgar2.core/download
+ {:run {:main-opts ["-m" "edgar2.filing"]}
+  :download {:exec-fn edgar2.filing/download
              :exec-args {:ticker "XOM" :years 5}}
-  :report {:exec-fn edgar2.core/report
+  :report {:exec-fn edgar2.filing/report
            :exec-args {:ticker "XOM" :years 5}}
-  :financials {:exec-fn edgar2.core/financials
+  :financials {:exec-fn edgar2.filing/financials
                :exec-args {:ticker "XOM" :years 5}}
-  :pl-fields {:exec-fn edgar2.core/pl-fields
+  :pl-fields {:exec-fn edgar2.filing/pl-fields
               :exec-args {:ticker "XOM"}}
-  :business {:exec-fn edgar2.core/business
+  :business {:exec-fn edgar2.filing/business
              :exec-args {:ticker "XOM"}}
   ; download
   :download-tickers {:exec-fn edgar2.download.tickers/download-tickers}
   :download-exchanges {:exec-fn edgar2.download.ticker-exchange/download-exchanges}
   :download-prices {:extra-deps {org.duckdb/duckdb_jdbc {:mvn/version "1.3.1.0"}}
                     :exec-fn edgar2.download.price/download-prices}
-  :filer-info {:exec-fn edgar2.fsds/filer-info}
+  :filer-info {:exec-fn edgar2.download.custom.fsds/filer-info}
   ; universe 
-  :universe {:exec-fn edgar2.universe/universe}
-  :stats {:exec-fn edgar2.stats/stats}
-  :screen {:exec-fn edgar2.screen/screen}}}
+  :universe {:exec-fn edgar2.download.custom.universe/universe}
+  :stats {:exec-fn edgar2.report.stats/stats}
+  :screen {:exec-fn edgar2.report.screen/screen}}}
