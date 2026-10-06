@@ -69,6 +69,41 @@
       [:a {:href (str "/filing/" ticker)}
        (str "Latest " (or form "annual report"))]]]))
 
+(def result-fields
+  "Subtotals drawn with a light green row."
+  #{"Gross Profit" "Operating Income" "Net Income"})
+
+(def asset-fields
+  "Cash and equivalents through total assets."
+  #{"Cash and Equivalents"
+    "Accounts Receivable"
+    "Inventory"
+    "Current Assets"
+    "PP&E Net"
+    "Total Assets"})
+
+(def passive-fields
+  "Accounts payable through total liabilities and equity."
+  #{"Accounts Payable"
+    "Current Debt"
+    "Current Portion of Long-Term Debt"
+    "Short-Term Borrowings"
+    "Current Liabilities"
+    "Long-Term Debt"
+    "Total Liabilities"
+    "Stockholders Equity"
+    "Total Equity"
+    "Total Liabilities and Equity"})
+
+(defn- row-class
+  [field rule?]
+  (cond
+    rule? "fin-above-rule"
+    (= field "Gross Profit") "fin-result fin-gross"
+    (result-fields field) "fin-result"
+    (asset-fields field) "fin-asset"
+    (passive-fields field) "fin-passive"))
+
 (defn- financials-table
   [{:keys [columns rows]}]
   [:div.table-wrap
@@ -80,12 +115,22 @@
               :class (when-not (= col :field) "num")}
          (str col)])]]
     [:tbody
-     (for [[i row] (map-indexed vector rows)]
-       [:tr {:key i}
-        (for [col columns]
-          [:td {:key (str col)
-                :class (when-not (= col :field) "num")}
-           (cell (get row col))])])]]])
+     (mapcat
+      (fn [[i row]]
+        (let [field (:field row)
+              next-field (:field (nth rows (inc i) nil))
+              ;; Revenue − cost of revenue. Two rules sit between those rows.
+              rule? (and (= field "Cost of Revenue") (= next-field "Gross Profit"))
+              class (row-class field rule?)]
+          (cond-> [[:tr (cond-> {:key i}
+                          class (assoc :class class))
+                    (for [col columns]
+                      [:td {:key (str col)
+                            :class (when-not (= col :field) "num")}
+                       (cell (get row col))])]]
+            rule? (conj [:tr.fin-double-rule {:key (str "rule-" i)}
+                         [:td {:colspan (count columns)}]]))))
+      (map-indexed vector rows))]]])
 
 (defn- go-financials!
   "Open financials for a ticker and year count. Years stay in the path so

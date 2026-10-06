@@ -142,6 +142,21 @@
   (when (seq xs)
     (/ (double (reduce + xs)) (count xs))))
 
+(defn direction-score
+  "Share of years that did not fall versus the prior year, from 0 to 100.
+
+  Each annual value after the first scores 1 when value − prior >= 0,
+  otherwise 0. The score is 100 times that count divided by the number of
+  year-to-year steps. The first year has no prior year, so it is omitted."
+  [series]
+  (let [vals (mapv :val series)
+        steps (keep (fn [[prev cur]]
+                      (when (and (number? prev) (number? cur))
+                        (if (>= (double cur) (double prev)) 1 0)))
+                    (map vector vals (rest vals)))]
+    (when (seq steps)
+      (* 100.0 (/ (double (reduce + steps)) (count steps))))))
+
 (defn avg-sales-growth
   "Mean of the last `n` year-over-year revenue changes (%)."
   [revenue-annual n]
@@ -351,7 +366,10 @@
         last-end (later-end (some-> (latest-obs rev) :end str) bs-end)
         eps (latest-obs (annual-eps facts))
         dps (annual-dps facts last-end revenue-unit)
+        oi (annual-flows facts ebit-tags revenue-unit)
         growth (avg-sales-growth rev sales-growth-window)
+        rev-score (direction-score rev)
+        oi-score (direction-score oi)
         margin (latest-aligned ni rev)
         roc (latest-aligned ni assets)
         debt (interest-bearing-debt facts revenue-unit bs-end)
@@ -364,6 +382,8 @@
       (:sales-growth-yoy growth)
       (assoc :sales-growth-yoy (:sales-growth-yoy growth)
              :sales-growth-years (:sales-growth-years growth))
+      (number? rev-score) (assoc :revenue-score rev-score)
+      (number? oi-score) (assoc :operating-income-score oi-score)
       margin
       (assoc :profit-margin (ratio (:num margin) (:den margin))
              :net-profit (:num margin)
@@ -463,6 +483,8 @@
    :eps
    :assets
    :sales-growth-yoy
+   :revenue-score
+   :operating-income-score
    :return-on-capital
    :price-earnings
    :dividend-yield
@@ -509,7 +531,8 @@
   (Net Income / assets), plus :shares, :price, :marketcap, :price-sales,
   :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
-  and :ev-ebit.
+  :ev-ebit, :revenue-score, and :operating-income-score
+  (0–100 share of annual years that did not fall versus the prior year).
 
   Usage: clj -X:stats
          clj -X:stats :limit 25"
@@ -566,7 +589,7 @@
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  rev-score=%d  oi-score=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
@@ -576,5 +599,7 @@
                               (count (filter :marketcap out))
                               (count (filter :price-earnings out))
                               (count (filter :enterprise-value out))
-                              (count (filter :ev-ebit out))))
+                              (count (filter :ev-ebit out))
+                              (count (filter :revenue-score out))
+                              (count (filter :operating-income-score out))))
              out)))))))

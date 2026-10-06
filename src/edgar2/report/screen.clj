@@ -1,11 +1,11 @@
 (ns edgar2.report.screen
-  "Text screens from data/stats.edn → screen.txt."
+  "Text screens from data/stats.edn → data/screen.txt."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [edgar2.report.stats :as stats]))
 
-(def screen-path "screen.txt")
+(def screen-path "data/screen.txt")
 
 (defn load-stats
   []
@@ -76,6 +76,39 @@
   [rows]
   (cheap-growth-on rows :ev-ebit #(and (number? (:ebit %)) (pos? (double (:ebit %))))))
 
+(defn cheap-consistent
+  "Bottom 30% PE (positive only), top 30% revenue-score, top 30% operating-income-score."
+  [rows]
+  (let [with-pe (filter #(and (number? (:price-earnings %))
+                              (pos? (double (:price-earnings %))))
+                        rows)
+        with-rev (filter #(number? (:revenue-score %)) rows)
+        with-oi (filter #(number? (:operating-income-score %)) rows)
+        pe-cut (when (seq with-pe) (cutoff-max-bottom (numeric :price-earnings with-pe) 0.30))
+        rev-cut (when (seq with-rev) (cutoff-min-top (numeric :revenue-score with-rev) 0.30))
+        oi-cut (when (seq with-oi) (cutoff-min-top (numeric :operating-income-score with-oi) 0.30))
+        hits (if (and pe-cut rev-cut oi-cut)
+               (->> rows
+                    (filter (fn [r]
+                              (and (number? (:price-earnings r))
+                                   (pos? (double (:price-earnings r)))
+                                   (number? (:revenue-score r))
+                                   (number? (:operating-income-score r))
+                                   (<= (double (:price-earnings r)) pe-cut)
+                                   (>= (double (:revenue-score r)) rev-cut)
+                                   (>= (double (:operating-income-score r)) oi-cut))))
+                    (sort-by (juxt :price-earnings
+                                   (comp - :revenue-score)
+                                   (comp - :operating-income-score))))
+               [])]
+    {:cut pe-cut
+     :rev-cut rev-cut
+     :oi-cut oi-cut
+     :n-cheap (count with-pe)
+     :n-rev (count with-rev)
+     :n-oi (count with-oi)
+     :rows hits}))
+
 (defn high-revenue-growth
   [rows n]
   (->> rows
@@ -105,6 +138,8 @@
     (number? (:price-earnings r)) (assoc :pe (stats/round1 (:price-earnings r)))
     (number? (:ev-ebit r)) (assoc :ev-ebit (stats/round1 (:ev-ebit r)))
     (number? (:sales-growth-yoy r)) (assoc :s-yoy (stats/round1 (:sales-growth-yoy r)))
+    (number? (:revenue-score r)) (assoc :rev-score (stats/round1 (:revenue-score r)))
+    (number? (:operating-income-score r)) (assoc :oi-score (stats/round1 (:operating-income-score r)))
     (number? (:return-on-capital r)) (assoc :roc (stats/round4 (:return-on-capital r)))
     (number? (:dividend-yield r))
     (assoc :dyld (format "%.1f" (double (:dividend-yield r))))))
@@ -128,8 +163,10 @@
   [rows]
   (let [cheap (cheap-growth rows)
         cheap-ev (cheap-growth-ev-ebit rows)
+        consistent (cheap-consistent rows)
         growth (high-revenue-growth rows 50)
         cheap-cols [:ticker :entityName :price :mc :ev :pe :ev-ebit :s-yoy :roc :dyld]
+        consistent-cols [:ticker :entityName :price :mc :pe :rev-score :oi-score :dyld]
         growth-cols [:ticker :entityName :price :mc :s-yoy :dyld]
         cheap-spec (fn [id title metric positive screen notes]
                      {:id id
@@ -143,6 +180,20 @@
                  "Cheap growth EV/EBIT" "EV/EBIT" "positive EBIT only" cheap-ev
                  ["  EV (USD millions) = market cap + interest-bearing debt + preferred + NCI - cash"
                   "  EBIT = operating income, else net income + interest + tax"])
+     {:id :cheap-consistent
+      :title "Cheap consistent"
+      :lines (if-not (:cut consistent)
+               ["  no positive PE"]
+               [(format "  bottom 30%% PE (n=%d, PE <= %.1f, positive only)"
+                        (:n-cheap consistent) (double (:cut consistent)))
+                (format "  top 30%% revenue-score (n=%d, >= %.1f)"
+                        (:n-rev consistent) (double (:rev-cut consistent)))
+                (format "  top 30%% operating-income-score (n=%d, >= %.1f)"
+                        (:n-oi consistent) (double (:oi-cut consistent)))
+                (format "  %d names" (count (:rows consistent)))])
+      :columns consistent-cols
+      :rows (mapv table-row (:rows consistent))
+      :table? (boolean (:cut consistent))}
      {:id :high-revenue-growth
       :title "High revenue growth"
       :lines ["  50 names with the highest 7-year mean YoY sales-growth"]
@@ -168,7 +219,7 @@
       (print-spec spec))))
 
 (defn screen
-  "Write screen.txt from data/stats.edn.
+  "Write data/screen.txt from data/stats.edn.
 
   Usage: clj -X:screen"
   ([] (screen {}))
