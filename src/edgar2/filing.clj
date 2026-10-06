@@ -107,8 +107,30 @@
                       (forms (str (:form %)))))
          (filter #(fiscal-period-end? (:end %) mm)))))
 
+(def dividends-paid-label "Dividends Paid")
+
+(def dividends-paid-concepts
+  "Total cash dividends. US-GAAP total, then common-only, then IFRS financing."
+  [[dividends-paid-label
+    "PaymentsOfDividends"
+    "PaymentsOfDividendsCommonStock"
+    "DividendsPaidClassifiedAsFinancingActivities"
+    "DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities"
+    "DividendsPaid"]])
+
+(defn annual-cashflow-rows
+  "Full-year cash-flow fact rows (quarterly repeats removed)."
+  [cik fiscal-year-end form concepts]
+  (let [rows (ds/mapseq-reader
+              (e/cashflow cik :form form :view :standardized :concepts concepts))
+        mm (or (fye-month fiscal-year-end)
+               (fye-month (some->> rows (map :end) (map str) sort last)))]
+    (->> rows
+         (filter annual-duration?)
+         (filter #(fiscal-period-end? (:end %) mm)))))
+
 (defn annual-line-values
-  "Map of period-end string → value for one income-statement line item."
+  "Map of period-end string → value for one statement line item."
   [rows line-item]
   (->> rows
        (filter #(= line-item (:line-item %)))
@@ -262,7 +284,8 @@
    "EPS Basic"
    "EPS Diluted"
    "Shares Basic"
-   "Shares Diluted"])
+   "Shares Diluted"
+   "Dividends Paid"])
 
 (def bs-column-order
   "Main balance-sheet lines only."
@@ -327,6 +350,17 @@
              ends
              year-cols)))
 
+(defn insert-after
+  "Place `row` immediately after the row whose :field is `field`.
+  Append when that field is missing. Leave rows unchanged when `row` is nil."
+  [rows field row]
+  (if-not row
+    (vec rows)
+    (let [idx (first (keep-indexed (fn [i r] (when (= field (:field r)) i)) rows))]
+      (if idx
+        (vec (concat (take (inc idx) rows) [row] (drop (inc idx) rows)))
+        (vec (concat rows [row]))))))
+
 (defn financials-data
   "Standardized P&L and main balance-sheet lines for the last `:years`.
 
@@ -339,6 +373,10 @@
           form (annual-form cik)
           annual (annual-statement-rows cik (:fiscal-year-end meta) form)
           bs (annual-balance-rows cik (:fiscal-year-end meta) form)
+          dividends (annual-line-values
+                     (annual-cashflow-rows cik (:fiscal-year-end meta) form
+                                           dividends-paid-concepts)
+                     dividends-paid-label)
           items (vec (distinct (map :line-item annual)))
           by-pl* (into {} (for [item items]
                             [item (annual-line-values annual item)]))
@@ -364,7 +402,14 @@
                              (some #(get (by-bs item) %) ends))
                            bs-column-order)
           blank (into {:field ""} (map (fn [year] [year nil]) year-cols))
-          rows (vec (concat (map #(field-row % by-pl ends year-cols) pl-items)
+          div-row (when (some #(get dividends %) ends)
+                    (field-row dividends-paid-label
+                               {dividends-paid-label dividends}
+                               ends year-cols))
+          pl-rows (insert-after (map #(field-row % by-pl ends year-cols) pl-items)
+                                "Shares Diluted"
+                                div-row)
+          rows (vec (concat pl-rows
                             [blank]
                             (map #(field-row % by-bs ends year-cols) bs-items)))]
       {:ticker ticker
