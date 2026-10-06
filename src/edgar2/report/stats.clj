@@ -29,10 +29,14 @@
    [:ifrs-full :BasicEarningsLossPerShare]
    [:ifrs-full :BasicAndDilutedEarningsLossPerShare]])
 
-(def dps-tags
-  [[:us-gaap :CommonStockDividendsPerShareDeclared]
-   [:us-gaap :CommonStockDividendsPerShareCashPaid]
-   [:us-gaap :CommonStockDividendsPerShare]
+(def dps-cash-tags
+  "Per-share cash dividend. Used when it falls on the last report date."
+  [[:us-gaap :CommonStockDividendsPerShareCashPaid]])
+
+(def dps-other-tags
+  "Other per-share dividends, used only when they fall on the last report date."
+  [[:us-gaap :CommonStockDividendsPerShare]
+   [:us-gaap :CommonStockDividendsPerShareDeclared]
    [:ifrs-full :DividendsPaidOrdinaryShares]])
 
 (def asset-tags
@@ -184,6 +188,26 @@
   (when (and (seq series) end)
     (get (by-end series) (str end))))
 
+(defn later-end
+  "Later of two period-end strings."
+  [a b]
+  (->> [a b] (remove str/blank?) sort last))
+
+(defn fact-at
+  "First annual fact among `tag-pairs` whose period-end is `end`."
+  [facts tag-pairs unit end]
+  (when-not (str/blank? (str end))
+    (some (fn [pair]
+            (some (fn [series]
+                    (when-let [v (value-at series end)]
+                      (when (number? v)
+                        {:val v
+                         :end (str end)
+                         :unit (:unit (some #(when (= (str end) (str (:end %))) %) series))})))
+                  [(annual-flows facts [pair] unit)
+                   (annual-stocks facts [pair] unit)]))
+          tag-pairs)))
+
 (defn approx=
   "True when a and b are within 2% or 1 unit (tag double-counts)."
   [a b]
@@ -264,56 +288,78 @@
     (some #(stock-at facts [%] unit end) cash-tag-pairs)))
 
 (defn annual-ebit
-  "Latest annual operating income, else net income + interest + tax
-  at the latest net-income period-end."
-  [facts unit]
-  (let [reported (latest-obs (best-annual-flows facts ebit-tags unit))]
-    (if (and reported (number? (:val reported)))
-      {:ebit (:val reported) :ebit-end (str (:end reported))}
-      (let [ni (latest-obs (first-annual-flows facts net-income-tags unit))
-            end (some-> ni :end str)
-            interest (value-at (best-annual-flows facts interest-expense-tags unit) end)
-            tax (value-at (best-annual-flows facts income-tax-tags unit) end)]
-        (when (and ni (number? (:val ni)) end
-                   (or (number? interest) (number? tax)))
-          {:ebit (+ (double (:val ni))
-                    (double (or interest 0))
-                    (double (or tax 0)))
-           :ebit-end end})))))
+  "Operating income at the last report `end`. Otherwise net income +
+  interest + tax at that same date."
+  [facts unit end]
+  (if-let [reported (fact-at facts ebit-tags unit end)]
+    {:ebit (:val reported) :ebit-end (:end reported)}
+    (let [ni (fact-at facts net-income-tags unit end)
+          interest (fact-at facts interest-expense-tags unit end)
+          tax (fact-at facts income-tax-tags unit end)]
+      (when (and ni (or interest tax))
+        {:ebit (+ (double (:val ni))
+                  (double (or (:val interest) 0))
+                  (double (or (:val tax) 0)))
+         :ebit-end (str end)}))))
+
+(defn flow-or-stock
+  [facts pair unit]
+  (let [flows (annual-flows facts [pair] unit)]
+    (if (seq flows)
+      flows
+      (annual-stocks facts [pair] unit))))
+
+(defn basic-if-diluted-older
+  "Basic series when its latest period-end is after diluted's."
+  [diluted basic]
+  (let [de (some-> (latest-obs diluted) :end str)
+        be (some-> (latest-obs basic) :end str)]
+    (cond
+      (and de be (neg? (compare de be))) basic
+      (seq diluted) diluted
+      (seq basic) basic)))
 
 (defn annual-eps
-  "Latest annual diluted/basic EPS series (do not force the revenue unit)."
+  "Latest annual EPS. Basic wins when diluted's period-end is older."
   [facts]
-  (let [flows (first-annual-flows facts eps-tags nil)]
-    (if (seq flows)
-      flows
-      (annual-stocks facts eps-tags nil))))
+  (or (basic-if-diluted-older
+       (flow-or-stock facts [:us-gaap :EarningsPerShareDiluted] nil)
+       (flow-or-stock facts [:us-gaap :EarningsPerShareBasic] nil))
+      (basic-if-diluted-older
+       (flow-or-stock facts [:ifrs-full :DilutedEarningsLossPerShare] nil)
+       (flow-or-stock facts [:ifrs-full :BasicEarningsLossPerShare] nil))
+      (seq (flow-or-stock facts [:ifrs-full :BasicAndDilutedEarningsLossPerShare] nil))
+      []))
 
 (defn annual-dps
-  "Latest annual common dividend per share."
-  [facts]
-  (let [flows (first-annual-flows facts dps-tags nil)]
-    (if (seq flows)
-      flows
-      (annual-stocks facts dps-tags nil))))
+  "Per-share dividend at the last report `end`. Cash paid wins. No fact
+  on that date is 0."
+  [facts end revenue-unit]
+  (or (fact-at facts dps-cash-tags nil end)
+      (fact-at facts dps-other-tags nil end)
+      (when end
+        {:val 0.0
+         :end (str end)
+         :unit (when (usd-unit? revenue-unit) "USD/shares")})))
 
 (defn company-stats
   [facts {:keys [revenue-unit] :as row}]
   (let [rev (annual-flows facts universe/revenue-tags revenue-unit)
         ni (first-annual-flows facts net-income-tags revenue-unit)
         assets (annual-stocks facts asset-tags revenue-unit)
+        bs-end (balance-sheet-end assets)
+        last-end (later-end (some-> (latest-obs rev) :end str) bs-end)
         eps (latest-obs (annual-eps facts))
-        dps (latest-obs (annual-dps facts))
+        dps (annual-dps facts last-end revenue-unit)
         growth (avg-sales-growth rev sales-growth-window)
         margin (latest-aligned ni rev)
         roc (latest-aligned ni assets)
-        bs-end (balance-sheet-end assets)
         debt (interest-bearing-debt facts revenue-unit bs-end)
         cash (cash-at facts revenue-unit bs-end)
         preferred (stock-at facts [[:us-gaap :PreferredStockValue]] revenue-unit bs-end)
         nci (or (stock-at facts [[:us-gaap :MinorityInterest]] revenue-unit bs-end)
                 (stock-at facts [[:ifrs-full :NoncontrollingInterests]] revenue-unit bs-end))
-        ebit (annual-ebit facts revenue-unit)]
+        ebit (annual-ebit facts revenue-unit last-end)]
     (cond-> (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
       (:sales-growth-yoy growth)
       (assoc :sales-growth-yoy (:sales-growth-yoy growth)
@@ -333,8 +379,9 @@
              :eps-end (:end eps))
       (and dps (number? (:val dps)))
       (assoc :dps (:val dps)
-             :dps-unit (:unit dps)
              :dps-end (:end dps))
+      (and dps (:unit dps))
+      (assoc :dps-unit (:unit dps))
       (number? debt) (assoc :debt debt :debt-end bs-end)
       (number? cash) (assoc :cash cash)
       (number? preferred) (assoc :preferred-stock preferred)
