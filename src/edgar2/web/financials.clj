@@ -3,6 +3,7 @@
             [hyper.core :as h]
             [hyper.effects :as effects]
             [edgar2.filing :as filing]
+            [edgar2.web.fsds :as fsds]
             [edgar2.web.nav :refer [nav]]))
 
 (def year-choices
@@ -31,6 +32,42 @@
 (defn- cell
   [v]
   (if (nil? v) "" (str v)))
+
+(def google-exchange
+  {"NYSE" "NYSE"
+   "Nasdaq" "NASDAQ"
+   "OTC" "OTCMKTS"
+   "CBOE" "CBOE"})
+
+(defn google-finance-url
+  [ticker exchange]
+  (let [t (str/upper-case (str ticker))
+        x (get google-exchange exchange)]
+    (if x
+      (str "https://www.google.com/finance/quote/" t ":" x)
+      (str "https://www.google.com/finance/quote/" t))))
+
+(defn- sector-line
+  "SIC code and description, shown under the company name."
+  [ticker]
+  (let [{:keys [sic sic-description]} (fsds/company ticker)
+        sector (str/trim (str/join " " (remove str/blank? [(str sic) sic-description])))]
+    (when (seq sector)
+      [:p.fin-header (str "Sector " sector)])))
+
+(defn- filing-links
+  "Google Finance and the cached annual-report link."
+  [ticker form]
+  (let [{:keys [exchange]} (fsds/company ticker)]
+    [:div.fin-extra
+     [:p
+      [:a {:href (google-finance-url ticker exchange)
+           :target "_blank"
+           :rel "noopener noreferrer"}
+       "Google Finance"]
+      " · "
+      [:a {:href (str "/filing/" ticker)}
+       (str "Latest " (or form "annual report"))]]]))
 
 (defn- financials-table
   [{:keys [columns rows]}]
@@ -110,5 +147,7 @@
                    [:p.fin-header
                     (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
                             (:ticker data) (:name data) (:cik data) (:form data))]
-                   (financials-table data)]
+                   (sector-line ticker)
+                   (financials-table data)
+                   (filing-links ticker (:form data))]
            nil)]))))

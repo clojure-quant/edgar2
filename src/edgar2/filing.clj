@@ -76,12 +76,18 @@
   (when-let [days (period-days (:start row) (:end row))]
     (<= 300 days 400)))
 
+(defn- latest-by-filed
+  "Row with the latest :filed. ISO dates compare as strings; `max-key`
+  only accepts numbers, so two facts for one period would throw."
+  [rows]
+  (last (sort-by #(str (:filed %)) rows)))
+
 (defn latest-filed
   [rows]
   (->> rows
        (group-by #(str (:end %)))
        vals
-       (map (fn [rs] (apply max-key #(str (:filed %)) rs)))))
+       (map latest-by-filed)))
 
 (defn annual-statement-rows
   "Full-year income-statement fact rows (quarterly repeats removed)."
@@ -461,7 +467,7 @@
                        (filter #(= latest-end (str (:end %))))
                        (group-by :concept)
                        vals
-                       (map (fn [rs] (apply max-key #(str (:filed %)) rs)))
+                       (map latest-by-filed)
                        (map (fn [r]
                               (let [usd? (= "USD" (:unit r))]
                                 {:line (or (line-by-concept (:concept r))

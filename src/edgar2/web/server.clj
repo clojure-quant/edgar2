@@ -1,5 +1,6 @@
 (ns edgar2.web.server
   (:require [hyper.core :as h]
+            [edgar2.web.filing :refer [annual-report-page]]
             [edgar2.web.financials :refer [financials-page]]
             [edgar2.web.screen :refer [screen-page]]))
 
@@ -15,7 +16,10 @@
                            :get #'financials-page}]
    ["/financials/:ticker/:years" {:name :financials-years
                                   :title "Financials"
-                                  :get #'financials-page}]])
+                                  :get #'financials-page}]
+   ["/filing/:ticker" {:name :annual-report
+                       :title "Annual report"
+                       :get #'annual-report-page}]])
 
 (defn web
   "Start the Hyper UI and block until the process stops.

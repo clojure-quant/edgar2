@@ -62,9 +62,18 @@ th.num {
 }
 
 .screen-notes,
-.fin-header {
+.fin-header,
+.fin-extra {
   font-family: ui-monospace, monospace;
   white-space: pre-wrap;
+}
+
+.fin-extra {
+  margin-top: 1rem;
+}
+
+.fin-extra p {
+  margin: 0.35rem 0;
 }
 
 .error {
