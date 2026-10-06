@@ -32,7 +32,8 @@ body {
   margin-bottom: 1rem;
 }
 
-.ticker-form input {
+.ticker-form input,
+.ticker-form select {
   font-size: 1rem;
   padding: 0.25rem 0.4rem;
   margin-right: 0.5rem;

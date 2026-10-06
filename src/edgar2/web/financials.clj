@@ -5,6 +5,9 @@
             [edgar2.filing :as filing]
             [edgar2.web.nav :refer [nav]]))
 
+(def year-choices
+  [5 10 15 20 25 30 35 40 45 50])
+
 (defn- ticker-param
   [req]
   (some-> (get-in req [:hyper/route :path-params :ticker])
@@ -12,6 +15,18 @@
           str/trim
           not-empty
           str/upper-case))
+
+(defn- parse-years
+  "One of `year-choices`, or nil."
+  [s]
+  (let [n (try (Long/parseLong (str/trim (str s)))
+               (catch Exception _ nil))]
+    (when (some #{n} year-choices) n)))
+
+(defn- years-param
+  [req]
+  (or (parse-years (get-in req [:hyper/route :path-params :years]))
+      5))
 
 (defn- cell
   [v]
@@ -35,24 +50,43 @@
                 :class (when-not (= col :field) "num")}
            (cell (get row col))])])]]])
 
+(defn- go-financials!
+  "Open financials for a ticker and year count. Years stay in the path so
+  a new count remounts the page and refetches."
+  [ticker years]
+  (when (and ticker (parse-years years))
+    (effects/navigate! :financials-years
+                       {:ticker ticker
+                        :years (str (parse-years years))})))
+
 (defn- ticker-form
-  [ticker]
+  [ticker years]
   [:form.ticker-form
    {:data-on:submit__prevent
     (h/action
-     (let [t (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)]
-       (when t
-         (effects/navigate! :financials {:ticker t}))))}
+     (go-financials! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
+                     (:years $form-data)))}
    [:label "Ticker "
     [:input {:type "text"
              :name "ticker"
              :value (or ticker "")
              :autofocus true}]]
+   [:label "Years "
+    [:select {:name "years"
+              :data-on:change
+              (h/action
+               (go-financials! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
+                               (:years $form-data)))}
+     (for [y year-choices]
+       [:option (cond-> {:key y :value (str y)}
+                  (= y years) (assoc :selected true))
+        (str y)])]]
    [:button {:type "submit"} "Show"]])
 
 (defn financials-page
   [req]
   (let [ticker (ticker-param req)
+        years (years-param req)
         result* (atom (when ticker {:status :loading}))]
     (when ticker
       (h/watch! result*)
@@ -60,7 +94,7 @@
         (reset! result*
                 (try
                   {:status :ready
-                   :data (filing/financials-data {:ticker ticker})}
+                   :data (filing/financials-data {:ticker ticker :years years})}
                   (catch Throwable e
                     {:status :error
                      :message (or (ex-message e) (str e))})))))
@@ -68,9 +102,9 @@
       (let [{:keys [status data message]} @result*]
         [:div.page
          (nav)
-         (ticker-form ticker)
+         (ticker-form ticker years)
          (case status
-           :loading [:p (str "Loading " ticker "…")]
+           :loading [:p (str "Loading " ticker " (" years " years)…")]
            :error [:p.error message]
            :ready [:div
                    [:p.fin-header

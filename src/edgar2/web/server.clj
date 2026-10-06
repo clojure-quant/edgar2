@@ -12,7 +12,10 @@
                    :get #'financials-page}]
    ["/financials/:ticker" {:name :financials
                            :title "Financials"
-                           :get #'financials-page}]])
+                           :get #'financials-page}]
+   ["/financials/:ticker/:years" {:name :financials-years
+                                  :title "Financials"
+                                  :get #'financials-page}]])
 
 (defn web
   "Start the Hyper UI and block until the process stops.

@@ -69,7 +69,7 @@ clj -X:stats
 clj -X:stats :limit 25
 ```
 
-Open a web UI with the screen tabs (from `data/stats.edn`; run `clj -X:stats` first) and a financials page for one ticker. Same tables as `clj -X:screen` and `clj -X:financials` (5 years). No login.
+Open a web UI with the screen tabs (from `data/stats.edn`; run `clj -X:stats` first) and a financials page for one ticker. Same tables as `clj -X:screen` and `clj -X:financials`. Financials defaults to 5 years; the page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
 
 ```bash
 clj -X:web
