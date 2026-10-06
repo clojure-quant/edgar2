@@ -76,6 +76,28 @@
   (when-let [days (period-days (:start row) (:end row))]
     (<= 300 days 400)))
 
+(defn window-months
+  "3, 9, or 12 for a duration that is one quarter, nine months, or a year."
+  [row]
+  (when-let [days (period-days (:start row) (:end row))]
+    (cond
+      (<= 75 days 115) 3
+      (<= 250 days 290) 9
+      (<= 300 days 400) 12)))
+
+(defn fiscal-quarter-label
+  "Column name such as \"2025 Q1\" from a period-end and fiscal-year-end month."
+  [end fye-mm]
+  (if-let [e (parse-date end)]
+    (let [month (.getMonthValue e)
+          year (.getYear e)
+          mm (parse-long (or fye-mm (format "%02d" month)))
+          offset (mod (- month mm) 12)
+          q (let [k (quot offset 3)] (if (zero? k) 4 k))
+          fy (if (> month mm) (inc year) year)]
+      (format "%d Q%d" fy q))
+    (str end)))
+
 (defn- latest-by-filed
   "Row with the latest :filed. ISO dates compare as strings; `max-key`
   only accepts numbers, so two facts for one period would throw."
@@ -144,6 +166,63 @@
        (map (juxt #(str (:end %)) :val))
        (into {})))
 
+(defn latest-by-start
+  [rows]
+  (->> rows
+       (group-by #(str (:start %)))
+       vals
+       (map latest-by-filed)))
+
+(defn per-share-line?
+  "Share counts and per-share amounts are not additive across quarters."
+  [line-item]
+  (boolean (re-find #"(?i)eps|per share|shares" (str line-item))))
+
+(defn quarterly-values
+  "Period-end → single-quarter amount for one line.
+
+  A reported ~3-month fact wins. Otherwise the quarter is the :val-q on the
+  year-to-date row. Q4 is not on the 10-Q; for additive lines it is the
+  annual fact minus the nine-month fact with the same start. Share counts
+  and EPS are not subtracted."
+  [flow-rows annual-rows line-item]
+  (let [flow (filter #(= line-item (:line-item %)) flow-rows)
+        ann (filter #(= line-item (:line-item %)) annual-rows)
+        share? (per-share-line? line-item)
+        direct (->> (concat flow ann)
+                    (filter #(and (= 3 (window-months %)) (number? (:val %))))
+                    latest-filed)
+        derived (when-not share?
+                  (->> flow
+                       (filter #(and (number? (:val-q %))
+                                     (not= 3 (window-months %))))
+                       (group-by #(str (:end %)))
+                       vals
+                       (map latest-by-filed)
+                       (map (fn [r]
+                              {:line-item line-item
+                               :end (:end r)
+                               :filed (:filed r)
+                               :val (:val-q r)}))))
+        nine-by-start (->> flow
+                           (filter #(= 9 (window-months %)))
+                           latest-by-start
+                           (map (juxt #(str (:start %)) :val))
+                           (into {}))
+        q4 (when-not share?
+             (keep (fn [row]
+                     (when-let [ytd (get nine-by-start (str (:start row)))]
+                       (when (and (= 12 (window-months row))
+                                  (number? (:val row))
+                                  (number? ytd))
+                         {:line-item line-item
+                          :end (:end row)
+                          :filed (:filed row)
+                          :val (- (double (:val row)) (double ytd))})))
+                   ann))]
+    (merge (annual-line-values (concat derived q4) line-item)
+           (annual-line-values direct line-item))))
+
 (defn annual-income
   "Last `n` full-year rows: revenue, cogs, gross profit, net income."
   [cik n fiscal-year-end]
@@ -193,12 +272,24 @@
   []
   (e/init! identity-header))
 
+(defn parse-period
+  ":annual or :quarterly. Missing or unknown values are annual."
+  [period]
+  (let [s (str/lower-case
+           (cond
+             (nil? period) "annual"
+             (keyword? period) (name period)
+             :else (str period)))]
+    (if (#{"quarterly" "q"} s) :quarterly :annual)))
+
 (defn opts
-  "Normalize -X exec args. Accepts :ticker and :years (or :n)."
-  [{:keys [ticker n years]
+  "Normalize -X exec args. Accepts :ticker, :years (or :n), and :period.
+  :period is annual (default) or quarterly."
+  [{:keys [ticker n years period]
     :or {ticker default-ticker}}]
   {:ticker (str/upper-case (name ticker))
-   :n (long (or years n 5))})
+   :n (long (or years n 5))
+   :period (parse-period period)})
 
 (defn download
   "Download the last `:years` annual 10-Ks for `:ticker` into `filing-dir`.
@@ -367,68 +458,124 @@
         (vec (concat (take (inc idx) rows) [row] (drop (inc idx) rows)))
         (vec (concat rows [row]))))))
 
-(defn financials-data
-  "Standardized P&L and main balance-sheet lines for the last `:years`.
+(defn statement-rows
+  "P&L, a blank line, then the balance sheet. `col-labels` names each period in `ends`."
+  [by-pl* by-bs dividends ends col-labels]
+  (let [by-pl (with-derived-opex by-pl* ends)
+        items (cond-> (vec (keys by-pl*))
+                (seq (by-pl "Operating Expenses"))
+                (as-> xs (vec (distinct (conj xs "Operating Expenses")))))
+        columns (into [:field] col-labels)
+        pl-items (concat (filter (set items) pl-column-order)
+                         (sort (remove (set pl-column-order) items)))
+        bs-items (filter (fn [item]
+                           (some #(get (by-bs item) %) ends))
+                         bs-column-order)
+        blank (into {:field ""} (map (fn [label] [label nil]) col-labels))
+        div-row (when (some #(get dividends %) ends)
+                  (field-row dividends-paid-label
+                             {dividends-paid-label dividends}
+                             ends col-labels))
+        pl-rows (insert-after (map #(field-row % by-pl ends col-labels) pl-items)
+                              "Shares Diluted"
+                              div-row)
+        rows (vec (concat pl-rows
+                          [blank]
+                          (map #(field-row % by-bs ends col-labels) bs-items)))]
+    {:columns columns :rows rows}))
 
-  Returns `{:ticker :name :cik :form :columns :rows}`."
+(defn period-ends
+  [preferred fallback n]
+  (->> (or (seq (keys preferred))
+           (keys fallback)
+           [])
+       distinct
+       sort
+       reverse
+       (take n)
+       sort
+       vec))
+
+(defn column-labels
+  "One label per end. Annual labels are the year. Quarterly labels are \"2025 Q1\"."
+  [ends period fye-mm]
+  (if-not (= period :quarterly)
+    (mapv #(subs (str %) 0 4) ends)
+    (let [labels (map #(fiscal-quarter-label % fye-mm) ends)
+          counts (frequencies labels)]
+      (mapv (fn [end label]
+              (if (> (get counts label) 1)
+                (str label " " end)
+                label))
+            ends
+            labels))))
+
+(defn quarterly-statements
+  "10-Q single quarters, with Q4 taken from the annual report minus nine months."
+  [cik fiscal-year-end form]
+  (let [income (ds/mapseq-reader (e/income cik :form "10-Q" :view :standardized))
+        annual (annual-statement-rows cik fiscal-year-end form)
+        bs (concat (ds/mapseq-reader (e/balance cik :form "10-Q" :view :standardized))
+                   (annual-balance-rows cik fiscal-year-end form))
+        cash (ds/mapseq-reader
+              (e/cashflow cik :form "10-Q" :view :standardized
+                          :concepts dividends-paid-concepts))
+        annual-cash (annual-cashflow-rows cik fiscal-year-end form dividends-paid-concepts)
+        items (vec (distinct (map :line-item (concat income annual))))]
+    {:income-values (into {} (for [item items]
+                               [item (quarterly-values income annual item)]))
+     :balance-values (into {} (for [item (distinct (map :line-item bs))]
+                                [item (annual-line-values bs item)]))
+     :dividends (quarterly-values cash annual-cash dividends-paid-label)}))
+
+(defn financials-data
+  "Standardized P&L and main balance-sheet lines.
+
+  `:n` is how many columns to keep: fiscal years when annual, quarters
+  when quarterly. `:period` is annual (default) or quarterly.
+
+  Returns `{:ticker :name :cik :form :period :columns :rows}`."
   [m]
-  (let [{:keys [ticker n]} (opts m)]
+  (let [{:keys [ticker n period]} (opts m)]
     (ensure-identity!)
     (let [cik (resolve-filer ticker)
           meta (e/company-metadata cik)
           form (annual-form cik)
-          annual (annual-statement-rows cik (:fiscal-year-end meta) form)
-          bs (annual-balance-rows cik (:fiscal-year-end meta) form)
-          dividends (annual-line-values
-                     (annual-cashflow-rows cik (:fiscal-year-end meta) form
-                                           dividends-paid-concepts)
-                     dividends-paid-label)
-          items (vec (distinct (map :line-item annual)))
-          by-pl* (into {} (for [item items]
-                            [item (annual-line-values annual item)]))
-          by-bs (into {} (for [item (distinct (map :line-item bs))]
-                           [item (annual-line-values bs item)]))
-          ends (->> (or (keys (by-pl* "Revenue"))
-                        (keys (by-bs "Total Assets"))
-                        (map #(str (:end %)) annual))
-                    distinct
-                    sort
-                    reverse
-                    (take n)
-                    sort)
-          by-pl (with-derived-opex by-pl* ends)
-          items (cond-> items
-                  (seq (by-pl "Operating Expenses"))
-                  (as-> xs (vec (distinct (conj xs "Operating Expenses")))))
-          year-cols (mapv #(subs (str %) 0 4) ends)
-          columns (into [:field] year-cols)
-          pl-items (concat (filter (set items) pl-column-order)
-                           (sort (remove (set pl-column-order) items)))
-          bs-items (filter (fn [item]
-                             (some #(get (by-bs item) %) ends))
-                           bs-column-order)
-          blank (into {:field ""} (map (fn [year] [year nil]) year-cols))
-          div-row (when (some #(get dividends %) ends)
-                    (field-row dividends-paid-label
-                               {dividends-paid-label dividends}
-                               ends year-cols))
-          pl-rows (insert-after (map #(field-row % by-pl ends year-cols) pl-items)
-                                "Shares Diluted"
-                                div-row)
-          rows (vec (concat pl-rows
-                            [blank]
-                            (map #(field-row % by-bs ends year-cols) bs-items)))]
-      {:ticker ticker
-       :name (:name meta)
-       :cik cik
-       :form form
-       :columns columns
-       :rows rows})))
+          fye (:fiscal-year-end meta)
+          quarterly? (= period :quarterly)
+          source (if quarterly?
+                   (quarterly-statements cik fye form)
+                   (let [annual (annual-statement-rows cik fye form)
+                         bs (annual-balance-rows cik fye form)
+                         cash (annual-cashflow-rows cik fye form dividends-paid-concepts)
+                         items (vec (distinct (map :line-item annual)))]
+                     {:income-values (into {} (for [item items]
+                                                [item (annual-line-values annual item)]))
+                      :balance-values (into {} (for [item (distinct (map :line-item bs))]
+                                                 [item (annual-line-values bs item)]))
+                      :dividends (annual-line-values cash dividends-paid-label)}))
+          by-pl* (:income-values source)
+          by-bs (:balance-values source)
+          ends (period-ends (get by-pl* "Revenue")
+                            (get by-bs "Total Assets")
+                            n)
+          labels (column-labels ends period (fye-month fye))
+          table (statement-rows by-pl* by-bs (:dividends source) ends labels)]
+      (merge {:ticker ticker
+              :name (:name meta)
+              :cik cik
+              :form (if quarterly? "10-Q" form)
+              :period period}
+             table))))
 
 (defn financials
-  "Print standardized P&L and main balance-sheet lines for the last `:years`.
+  "Print standardized P&L and main balance-sheet lines.
 
-  Usage: clj -X:financials :ticker IMPP :years 20"
+  `:n` is fiscal years when annual (the default), or quarters when
+  `:period` is quarterly.
+
+  Usage: clj -X:financials :ticker IMPP :n 20
+         clj -X:financials :ticker AAPL :period quarterly :n 10"
   ([] (financials {}))
   ([m]
    (let [{:keys [ticker cik form columns rows] :as data} (financials-data m)

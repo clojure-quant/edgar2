@@ -6,7 +6,7 @@
             [edgar2.web.fsds :as fsds]
             [edgar2.web.nav :refer [nav]]))
 
-(def year-choices
+(def n-choices
   [5 10 15 20 25 30 35 40 45 50])
 
 (defn- ticker-param
@@ -17,16 +17,16 @@
           not-empty
           str/upper-case))
 
-(defn- parse-years
-  "One of `year-choices`, or nil."
+(defn- parse-n
+  "One of `n-choices`, or nil."
   [s]
   (let [n (try (Long/parseLong (str/trim (str s)))
                (catch Exception _ nil))]
-    (when (some #{n} year-choices) n)))
+    (when (some #{n} n-choices) n)))
 
-(defn- years-param
+(defn- n-param
   [req]
-  (or (parse-years (get-in req [:hyper/route :path-params :years]))
+  (or (parse-n (get-in req [:hyper/route :path-params :n]))
       5))
 
 (defn- cell
@@ -48,12 +48,16 @@
       (str "https://www.google.com/finance/quote/" t))))
 
 (defn- sector-line
-  "SIC code and description, shown under the company name."
+  "SIC code, boxed, then the description."
   [ticker]
   (let [{:keys [sic sic-description]} (fsds/company ticker)
-        sector (str/trim (str/join " " (remove str/blank? [(str sic) sic-description])))]
-    (when (seq sector)
-      [:p.fin-header (str "Sector " sector)])))
+        code (some-> sic str str/trim not-empty)
+        desc (some-> sic-description str str/trim not-empty)]
+    (when (or code desc)
+      [:p.fin-sector
+       (when code [:span.fin-sic code])
+       (when (and code desc) " ")
+       desc])))
 
 (defn- filing-links
   "Google Finance and the cached annual-report link."
@@ -132,43 +136,73 @@
                          [:td {:colspan (count columns)}]]))))
       (map-indexed vector rows))]]])
 
+(def period-choices
+  [["annual" "Annual"]
+   ["quarterly" "Quarterly"]])
+
+(defn- period-param
+  [req]
+  (filing/parse-period (get-in req [:hyper/route :path-params :period])))
+
 (defn- go-financials!
-  "Open financials for a ticker and year count. Years stay in the path so
-  a new count remounts the page and refetches."
-  [ticker years]
-  (when (and ticker (parse-years years))
-    (effects/navigate! :financials-years
-                       {:ticker ticker
-                        :years (str (parse-years years))})))
+  "Open financials for a ticker, count, and period. The path includes both
+  so a new choice remounts the page and refetches. Annual omits the period
+  segment. `:n` is years when annual and quarters when quarterly."
+  [ticker n period]
+  (let [n (parse-n n)
+        period (name (filing/parse-period period))]
+    (when (and ticker n)
+      (if (= period "quarterly")
+        (effects/navigate! :financials-period
+                           {:ticker ticker
+                            :n (str n)
+                            :period "quarterly"})
+        (effects/navigate! :financials-n
+                           {:ticker ticker
+                            :n (str n)})))))
 
 (defn- ticker-form
-  [ticker years]
+  [ticker n period]
   [:form.ticker-form
    {:data-on:submit__prevent
     (h/action
      (go-financials! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
-                     (:years $form-data)))}
+                     (:n $form-data)
+                     (:period $form-data)))}
    [:label "Ticker "
     [:input {:type "text"
              :name "ticker"
              :value (or ticker "")
              :autofocus true}]]
-   [:label "Years "
-    [:select {:name "years"
+   [:label "n "
+    [:select {:name "n"
               :data-on:change
               (h/action
                (go-financials! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
-                               (:years $form-data)))}
-     (for [y year-choices]
-       [:option (cond-> {:key y :value (str y)}
-                  (= y years) (assoc :selected true))
-        (str y)])]]
+                               (:n $form-data)
+                               (:period $form-data)))}
+     (for [choice n-choices]
+       [:option (cond-> {:key choice :value (str choice)}
+                  (= choice n) (assoc :selected true))
+        (str choice)])]]
+   [:label "Period "
+    [:select {:name "period"
+              :data-on:change
+              (h/action
+               (go-financials! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
+                               (:n $form-data)
+                               (:period $form-data)))}
+     (for [[value label] period-choices]
+       [:option (cond-> {:key value :value value}
+                  (= value (name period)) (assoc :selected true))
+        label])]]
    [:button {:type "submit"} "Show"]])
 
 (defn financials-page
   [req]
   (let [ticker (ticker-param req)
-        years (years-param req)
+        n (n-param req)
+        period (period-param req)
         result* (atom (when ticker {:status :loading}))]
     (when ticker
       (h/watch! result*)
@@ -176,7 +210,9 @@
         (reset! result*
                 (try
                   {:status :ready
-                   :data (filing/financials-data {:ticker ticker :years years})}
+                   :data (filing/financials-data {:ticker ticker
+                                                  :n n
+                                                  :period period})}
                   (catch Throwable e
                     {:status :error
                      :message (or (ex-message e) (str e))})))))
@@ -184,9 +220,9 @@
       (let [{:keys [status data message]} @result*]
         [:div.page
          (nav)
-         (ticker-form ticker years)
+         (ticker-form ticker n period)
          (case status
-           :loading [:p (str "Loading " ticker " (" years " years)…")]
+           :loading [:p (str "Loading " ticker " (n=" n ", " (name period) ")…")]
            :error [:p.error message]
            :ready [:div
                    [:p.fin-header

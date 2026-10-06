@@ -8,7 +8,7 @@
   :report {:exec-fn edgar2.filing/report
            :exec-args {:ticker "XOM" :years 5}}
   :financials {:exec-fn edgar2.filing/financials
-               :exec-args {:ticker "XOM" :years 5}}
+               :exec-args {:ticker "XOM" :n 5}}
   :pl-fields {:exec-fn edgar2.filing/pl-fields
               :exec-args {:ticker "XOM"}}
   :business {:exec-fn edgar2.filing/business

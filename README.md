@@ -21,7 +21,7 @@ clj -X:report :ticker AAPL :years 3
 Print P&L and main balance-sheet lines (last 20 fiscal years; 10-K, 20-F, or 40-F):
 
 ```bash
-clj -X:financials :ticker IMPP :years 20
+clj -X:financials :ticker IMPP :n 20
 ```
 
 Print last year’s income-statement lines with XBRL tags:
@@ -69,14 +69,14 @@ clj -X:stats
 clj -X:stats :limit 25
 ```
 
-Open a web UI with the screen tabs (from `data/stats.edn`; run `clj -X:stats` first) and a financials page for one ticker. Same tables as `clj -X:screen` and `clj -X:financials`. Financials defaults to 5 years; the page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
+Open a web UI with the screen tabs (from `data/stats.edn`; run `clj -X:stats` first) and a financials page for one ticker. Same tables as `clj -X:screen` and `clj -X:financials`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
 
 ```bash
 clj -X:web
 clj -X:web :port 8080
 ```
 
-`:ticker` and `:years` work on all aliases. `:n` is accepted as a synonym for `:years`.
+`:ticker` and `:years` work on the download and report aliases. `:financials` takes `:n`: fiscal years when annual, quarters when `:period` is quarterly. `:years` is still accepted there as a synonym for `:n`.
 
 
 20-F is the annual report for a foreign private issuer listed in the U.S. (usually via ADRs). It is the 10-K equivalent for non-U.S. companies: Toyota, Sony, Ecopetrol. They can use IFRS or home-country GAAP, and numbers are often in yen, won, pesos, not dollars. Interim updates are usually 6-K, not 10-Q.

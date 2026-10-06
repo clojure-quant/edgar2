@@ -14,9 +14,12 @@
    ["/financials/:ticker" {:name :financials
                            :title "Financials"
                            :get #'financials-page}]
-   ["/financials/:ticker/:years" {:name :financials-years
-                                  :title "Financials"
-                                  :get #'financials-page}]
+   ["/financials/:ticker/:n" {:name :financials-n
+                               :title "Financials"
+                               :get #'financials-page}]
+   ["/financials/:ticker/:n/:period" {:name :financials-period
+                                          :title "Financials"
+                                          :get #'financials-page}]
    ["/filing/:ticker" {:name :annual-report
                        :title "Annual report"
                        :get #'annual-report-page}]])
