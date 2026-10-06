@@ -69,6 +69,13 @@ clj -X:stats
 clj -X:stats :limit 25
 ```
 
+Open a web UI with the screen tabs (from `data/stats.edn`; run `clj -X:stats` first) and a financials page for one ticker. Same tables as `clj -X:screen` and `clj -X:financials` (5 years). No login.
+
+```bash
+clj -X:web
+clj -X:web :port 8080
+```
+
 `:ticker` and `:years` work on all aliases. `:n` is accepted as a synonym for `:years`.
 
 
@@ -76,3 +83,8 @@ clj -X:stats :limit 25
 
 40-F is the annual report for Canadian issuers under the Multijurisdictional Disclosure System (MJDS). The SEC lets them file their Canadian annual package (NI 51-102 AIF / audited statements) wrapped as a 40-F instead of rewriting it as a 10-K or 20-F. Agnico Eagle in your file is a 40-F. Interims are often 6-K as well.
 
+Enterprise value (shown as :ev, in millions of dollars) is:
+
+market cap + interest-bearing debt + preferred stock + noncontrolling interest − cash
+
+Debt is long-term debt including the current portion, plus commercial paper and other short-term borrowings when those are not already counted. EBIT is operating income. When that tag is missing, it is net income + interest + tax. EV/EBIT (:ev-ebit) is that enterprise value divided by EBIT, and only when the financials are in USD.

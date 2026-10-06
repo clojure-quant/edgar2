@@ -39,6 +39,25 @@
   [[:us-gaap :Assets]
    [:ifrs-full :Assets]])
 
+(def ebit-tags
+  "Operating income. Fallback is net income + interest + tax."
+  [[:us-gaap :OperatingIncomeLoss]
+   [:ifrs-full :ProfitLossFromOperatingActivities]])
+
+(def interest-expense-tags
+  [[:us-gaap :InterestExpense]
+   [:ifrs-full :InterestExpense]
+   [:ifrs-full :InterestExpenseOnBorrowings]])
+
+(def income-tax-tags
+  [[:us-gaap :IncomeTaxExpenseBenefit]
+   [:ifrs-full :IncomeTaxExpenseContinuingOperations]])
+
+(def cash-tag-pairs
+  [[:us-gaap :CashAndCashEquivalentsAtCarryingValue]
+   [:ifrs-full :CashAndCashEquivalents]
+   [:us-gaap :Cash]])
+
 (def annual-forms
   #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"})
 
@@ -160,6 +179,108 @@
   (when (seq series)
     (last series)))
 
+(defn value-at
+  [series end]
+  (when (and (seq series) end)
+    (get (by-end series) (str end))))
+
+(defn approx=
+  "True when a and b are within 2% or 1 unit (tag double-counts)."
+  [a b]
+  (and (number? a) (number? b)
+       (let [a (double a)
+             b (double b)]
+         (<= (Math/abs (- a b))
+             (max 1.0 (* 0.02 (Math/abs b)))))))
+
+(defn sum-unique
+  "Sum xs, counting near-duplicate tags once."
+  [xs]
+  (loop [acc [] xs (filter number? xs)]
+    (if-let [x (first xs)]
+      (if (some #(approx= % x) acc)
+        (recur acc (next xs))
+        (recur (conj acc (double x)) (next xs)))
+      (when (seq acc)
+        (reduce + acc)))))
+
+(defn best-annual-flows
+  "Annual series from the tag whose latest period-end is most recent."
+  [facts tag-pairs unit]
+  (let [series (keep (fn [pair]
+                        (let [s (annual-flows facts [pair] unit)]
+                          (when (seq s) s)))
+                      tag-pairs)]
+    (when (seq series)
+      (apply max-key #(str (:end (last %))) series))))
+
+(defn stock-at
+  [facts tag-pairs unit end]
+  (value-at (annual-stocks facts tag-pairs unit) end))
+
+(defn balance-sheet-end
+  [assets]
+  (some-> (latest-obs assets) :end str))
+
+(defn interest-bearing-debt
+  "Interest-bearing debt at annual balance-sheet `end`.
+
+  Term debt is the noncurrent portion plus the current portion when both
+  are tagged, otherwise the long-term debt total (US-GAAP LongTermDebt or
+  IFRS Borrowings). Commercial paper and other short-term borrowings are
+  added unless they repeat that current portion."
+  [facts unit end]
+  (when end
+    (let [at (fn [pairs] (stock-at facts pairs unit end))
+          non (or (at [[:us-gaap :LongTermDebtNoncurrent]])
+                  (at [[:ifrs-full :LongtermBorrowings]]))
+          cur (or (at [[:us-gaap :LongTermDebtCurrent]])
+                  (at [[:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]])
+                  (at [[:ifrs-full :ShorttermBorrowings]]))
+          ltd (or (at [[:us-gaap :LongTermDebt]])
+                  (at [[:ifrs-full :Borrowings]]))
+          term (cond
+                 (and (number? non) (number? cur)) (+ (double non) (double cur))
+                 (and (number? non) (number? ltd)
+                      (> (double ltd) (* 1.01 (double non)))) (double ltd)
+                 (number? non) (double non)
+                 (number? ltd) (double ltd)
+                 (number? cur) (double cur))
+          already (when (and (number? cur) (number? term)
+                             (or (and (number? non) (number? cur))
+                                 (approx= ltd term)))
+                    cur)
+          extras (sum-unique
+                  (remove #(approx= % already)
+                          [(at [[:us-gaap :CommercialPaper]])
+                           (at [[:us-gaap :ShortTermBorrowings]])
+                           (at [[:us-gaap :OtherShortTermBorrowings]])]))]
+      (when (or term extras)
+        (+ (double (or term 0)) (double (or extras 0)))))))
+
+(defn cash-at
+  [facts unit end]
+  (when end
+    (some #(stock-at facts [%] unit end) cash-tag-pairs)))
+
+(defn annual-ebit
+  "Latest annual operating income, else net income + interest + tax
+  at the latest net-income period-end."
+  [facts unit]
+  (let [reported (latest-obs (best-annual-flows facts ebit-tags unit))]
+    (if (and reported (number? (:val reported)))
+      {:ebit (:val reported) :ebit-end (str (:end reported))}
+      (let [ni (latest-obs (first-annual-flows facts net-income-tags unit))
+            end (some-> ni :end str)
+            interest (value-at (best-annual-flows facts interest-expense-tags unit) end)
+            tax (value-at (best-annual-flows facts income-tax-tags unit) end)]
+        (when (and ni (number? (:val ni)) end
+                   (or (number? interest) (number? tax)))
+          {:ebit (+ (double (:val ni))
+                    (double (or interest 0))
+                    (double (or tax 0)))
+           :ebit-end end})))))
+
 (defn annual-eps
   "Latest annual diluted/basic EPS series (do not force the revenue unit)."
   [facts]
@@ -185,7 +306,14 @@
         dps (latest-obs (annual-dps facts))
         growth (avg-sales-growth rev sales-growth-window)
         margin (latest-aligned ni rev)
-        roc (latest-aligned ni assets)]
+        roc (latest-aligned ni assets)
+        bs-end (balance-sheet-end assets)
+        debt (interest-bearing-debt facts revenue-unit bs-end)
+        cash (cash-at facts revenue-unit bs-end)
+        preferred (stock-at facts [[:us-gaap :PreferredStockValue]] revenue-unit bs-end)
+        nci (or (stock-at facts [[:us-gaap :MinorityInterest]] revenue-unit bs-end)
+                (stock-at facts [[:ifrs-full :NoncontrollingInterests]] revenue-unit bs-end))
+        ebit (annual-ebit facts revenue-unit)]
     (cond-> (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
       (:sales-growth-yoy growth)
       (assoc :sales-growth-yoy (:sales-growth-yoy growth)
@@ -206,7 +334,12 @@
       (and dps (number? (:val dps)))
       (assoc :dps (:val dps)
              :dps-unit (:unit dps)
-             :dps-end (:end dps)))))
+             :dps-end (:end dps))
+      (number? debt) (assoc :debt debt :debt-end bs-end)
+      (number? cash) (assoc :cash cash)
+      (number? preferred) (assoc :preferred-stock preferred)
+      (number? nci) (assoc :noncontrolling-interest nci)
+      (:ebit ebit) (assoc :ebit (:ebit ebit) :ebit-end (:ebit-end ebit)))))
 
 (defn load-price-by-ticker
   "ticker → close from data/prices.edn."
@@ -217,9 +350,12 @@
              (price/load-prices))))
 
 (defn with-valuation
-  "Add :shares, :price, :marketcap, :price-sales, and :price-earnings.
+  "Add :shares, :price, :marketcap, :price-sales, :price-earnings,
+  :enterprise-value, and :ev-ebit.
   PE is price / USD EPS, else USD market cap / USD Net Income — never mix
-  a dollar price with ARS/JPY/etc. earnings."
+  a dollar price with ARS/JPY/etc. earnings.
+  Enterprise value is USD market cap + debt + preferred + noncontrolling
+  interest − cash. EV/EBIT divides that by USD EBIT."
   [st price-by-ticker shares]
   (let [price (get price-by-ticker (str/upper-case (str (:ticker st))))
         mcap (when (and price (number? shares))
@@ -237,7 +373,14 @@
              (and mcap usd-pl? (number? ni) (not (zero? (double ni))))
              (/ mcap (double ni)))
         dy (when (and price (pos? (double price)) (number? dps) usd-dps?)
-             (* 100.0 (/ (double dps) (double price))))]
+             (* 100.0 (/ (double dps) (double price))))
+        ebit (when (number? (:ebit st)) (:ebit st))
+        ev (when (and mcap usd-pl?)
+             (+ (double mcap)
+                (double (or (:debt st) 0))
+                (double (or (:preferred-stock st) 0))
+                (double (or (:noncontrolling-interest st) 0))
+                (- (double (or (:cash st) 0)))))]
     (cond-> st
       (number? shares) (assoc :shares shares)
       price (assoc :price price)
@@ -245,7 +388,10 @@
       (and mcap usd-pl? rev (not (zero? (double rev))))
       (assoc :price-sales (/ mcap (double rev)))
       pe (assoc :price-earnings pe)
-      dy (assoc :dividend-yield dy))))
+      dy (assoc :dividend-yield dy)
+      ev (assoc :enterprise-value ev)
+      (and ev (number? ebit) (not (zero? (double ebit))))
+      (assoc :ev-ebit (/ ev (double ebit))))))
 
 (defn load-universe
   []
@@ -272,7 +418,12 @@
    :sales-growth-yoy
    :return-on-capital
    :price-earnings
-   :dividend-yield])
+   :dividend-yield
+   :enterprise-value
+   :ev-ebit
+   :ebit
+   :debt
+   :cash])
 
 (defn select-fields
   "Map with `ks` first (present keys only); remaining keys last, sorted."
@@ -309,7 +460,9 @@
   "From data/universe.edn + companyfacts.zip + prices.edn, write data/stats.edn
   with 7-year mean YoY sales growth (%), profit margin, return on capital
   (Net Income / assets), plus :shares, :price, :marketcap, :price-sales,
-  and :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income).
+  :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income),
+  :enterprise-value (USD market cap + debt + preferred + NCI − cash),
+  and :ev-ebit.
 
   Usage: clj -X:stats
          clj -X:stats :limit 25"
@@ -366,7 +519,7 @@
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roc=%d  price=%d  mcap=%d  pe=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
@@ -374,5 +527,7 @@
                               (count (filter :return-on-capital out))
                               (count (filter :price out))
                               (count (filter :marketcap out))
-                              (count (filter :price-earnings out))))
+                              (count (filter :price-earnings out))
+                              (count (filter :enterprise-value out))
+                              (count (filter :ev-ebit out))))
              out)))))))

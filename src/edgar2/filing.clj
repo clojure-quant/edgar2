@@ -327,55 +327,68 @@
              ends
              year-cols)))
 
+(defn financials-data
+  "Standardized P&L and main balance-sheet lines for the last `:years`.
+
+  Returns `{:ticker :name :cik :form :columns :rows}`."
+  [m]
+  (let [{:keys [ticker n]} (opts m)]
+    (ensure-identity!)
+    (let [cik (resolve-filer ticker)
+          meta (e/company-metadata cik)
+          form (annual-form cik)
+          annual (annual-statement-rows cik (:fiscal-year-end meta) form)
+          bs (annual-balance-rows cik (:fiscal-year-end meta) form)
+          items (vec (distinct (map :line-item annual)))
+          by-pl* (into {} (for [item items]
+                            [item (annual-line-values annual item)]))
+          by-bs (into {} (for [item (distinct (map :line-item bs))]
+                           [item (annual-line-values bs item)]))
+          ends (->> (or (keys (by-pl* "Revenue"))
+                        (keys (by-bs "Total Assets"))
+                        (map #(str (:end %)) annual))
+                    distinct
+                    sort
+                    reverse
+                    (take n)
+                    sort)
+          by-pl (with-derived-opex by-pl* ends)
+          items (cond-> items
+                  (seq (by-pl "Operating Expenses"))
+                  (as-> xs (vec (distinct (conj xs "Operating Expenses")))))
+          year-cols (mapv #(subs (str %) 0 4) ends)
+          columns (into [:field] year-cols)
+          pl-items (concat (filter (set items) pl-column-order)
+                           (sort (remove (set pl-column-order) items)))
+          bs-items (filter (fn [item]
+                             (some #(get (by-bs item) %) ends))
+                           bs-column-order)
+          blank (into {:field ""} (map (fn [year] [year nil]) year-cols))
+          rows (vec (concat (map #(field-row % by-pl ends year-cols) pl-items)
+                            [blank]
+                            (map #(field-row % by-bs ends year-cols) bs-items)))]
+      {:ticker ticker
+       :name (:name meta)
+       :cik cik
+       :form form
+       :columns columns
+       :rows rows})))
+
 (defn financials
   "Print standardized P&L and main balance-sheet lines for the last `:years`.
 
   Usage: clj -X:financials :ticker IMPP :years 20"
   ([] (financials {}))
   ([m]
-   (let [{:keys [ticker n]} (opts m)]
-     (ensure-identity!)
-     (let [cik (resolve-filer ticker)
-           meta (e/company-metadata cik)
-           form (annual-form cik)
-           annual (annual-statement-rows cik (:fiscal-year-end meta) form)
-           bs (annual-balance-rows cik (:fiscal-year-end meta) form)
-           items (vec (distinct (map :line-item annual)))
-           by-pl* (into {} (for [item items]
-                             [item (annual-line-values annual item)]))
-           by-bs (into {} (for [item (distinct (map :line-item bs))]
-                            [item (annual-line-values bs item)]))
-           ends (->> (or (keys (by-pl* "Revenue"))
-                         (keys (by-bs "Total Assets"))
-                         (map #(str (:end %)) annual))
-                     distinct
-                     sort
-                     reverse
-                     (take n)
-                     sort)
-           by-pl (with-derived-opex by-pl* ends)
-           items (cond-> items
-                   (seq (by-pl "Operating Expenses"))
-                   (as-> xs (vec (distinct (conj xs "Operating Expenses")))))
-           year-cols (mapv #(subs (str %) 0 4) ends)
-           print-cols (into [:field] year-cols)
-           pl-items (concat (filter (set items) pl-column-order)
-                            (sort (remove (set pl-column-order) items)))
-           bs-items (filter (fn [item]
-                              (some #(get (by-bs item) %) ends))
-                            bs-column-order)
-           blank (into {:field ""} (map (fn [year] [year nil]) year-cols))
-           rows (concat (map #(field-row % by-pl ends year-cols) pl-items)
-                        [blank]
-                        (map #(field-row % by-bs ends year-cols) bs-items))
-           ds (ds/->dataset rows
-                            {:dataset-name (str ticker " financials ($ millions; EPS in $)")
-                             :column-order print-cols})]
-       (println)
-       (println (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
-                        ticker (:name meta) cik form))
-       (pprint/print-table print-cols rows)
-       ds))))
+   (let [{:keys [ticker cik form columns rows] :as data} (financials-data m)
+         ds (ds/->dataset rows
+                          {:dataset-name (str ticker " financials ($ millions; EPS in $)")
+                           :column-order columns})]
+     (println)
+     (println (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
+                      ticker (:name data) cik form))
+     (pprint/print-table columns rows)
+     ds)))
 
 (defn pl-fields
   "Print last-year income-statement tags: line, XBRL concept, value.

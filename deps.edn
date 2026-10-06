@@ -22,4 +22,8 @@
   ; universe 
   :universe {:exec-fn edgar2.download.custom.universe/universe}
   :stats {:exec-fn edgar2.report.stats/stats}
-  :screen {:exec-fn edgar2.report.screen/screen}}}
+  :screen {:exec-fn edgar2.report.screen/screen}
+  :web {:extra-paths ["resources"]
+        :extra-deps {ai.dyal/hyper {:mvn/version "0.2.2"}}
+        :exec-fn edgar2.web.server/web
+        :exec-args {:port 3000}}}}
