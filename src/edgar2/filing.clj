@@ -111,12 +111,45 @@
        vals
        (map latest-by-filed)))
 
+(def ifrs-income-concepts
+  "IFRS local names for lines edgarjure maps only from US-GAAP.
+  Appended after the US-GAAP concepts, so a GAAP tag still wins when both exist."
+  {"Revenue" ["RevenueFromContractsWithCustomers" "Revenue"]
+   "Cost of Revenue" ["CostOfSales"]
+   "Operating Income" ["ProfitLossFromOperatingActivities"]
+   "Pre-Tax Income" ["ProfitLossBeforeTax"]
+   "Income Tax Expense" ["IncomeTaxExpenseContinuingOperations"]
+   "EPS Basic" ["BasicEarningsLossPerShare"]
+   "EPS Diluted" ["DilutedEarningsLossPerShare"]})
+
+(defn income-industry
+  "Same SIC routing edgarjure uses for income-statement concept chains."
+  [sic]
+  (let [n (try (Long/parseLong (str sic)) (catch Exception _ nil))]
+    (cond
+      (nil? n) :standard
+      (or (<= 6000 n 6199) (= n 6712)) :bank
+      (or (<= 6300 n 6399) (= n 6411)) :insurance
+      (or (= n 6798) (<= 6500 n 6553)) :reit
+      :else :standard)))
+
+(defn income-concepts
+  "edgarjure income chains with IFRS fallbacks on the existing line labels."
+  [cik]
+  (let [sic (:sic (e/company-metadata cik))
+        chains (:chains (e/concepts-for :income :industry (income-industry sic)))]
+    (mapv (fn [[label & concepts]]
+            (into [label] (concat concepts (get ifrs-income-concepts label))))
+          chains)))
+
 (defn annual-statement-rows
   "Full-year income-statement fact rows (quarterly repeats removed)."
   ([cik fiscal-year-end]
    (annual-statement-rows cik fiscal-year-end "10-K"))
   ([cik fiscal-year-end form]
-   (let [rows (ds/mapseq-reader (e/income cik :form form :view :standardized))
+   (let [rows (ds/mapseq-reader
+               (e/income cik :form form :view :standardized
+                         :concepts (income-concepts cik)))
          mm (or (fye-month fiscal-year-end)
                 (fye-month (some->> rows (map :end) (map str) sort last)))]
      (->> rows
@@ -513,7 +546,9 @@
 (defn quarterly-statements
   "10-Q single quarters, with Q4 taken from the annual report minus nine months."
   [cik fiscal-year-end form]
-  (let [income (ds/mapseq-reader (e/income cik :form "10-Q" :view :standardized))
+  (let [income (ds/mapseq-reader
+                (e/income cik :form "10-Q" :view :standardized
+                          :concepts (income-concepts cik)))
         annual (annual-statement-rows cik fiscal-year-end form)
         bs (concat (ds/mapseq-reader (e/balance cik :form "10-Q" :view :standardized))
                    (annual-balance-rows cik fiscal-year-end form))

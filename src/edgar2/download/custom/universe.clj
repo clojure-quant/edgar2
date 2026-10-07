@@ -11,10 +11,17 @@
 
 (def universe-path "data/universe.edn")
 
-(def share-tags
+(def common-share-tags
   [[:dei :EntityCommonStockSharesOutstanding]
-   [:us-gaap :CommonStockSharesOutstanding]
-   [:ifrs-full :NumberOfSharesOutstanding]])
+   [:us-gaap :CommonStockSharesOutstanding]])
+
+(def ifrs-share-tags
+  [[:ifrs-full :NumberOfSharesOutstanding]])
+
+(def weighted-average-share-tags
+  [[:us-gaap :WeightedAverageNumberOfSharesOutstandingBasic]
+   [:us-gaap :WeightedAverageNumberOfSharesOutstandingBasicAndDiluted]
+   [:us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding]])
 
 (def revenue-tags
   [[:us-gaap :RevenueFromContractWithCustomerExcludingAssessedTax]
@@ -54,9 +61,32 @@
            (sort-by #(str (:filed %) "|" (:end %)))
            last))
 
-(defn most-recent-val
+(defn most-recent-share-count
+  "Latest positive fact whose unit is shares."
   [facts tag-pairs]
-  (:val (most-recent-obs facts tag-pairs)))
+  (some->> tag-pairs
+           (mapcat (fn [[tax tag]] (concept-observations facts tax tag)))
+           (filter #(and (number? (:val %))
+                         (= "shares" (:unit %))
+                         (pos? (double (:val %)))))
+           seq
+           (sort-by #(str (:filed %) "|" (:end %)))
+           last
+           :val))
+
+(defn shares-outstanding
+  "Common shares when dei or us-gaap reports them.
+
+  A US-GAAP filer with no common-share fact then uses the weighted-average
+  share count (basic, then basic-and-diluted, then diluted). Otherwise the
+  IFRS shares-outstanding fact.
+
+  Cover-page public float is an aggregate market value in dollars, not a
+  share count, so it is not used here."
+  [facts]
+  (or (most-recent-share-count facts common-share-tags)
+      (some #(most-recent-share-count facts [%]) weighted-average-share-tags)
+      (most-recent-share-count facts ifrs-share-tags)))
 
 (defn reporting-standard
   "us-gaap, ifrs-full, and/or ffd (filing-fee disclosure)."
@@ -73,7 +103,7 @@
         rev (most-recent-obs facts revenue-tags)]
     (cond-> {:cik (when (:cik data) (pad-cik (:cik data)))
              :entityName (:entityName data)
-             :shares-outstanding (most-recent-val facts share-tags)
+             :shares-outstanding (shares-outstanding facts)
              :revenue (:val rev)
              :reporting-standard (reporting-standard facts)}
       (:unit rev) (assoc :revenue-unit (:unit rev))
