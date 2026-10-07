@@ -116,11 +116,22 @@
   Appended after the US-GAAP concepts, so a GAAP tag still wins when both exist."
   {"Revenue" ["RevenueFromContractsWithCustomers" "Revenue"]
    "Cost of Revenue" ["CostOfSales"]
+   "Operating Expenses" ["OperatingExpense"]
    "Operating Income" ["ProfitLossFromOperatingActivities"]
    "Pre-Tax Income" ["ProfitLossBeforeTax"]
    "Income Tax Expense" ["IncomeTaxExpenseContinuingOperations"]
    "EPS Basic" ["BasicEarningsLossPerShare"]
    "EPS Diluted" ["DilutedEarningsLossPerShare"]})
+
+(def depreciation-line
+  "Depreciation sits with the operating-expense addends. Income-statement
+  tags first; the cash-flow total is the last fallback."
+  ["Depreciation"
+   "DepreciationAndAmortisationExpense"
+   "DepreciationExpense"
+   "DepreciationAndAmortization"
+   "Depreciation"
+   "DepreciationDepletionAndAmortization"])
 
 (defn income-industry
   "Same SIC routing edgarjure uses for income-statement concept chains."
@@ -138,9 +149,10 @@
   [cik]
   (let [sic (:sic (e/company-metadata cik))
         chains (:chains (e/concepts-for :income :industry (income-industry sic)))]
-    (mapv (fn [[label & concepts]]
-            (into [label] (concat concepts (get ifrs-income-concepts label))))
-          chains)))
+    (conj (mapv (fn [[label & concepts]]
+                  (into [label] (concat concepts (get ifrs-income-concepts label))))
+                chains)
+          depreciation-line)))
 
 (defn annual-statement-rows
   "Full-year income-statement fact rows (quarterly repeats removed)."
@@ -400,10 +412,11 @@
   ["Revenue"
    "Cost of Revenue"
    "Gross Profit"
-   "R&D Expense"
+   "SG&A Expense"
    "Selling and Marketing Expense"
    "General and Administrative Expense"
-   "SG&A Expense"
+   "R&D Expense"
+   "Depreciation"
    "Operating Expenses"
    "Operating Income"
    "Interest Expense"
@@ -497,7 +510,9 @@
   (let [by-pl (with-derived-opex by-pl* ends)
         items (cond-> (vec (keys by-pl*))
                 (seq (by-pl "Operating Expenses"))
-                (as-> xs (vec (distinct (conj xs "Operating Expenses")))))
+                (as-> xs (vec (distinct (conj xs "Operating Expenses"))))
+                true
+                (as-> xs (vec (distinct (conj xs "Depreciation")))))
         columns (into [:field] col-labels)
         pl-items (concat (filter (set items) pl-column-order)
                          (sort (remove (set pl-column-order) items)))

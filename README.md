@@ -86,3 +86,6 @@ FSDS
 - sub.txt submission summary
 - pre.txt presentation rows. accounting standard / fields
 - tag.txt tag dictionary (all reported fields)
+
+
+operating expenses (selling, general and administrative, research and development, and usually depreciation) → operating income

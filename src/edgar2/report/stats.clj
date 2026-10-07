@@ -208,6 +208,26 @@
   [a b]
   (->> [a b] (remove str/blank?) sort last))
 
+(defn annual-revenue
+  "Annual revenue for sales growth and the revenue score.
+
+  One IFRS series, not a mix: `ifrs-full` Revenue, or
+  RevenueFromSaleOfGoods when that series' latest period-end is later.
+  When both end on the same date, Revenue is the total and wins.
+  With neither tag, US-GAAP revenue tags are used."
+  [facts unit]
+  (let [total (annual-flows facts [[:ifrs-full :Revenue]] unit)
+        goods (annual-flows facts [[:ifrs-full :RevenueFromSaleOfGoods]] unit)
+        total-end (some-> (latest-obs total) :end str)
+        goods-end (some-> (latest-obs goods) :end str)
+        end (later-end total-end goods-end)
+        chosen (cond
+                 (= end total-end) total
+                 (= end goods-end) goods)]
+    (if (seq chosen)
+      chosen
+      (annual-flows facts universe/revenue-tags unit))))
+
 (defn fact-at
   "First annual fact among `tag-pairs` whose period-end is `end`."
   [facts tag-pairs unit end]
@@ -367,8 +387,9 @@
         eps (latest-obs (annual-eps facts))
         dps (annual-dps facts last-end revenue-unit)
         oi (annual-flows facts ebit-tags revenue-unit)
-        growth (avg-sales-growth rev sales-growth-window)
-        rev-score (direction-score rev)
+        revenue (annual-revenue facts revenue-unit)
+        growth (avg-sales-growth revenue sales-growth-window)
+        rev-score (direction-score revenue)
         oi-score (direction-score oi)
         margin (latest-aligned ni rev)
         roc (latest-aligned ni assets)

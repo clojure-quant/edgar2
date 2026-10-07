@@ -77,7 +77,8 @@ tr.fin-above-rule td {
   border-bottom-style: hidden;
 }
 
-tr.fin-gross td {
+tr.fin-gross td,
+tr.fin-below-rule td {
   border-top-style: hidden;
 }
 

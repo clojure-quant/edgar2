@@ -100,11 +100,20 @@
     "Total Equity"
     "Total Liabilities and Equity"})
 
+(def sum-line
+  "Last addend → the total drawn under the double rule.
+  Gross profit closes revenue minus cost of revenue. Operating expenses
+  closes SG&A + R&D + depreciation."
+  {"Cost of Revenue" "Gross Profit"
+   "Depreciation" "Operating Expenses"})
+
 (defn- row-class
-  [field rule?]
+  [field rule? below?]
   (cond
     rule? "fin-above-rule"
-    (= field "Gross Profit") "fin-result fin-gross"
+    (and (= field "Gross Profit") below?) "fin-result fin-gross"
+    (= field "Gross Profit") "fin-result"
+    (and below? (= field "Operating Expenses")) "fin-below-rule"
     (result-fields field) "fin-result"
     (asset-fields field) "fin-asset"
     (passive-fields field) "fin-passive"))
@@ -173,10 +182,12 @@
      (mapcat
       (fn [[i row]]
         (let [field (:field row)
+              prev-field (:field (nth rows (dec i) nil))
               next-field (:field (nth rows (inc i) nil))
-              ;; Revenue − cost of revenue. Two rules sit between those rows.
-              rule? (and (= field "Cost of Revenue") (= next-field "Gross Profit"))
-              class (row-class field rule?)]
+              ;; Two rules between the last addend and its total.
+              rule? (= (get sum-line field) next-field)
+              below? (= (get sum-line prev-field) field)
+              class (row-class field rule? below?)]
           (cond-> [[:tr (cond-> {:key i}
                           class (assoc :class class))
                     (for [col columns]
