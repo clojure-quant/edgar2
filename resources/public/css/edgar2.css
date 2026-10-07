@@ -116,7 +116,7 @@ tr.fin-double-rule td {
   flex-wrap: wrap;
   align-items: stretch;
   width: max-content;
-  max-width: 200rem;
+  max-width: 60rem;
   border-top: 1px solid #ccc;
   border-left: 1px solid #ccc;
 }
