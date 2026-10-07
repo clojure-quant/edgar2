@@ -3,9 +3,26 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.pprint :as pprint]
+            [clojure.string :as str]
             [edgar2.report.stats :as stats]))
 
 (def screen-path "data/screen.txt")
+
+(def mc-choices
+  "Minimum market cap, in millions of dollars."
+  [0 5 10 50 100 250 500 1000 5000 10000])
+
+(def default-min-mc 100)
+
+(defn parse-min-mc
+  "One of `mc-choices`, or nil. Accepts the number or its string."
+  [x]
+  (let [n (cond
+            (integer? x) (long x)
+            (number? x) (long x)
+            :else (try (Long/parseLong (str/trim (str x)))
+                       (catch Exception _ nil)))]
+    (when (some #{n} mc-choices) n)))
 
 (defn load-stats
   []
@@ -76,38 +93,67 @@
   [rows]
   (cheap-growth-on rows :ev-ebit #(and (number? (:ebit %)) (pos? (double (:ebit %))))))
 
+(defn cheap-consistent-on
+  "Bottom `pe-p` of positive PE, top 30% revenue-score, top 30% operating-income-score.
+  When `margin-p` is set, also the top `margin-p` of avg-profit-margin.
+  Score and margin cutoffs use every row; the PE cutoff uses positive PE only."
+  ([rows pe-p] (cheap-consistent-on rows pe-p nil))
+  ([rows pe-p margin-p]
+   (let [with-pe (filter #(and (number? (:price-earnings %))
+                               (pos? (double (:price-earnings %))))
+                         rows)
+         with-rev (filter #(number? (:revenue-score %)) rows)
+         with-oi (filter #(number? (:operating-income-score %)) rows)
+         with-margin (filter #(number? (:avg-profit-margin %)) rows)
+         pe-cut (when (seq with-pe) (cutoff-max-bottom (numeric :price-earnings with-pe) pe-p))
+         rev-cut (when (seq with-rev) (cutoff-min-top (numeric :revenue-score with-rev) 0.30))
+         oi-cut (when (seq with-oi) (cutoff-min-top (numeric :operating-income-score with-oi) 0.30))
+         margin-cut (when (and margin-p (seq with-margin))
+                      (cutoff-min-top (numeric :avg-profit-margin with-margin) margin-p))
+         hits (if (and pe-cut rev-cut oi-cut (or (nil? margin-p) margin-cut))
+                (->> rows
+                     (filter (fn [r]
+                               (and (number? (:price-earnings r))
+                                    (pos? (double (:price-earnings r)))
+                                    (number? (:revenue-score r))
+                                    (number? (:operating-income-score r))
+                                    (<= (double (:price-earnings r)) pe-cut)
+                                    (>= (double (:revenue-score r)) rev-cut)
+                                    (>= (double (:operating-income-score r)) oi-cut)
+                                    (or (nil? margin-p)
+                                        (and (number? (:avg-profit-margin r))
+                                             (>= (double (:avg-profit-margin r)) margin-cut))))))
+                     (sort-by (if margin-p
+                                (juxt :price-earnings
+                                      (comp - :revenue-score)
+                                      (comp - :operating-income-score)
+                                      (comp - :avg-profit-margin))
+                                (juxt :price-earnings
+                                      (comp - :revenue-score)
+                                      (comp - :operating-income-score)))))
+                [])]
+     {:cut pe-cut
+      :pe-p pe-p
+      :rev-cut rev-cut
+      :oi-cut oi-cut
+      :margin-cut margin-cut
+      :margin-p margin-p
+      :n-cheap (count with-pe)
+      :n-rev (count with-rev)
+      :n-oi (count with-oi)
+      :n-margin (count with-margin)
+      :rows hits})))
+
 (defn cheap-consistent
   "Bottom 30% PE (positive only), top 30% revenue-score, top 30% operating-income-score."
   [rows]
-  (let [with-pe (filter #(and (number? (:price-earnings %))
-                              (pos? (double (:price-earnings %))))
-                        rows)
-        with-rev (filter #(number? (:revenue-score %)) rows)
-        with-oi (filter #(number? (:operating-income-score %)) rows)
-        pe-cut (when (seq with-pe) (cutoff-max-bottom (numeric :price-earnings with-pe) 0.30))
-        rev-cut (when (seq with-rev) (cutoff-min-top (numeric :revenue-score with-rev) 0.30))
-        oi-cut (when (seq with-oi) (cutoff-min-top (numeric :operating-income-score with-oi) 0.30))
-        hits (if (and pe-cut rev-cut oi-cut)
-               (->> rows
-                    (filter (fn [r]
-                              (and (number? (:price-earnings r))
-                                   (pos? (double (:price-earnings r)))
-                                   (number? (:revenue-score r))
-                                   (number? (:operating-income-score r))
-                                   (<= (double (:price-earnings r)) pe-cut)
-                                   (>= (double (:revenue-score r)) rev-cut)
-                                   (>= (double (:operating-income-score r)) oi-cut))))
-                    (sort-by (juxt :price-earnings
-                                   (comp - :revenue-score)
-                                   (comp - :operating-income-score))))
-               [])]
-    {:cut pe-cut
-     :rev-cut rev-cut
-     :oi-cut oi-cut
-     :n-cheap (count with-pe)
-     :n-rev (count with-rev)
-     :n-oi (count with-oi)
-     :rows hits}))
+  (cheap-consistent-on rows 0.30))
+
+(defn cheap-consistent-margin
+  "Bottom 50% PE (positive only), top 30% revenue-score, top 30% operating-income-score,
+  top 30% avg-profit-margin."
+  [rows]
+  (cheap-consistent-on rows 0.50 0.30))
 
 (defn high-revenue-growth
   [rows n]
@@ -127,6 +173,16 @@
   (when (number? x)
     (Math/round (/ (double x) 1.0e6))))
 
+(defn at-least-mc
+  "Rows whose market cap, in millions of dollars, is at least `min-mc`.
+  A company with no market cap is left out at every level, including 0."
+  [rows min-mc]
+  (let [min-mc (long min-mc)]
+    (filterv (fn [r]
+               (when-let [mc (millions (:marketcap r))]
+                 (>= mc min-mc)))
+             rows)))
+
 (defn table-row
   [r]
   (cond-> {:ticker (:ticker r)
@@ -140,6 +196,7 @@
     (number? (:sales-growth-yoy r)) (assoc :s-yoy (stats/round1 (:sales-growth-yoy r)))
     (number? (:revenue-score r)) (assoc :rev-score (stats/round1 (:revenue-score r)))
     (number? (:operating-income-score r)) (assoc :oi-score (stats/round1 (:operating-income-score r)))
+    (number? (:avg-profit-margin r)) (assoc :avg-margin (stats/round4 (:avg-profit-margin r)))
     (number? (:return-on-capital r)) (assoc :roc (stats/round4 (:return-on-capital r)))
     (number? (:dividend-yield r))
     (assoc :dyld (format "%.1f" (double (:dividend-yield r))))))
@@ -158,15 +215,58 @@
                    (:n-roc screen) (* 100.0 (double (:roc-cut screen))))
            (format "  %d names" (count (:rows screen)))])))
 
+(defn- pct-label
+  [p]
+  (long (Math/round (* 100.0 (double p)))))
+
+(defn- consistent-lines
+  [screen]
+  (if-not (:cut screen)
+    ["  no positive PE"]
+    (cond-> [(format "  bottom %d%% PE (n=%d, PE <= %.1f, positive only)"
+                     (pct-label (:pe-p screen)) (:n-cheap screen) (double (:cut screen)))
+             (format "  top 30%% revenue-score (n=%d, >= %.1f)"
+                     (:n-rev screen) (double (:rev-cut screen)))
+             (format "  top 30%% operating-income-score (n=%d, >= %.1f)"
+                     (:n-oi screen) (double (:oi-cut screen)))]
+      (:margin-p screen)
+      (conj (format "  top %d%% avg-profit-margin (n=%d, >= %.2f%%)"
+                    (pct-label (:margin-p screen))
+                    (:n-margin screen)
+                    (* 100.0 (double (:margin-cut screen)))))
+      true
+      (conj (format "  %d names" (count (:rows screen)))))))
+
+(defn- with-mc-line
+  [specs min-mc n-universe n-all]
+  (let [line (format "  mc >= %d ($ millions; n=%d of %d)"
+                     (long min-mc) n-universe n-all)]
+    (mapv (fn [spec] (update spec :lines (fn [lines] (into [line] lines)))) specs)))
+
+(declare screen-specs*)
+
 (defn screen-specs
-  "Screens printed by `print-screen`: title, cutoff lines, columns, and rows."
+  "Screens printed by `print-screen`: title, cutoff lines, columns, and rows.
+
+  `min-mc` is applied first. Percentile cutoffs and the growth ranking
+  use only companies at or above that market cap, in millions of dollars.
+  Defaults to 100."
+  ([rows] (screen-specs rows {}))
+  ([rows {:keys [min-mc]}]
+   (let [min-mc (or (parse-min-mc min-mc) default-min-mc)
+         universe (at-least-mc rows min-mc)]
+     (with-mc-line (screen-specs* universe) min-mc (count universe) (count rows)))))
+
+(defn- screen-specs*
   [rows]
   (let [cheap (cheap-growth rows)
         cheap-ev (cheap-growth-ev-ebit rows)
         consistent (cheap-consistent rows)
+        consistent-margin (cheap-consistent-margin rows)
         growth (high-revenue-growth rows 50)
         cheap-cols [:ticker :entityName :price :mc :ev :pe :ev-ebit :s-yoy :roc :dyld]
         consistent-cols [:ticker :entityName :price :mc :pe :rev-score :oi-score :dyld]
+        margin-cols [:ticker :entityName :price :mc :pe :rev-score :oi-score :avg-margin :dyld]
         growth-cols [:ticker :entityName :price :mc :s-yoy :dyld]
         cheap-spec (fn [id title metric positive screen notes]
                      {:id id
@@ -182,18 +282,16 @@
                   "  EBIT = operating income, else net income + interest + tax"])
      {:id :cheap-consistent
       :title "Cheap consistent"
-      :lines (if-not (:cut consistent)
-               ["  no positive PE"]
-               [(format "  bottom 30%% PE (n=%d, PE <= %.1f, positive only)"
-                        (:n-cheap consistent) (double (:cut consistent)))
-                (format "  top 30%% revenue-score (n=%d, >= %.1f)"
-                        (:n-rev consistent) (double (:rev-cut consistent)))
-                (format "  top 30%% operating-income-score (n=%d, >= %.1f)"
-                        (:n-oi consistent) (double (:oi-cut consistent)))
-                (format "  %d names" (count (:rows consistent)))])
+      :lines (consistent-lines consistent)
       :columns consistent-cols
       :rows (mapv table-row (:rows consistent))
       :table? (boolean (:cut consistent))}
+     {:id :cheap-consistent-margin
+      :title "Cheap consistent margin"
+      :lines (consistent-lines consistent-margin)
+      :columns margin-cols
+      :rows (mapv table-row (:rows consistent-margin))
+      :table? (boolean (:cut consistent-margin))}
      {:id :high-revenue-growth
       :title "High revenue growth"
       :lines ["  50 names with the highest 7-year mean YoY sales-growth"]
@@ -211,21 +309,25 @@
     (pprint/print-table columns rows)))
 
 (defn print-screen
-  [rows]
-  (let [[first-spec & more] (screen-specs rows)]
-    (print-spec first-spec)
-    (doseq [spec more]
-      (println)
-      (print-spec spec))))
+  ([rows] (print-screen rows {}))
+  ([rows opts]
+   (let [[first-spec & more] (screen-specs rows opts)]
+     (print-spec first-spec)
+     (doseq [spec more]
+       (println)
+       (print-spec spec)))))
 
 (defn screen
   "Write data/screen.txt from data/stats.edn.
+  Market cap is filtered first; default minimum is 100 ($ millions).
 
-  Usage: clj -X:screen"
+  Usage: clj -X:screen
+         clj -X:screen :min-mc 1000"
   ([] (screen {}))
-  ([_]
-   (let [rows (load-stats)
-         text (with-out-str (print-screen rows))]
+  ([{:keys [min-mc]}]
+   (let [min-mc (or (parse-min-mc min-mc) default-min-mc)
+         rows (load-stats)
+         text (with-out-str (print-screen rows {:min-mc min-mc}))]
      (spit screen-path text)
      (print text)
      (println (format "Wrote %s" screen-path))

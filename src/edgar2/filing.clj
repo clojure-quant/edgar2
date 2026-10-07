@@ -123,6 +123,14 @@
    "EPS Basic" ["BasicEarningsLossPerShare"]
    "EPS Diluted" ["DilutedEarningsLossPerShare"]})
 
+(def income-fallbacks
+  "Extra concepts appended after a chain. The chain's own tags still win
+  for a period where both are filed. Insurers tag total revenue as Revenues
+  and then stop; contract revenue continues that line."
+  {"Total Revenue" ["RevenueFromContractWithCustomerExcludingAssessedTax"
+                    "RevenueFromContractWithCustomerIncludingAssessedTax"
+                    "SalesRevenueNet"]})
+
 (def depreciation-line
   "Depreciation sits with the operating-expense addends. Income-statement
   tags first; the cash-flow total is the last fallback."
@@ -150,7 +158,9 @@
   (let [sic (:sic (e/company-metadata cik))
         chains (:chains (e/concepts-for :income :industry (income-industry sic)))]
     (conj (mapv (fn [[label & concepts]]
-                  (into [label] (concat concepts (get ifrs-income-concepts label))))
+                  (into [label] (concat concepts
+                                        (get ifrs-income-concepts label)
+                                        (get income-fallbacks label))))
                 chains)
           depreciation-line)))
 
@@ -409,7 +419,8 @@
        ds))))
 
 (def pl-column-order
-  ["Revenue"
+  ["Total Revenue"
+   "Revenue"
    "Cost of Revenue"
    "Gross Profit"
    "SG&A Expense"
@@ -578,6 +589,111 @@
                                 [item (annual-line-values bs item)]))
      :dividends (quarterly-values cash annual-cash dividends-paid-label)}))
 
+(defn- ix-attr
+  [attrs k]
+  (second (re-find (re-pattern (str k "=\"([^\"]*)\"")) (str attrs))))
+
+(defn- xbrl-contexts
+  "Inline-XBRL context id → {:member :start :end}. :member is the share
+  class on StatementClassOfStockAxis, or nil when the fact is unscoped."
+  [html]
+  (into {}
+        (for [[_ id body] (re-seq #"(?s)<xbrli:context id=\"([^\"]+)\">(.*?)</xbrli:context>"
+                                  (str html))]
+          [id {:member (some-> (re-find #"StatementClassOfStockAxis\">(?:[^<:\"]+:)?([^<]+)" body)
+                               second)
+               :start (second (re-find #"<xbrli:startDate>([^<]+)" body))
+               :end (second (re-find #"<xbrli:endDate>([^<]+)" body))}])))
+
+(def weighted-share-names
+  {"us-gaap:WeightedAverageNumberOfSharesOutstandingBasic" "Shares Basic"
+   "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding" "Shares Diluted"})
+
+(defn- ix-share-facts
+  "Weighted-average share facts from inline XBRL. Nested tags with no text
+  are skipped; the inner tag carries the number."
+  [html]
+  (for [[_ attrs text] (re-seq #"<ix:nonFraction\b([^>]*)>([^<]*)" (str html))
+        :let [name (ix-attr attrs "name")
+              raw (-> text str str/trim (str/replace "," ""))
+              val (try (Double/parseDouble raw) (catch Exception _ nil))
+              scale (parse-long (or (ix-attr attrs "scale") "0"))]
+        :when (and val (contains? weighted-share-names name) scale)]
+    {:name name
+     :context (ix-attr attrs "contextRef")
+     :val (* val (Math/pow 10 scale))}))
+
+(defn- annual-share-rows
+  [facts contexts concept]
+  (keep (fn [{:keys [name context val]}]
+          (when (= concept name)
+            (when-let [ctx (get contexts context)]
+              (when (annual-duration? ctx)
+                {:member (:member ctx) :end (:end ctx) :val val}))))
+        facts))
+
+(defn- listed-share-class
+  "Share class to show. nil member means an unscoped total, which wins.
+   Otherwise the class with the largest count (the listed class when a
+   second class is a handful of shares)."
+  [rows]
+  (when (seq rows)
+    (if (some #(nil? (:member %)) rows)
+      {:member nil}
+      {:member (->> rows
+                    (group-by :member)
+                    (apply max-key (fn [[_ xs]] (reduce max (map :val xs))))
+                    key)})))
+
+(defn- end-values
+  [rows wanted]
+  (into {}
+        (keep (fn [{:keys [member end val]}]
+                (when (= wanted member)
+                  [end val]))
+              rows)))
+
+(defn class-weighted-shares
+  "Shares Basic and Shares Diluted from the latest annual report.
+
+  Company facts drop dimensional share counts, so a dual-class filer has
+  no share row. Read the weighted-average facts from the filing and keep
+  the listed class."
+  [cik form]
+  (try
+    (let [filing (e/filing cik :form form)
+          html (when filing (e/filing-document filing (:primaryDocument filing)))
+          contexts (xbrl-contexts html)
+          facts (ix-share-facts html)
+          basic-name "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic"
+          diluted-name "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding"
+          basic-rows (annual-share-rows facts contexts basic-name)
+          diluted-rows (annual-share-rows facts contexts diluted-name)
+          member (:member (or (listed-share-class basic-rows)
+                              (listed-share-class diluted-rows)))]
+      (into {}
+            (keep (fn [[concept line]]
+                    (let [values (end-values (if (= concept basic-name)
+                                               basic-rows
+                                               diluted-rows)
+                                             member)]
+                      (when (seq values) [line values]))))
+            weighted-share-names))
+    (catch Throwable _
+      {})))
+
+(defn- shares-present?
+  [by-pl]
+  (boolean (some (fn [line]
+                   (some number? (vals (get by-pl line))))
+                 ["Shares Basic" "Shares Diluted"])))
+
+(defn- with-class-shares
+  [by-pl cik form]
+  (if (shares-present? by-pl)
+    by-pl
+    (merge by-pl (class-weighted-shares cik form))))
+
 (defn financials-data
   "Standardized P&L and main balance-sheet lines.
 
@@ -604,7 +720,8 @@
                       :balance-values (into {} (for [item (distinct (map :line-item bs))]
                                                  [item (annual-line-values bs item)]))
                       :dividends (annual-line-values cash dividends-paid-label)}))
-          by-pl* (:income-values source)
+          by-pl* (cond-> (:income-values source)
+                   (not quarterly?) (with-class-shares cik form))
           by-bs (:balance-values source)
           ends (period-ends (get by-pl* "Revenue")
                             (get by-bs "Total Assets")

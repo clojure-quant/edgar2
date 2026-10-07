@@ -8,6 +8,16 @@ body {
   margin-bottom: 1rem;
 }
 
+.screen-controls {
+  display: inline-block;
+  margin-bottom: 1rem;
+}
+
+.screen-controls select {
+  font: inherit;
+  padding: 0.25rem 0.4rem;
+}
+
 .tabs {
   display: flex;
   gap: 0.5rem;
@@ -150,6 +160,20 @@ tr.fin-double-rule td {
 
 .fin-extra {
   margin-top: 1rem;
+}
+
+.fin-description {
+  max-width: 46rem;
+  margin: 0.75rem 0 0;
+  line-height: 1.45;
+}
+
+.fin-description p {
+  margin: 0.55rem 0;
+}
+
+.fin-description-loading {
+  color: #666;
 }
 
 .fin-extra p {

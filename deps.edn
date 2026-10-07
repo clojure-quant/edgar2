@@ -13,6 +13,8 @@
               :exec-args {:ticker "XOM"}}
   :business {:exec-fn edgar2.filing/business
              :exec-args {:ticker "XOM"}}
+  :description {:exec-fn edgar2.description/description
+                :exec-args {:ticker "MSFT"}}
   ; download
   :download-tickers {:exec-fn edgar2.download.tickers/download-tickers}
   :download-exchanges {:exec-fn edgar2.download.ticker-exchange/download-exchanges}

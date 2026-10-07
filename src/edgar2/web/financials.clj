@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [hyper.effects :as effects]
+            [edgar2.description :as description]
             [edgar2.filing :as filing]
             [edgar2.report.screen :as screen]
             [edgar2.web.fsds :as fsds]
@@ -74,6 +75,18 @@
       [:a {:href (str "/filing/" ticker)}
        (str "Latest " (or form "annual report"))]]]))
 
+(defn- description-view
+  "Company blurb loaded for this page's ticker."
+  [{:keys [status text]}]
+  (case status
+    :loading [:p {:class "fin-description fin-description-loading"} "Loading description…"]
+    :ready (if-let [text (some-> text str/trim not-empty)]
+             [:div.fin-description
+              (for [[i para] (map-indexed vector (str/split text #"\n\n+"))]
+                [:p {:key i} (str/trim para)])]
+             [:p {:class "fin-description fin-description-loading"} "No company description."])
+    nil))
+
 (def result-fields
   "Subtotals drawn with a light green row."
   #{"Gross Profit" "Operating Income" "Net Income"})
@@ -143,7 +156,8 @@
    {:key :pe :source :price-earnings :digits 1}
    {:key :ev-ebit :digits 1}
    {:key :price-sales :digits 2}
-   {:key :profit-margin :digits 4}])
+   {:key :profit-margin :digits 4}
+   {:key :avg-profit-margin :digits 4}])
 
 (defn- ratio-label
   [{:keys [key millions?]}]
@@ -265,9 +279,11 @@
   (let [ticker (ticker-param req)
         n (n-param req)
         period (period-param req)
-        result* (atom (when ticker {:status :loading}))]
+        result* (atom (when ticker {:status :loading}))
+        desc* (atom (when ticker {:status :loading :ticker ticker}))]
     (when ticker
       (h/watch! result*)
+      (h/watch! desc*)
       (future
         (reset! result*
                 (try
@@ -277,7 +293,15 @@
                                                   :period period})}
                   (catch Throwable e
                     {:status :error
-                     :message (or (ex-message e) (str e))})))))
+                     :message (or (ex-message e) (str e))}))))
+      (future
+        (let [text (try
+                     (:text (description/preferred ticker))
+                     (catch Throwable _ nil))]
+          (when (= ticker (:ticker @desc*))
+            (reset! desc* {:status :ready
+                           :ticker ticker
+                           :text text})))))
     (fn [_req]
       (let [{:keys [status data message]} @result*]
         [:div.page
@@ -293,5 +317,6 @@
                    (sector-line ticker)
                    (ratios-table ticker)
                    (financials-table data)
-                   (filing-links ticker (:form data))]
+                   (filing-links ticker (:form data))
+                   (description-view @desc*)]
            nil)]))))

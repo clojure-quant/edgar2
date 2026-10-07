@@ -30,14 +30,34 @@
                "")
              (cell (get row col)))])])]]])
 
+(defn- mc-select
+  [mc*]
+  (let [selected (or (screen/parse-min-mc @mc*) screen/default-min-mc)]
+    [:label.screen-controls "Min mc ($M) "
+     [:select {:data-on:change
+               (h/action
+                (when-let [n (screen/parse-min-mc $value)]
+                  (reset! mc* n)))}
+      (for [choice screen/mc-choices]
+        [:option (cond-> {:key choice :value (str choice)}
+                   (= choice selected) (assoc :selected true))
+         (str choice)])]]))
+
 (defn screen-page
   [_req]
-  (let [loaded (try {:specs (screen/screen-specs (screen/load-stats))}
+  (let [loaded (try {:rows (screen/load-stats)}
                     (catch Exception e
                       {:error (or (ex-message e) (str e))}))
-        tab* (h/tab-cursor :screen :cheap-growth)]
+        cache* (atom {})
+        tab* (h/tab-cursor :screen :cheap-growth)
+        mc* (h/tab-cursor :min-mc screen/default-min-mc)]
     (fn [_req]
-      (let [specs (:specs loaded)
+      (let [min-mc (or (screen/parse-min-mc @mc*) screen/default-min-mc)
+            specs (when (:rows loaded)
+                    (or (get @cache* min-mc)
+                        (let [s (screen/screen-specs (:rows loaded) {:min-mc min-mc})]
+                          (swap! cache* assoc min-mc s)
+                          s)))
             current (or (some #(when (= (:id %) @tab*) %) specs)
                         (first specs))]
         [:div.page
@@ -45,6 +65,7 @@
          (if-let [err (:error loaded)]
            [:p.error err]
            [:div
+            (mc-select mc*)
             [:div.tabs
              (for [s specs]
                [:button {:key (name (:id s))

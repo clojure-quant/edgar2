@@ -69,6 +69,10 @@
   "Number of trailing YoY revenue changes averaged into :sales-growth-yoy."
   7)
 
+(def profit-margin-window
+  "Number of trailing annual profit margins averaged into :avg-profit-margin."
+  10)
+
 (defn parse-date
   [d]
   (when d
@@ -171,12 +175,18 @@
   [series]
   (into {} (map (juxt #(str (:end %)) :val) series)))
 
+(defn aligned-ends
+  "Period-ends present in both series, oldest first."
+  [num-series den-series]
+  (sort (set/intersection (set (keys (by-end num-series)))
+                          (set (keys (by-end den-series))))))
+
 (defn latest-aligned
   "Latest period-end that exists in both series."
   [num-series den-series]
   (let [n (by-end num-series)
         d (by-end den-series)
-        ends (sort (set/intersection (set (keys n)) (set (keys d))))]
+        ends (aligned-ends num-series den-series)]
     (when (seq ends)
       (let [end (last ends)]
         {:end end :num (n end) :den (d end)}))))
@@ -185,6 +195,23 @@
   [num den]
   (when (and (number? num) (number? den) (not (zero? (double den))))
     (/ (double num) (double den))))
+
+(defn yearly-ratios
+  "num/den for each shared period-end, oldest first.
+  A year with a zero denominator is omitted."
+  [num-series den-series]
+  (let [n (by-end num-series)
+        d (by-end den-series)]
+    (vec (keep (fn [end] (ratio (n end) (d end)))
+               (aligned-ends num-series den-series)))))
+
+(defn avg-profit-margin
+  "Mean of the last `n` annual profit margins (net income / revenue)."
+  [ni rev n]
+  (let [window (take-last n (yearly-ratios ni rev))]
+    (when (seq window)
+      {:avg-profit-margin (avg window)
+       :avg-profit-margin-years (count window)})))
 
 (defn usd-unit?
   "True for USD or USD/shares (US listing price is in dollars)."
@@ -389,6 +416,7 @@
         oi (annual-flows facts ebit-tags revenue-unit)
         revenue (annual-revenue facts revenue-unit)
         growth (avg-sales-growth revenue sales-growth-window)
+        margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score revenue)
         oi-score (direction-score oi)
         margin (latest-aligned ni rev)
@@ -410,6 +438,9 @@
              :net-profit (:num margin)
              :revenue (:den margin)
              :margin-end (:end margin))
+      (:avg-profit-margin margins)
+      (assoc :avg-profit-margin (:avg-profit-margin margins)
+             :avg-profit-margin-years (:avg-profit-margin-years margins))
       roc
       (assoc :return-on-capital (ratio (:num roc) (:den roc))
              :assets (:den roc)
@@ -548,7 +579,8 @@
 
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
-  with 7-year mean YoY sales growth (%), profit margin, return on capital
+  with 7-year mean YoY sales growth (%), profit margin, 10-year mean
+  profit margin (Net Income / revenue), return on capital
   (Net Income / assets), plus :shares, :price, :marketcap, :price-sales,
   :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
@@ -610,11 +642,12 @@
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  rev-score=%d  oi-score=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  rev-score=%d  oi-score=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
                               (count (filter :profit-margin out))
+                              (count (filter :avg-profit-margin out))
                               (count (filter :return-on-capital out))
                               (count (filter :price out))
                               (count (filter :marketcap out))
