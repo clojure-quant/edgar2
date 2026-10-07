@@ -53,12 +53,17 @@ ATH-A Athene Holding Ltd
 
 WTRG Essential Utilities Inc
 - fast growing water utility
-- 4% divi yield.
+- 4% divi yield. 
+- pe 7
 
 RNR Renaissancere Holdings Ltd
 - global reinsurance bermuda
 - huge growth
 - pe 5
+
+V Visa Inc
+- growth stock.
+- pe 8
 
 
 SPRO Spero Therapeutics NO - they sold it all to KKR. next deal is risk.

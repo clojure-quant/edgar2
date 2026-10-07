@@ -50,13 +50,6 @@
       (re-matches #"\d{4}" s) (subs s 0 2)
       (re-find #"-\d{2}-" s) (second (re-find #"-(\d{2})-" s)))))
 
-(defn fiscal-period-end?
-  [end fye-mm]
-  (let [s (str end)]
-    (if fye-mm
-      (boolean (re-find (re-pattern (str "-" fye-mm "-")) s))
-      true)))
-
 (defn parse-date
   [d]
   (when d
@@ -168,27 +161,20 @@
   "Full-year income-statement fact rows (quarterly repeats removed)."
   ([cik fiscal-year-end]
    (annual-statement-rows cik fiscal-year-end "10-K"))
-  ([cik fiscal-year-end form]
-   (let [rows (ds/mapseq-reader
-               (e/income cik :form form :view :standardized
-                         :concepts (income-concepts cik)))
-         mm (or (fye-month fiscal-year-end)
-                (fye-month (some->> rows (map :end) (map str) sort last)))]
-     (->> rows
-          (filter annual-duration?)
-          (filter #(fiscal-period-end? (:end %) mm))))))
+  ([cik _fiscal-year-end form]
+   (->> (ds/mapseq-reader
+         (e/income cik :form form :view :standardized
+                   :concepts (income-concepts cik)))
+        (filter annual-duration?))))
 
 (defn annual-balance-rows
   "Year-end balance-sheet fact rows (instant FY / annual form)."
-  [cik fiscal-year-end form]
+  [cik _fiscal-year-end form]
   (let [rows (ds/mapseq-reader (e/balance cik :form form :view :standardized))
-        mm (or (fye-month fiscal-year-end)
-               (fye-month (some->> rows (map :end) (map str) sort last)))
         forms #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"}]
     (->> rows
          (filter #(or (= "FY" (:fp %))
-                      (forms (str (:form %)))))
-         (filter #(fiscal-period-end? (:end %) mm)))))
+                      (forms (str (:form %))))))))
 
 (def dividends-paid-label "Dividends Paid")
 
@@ -203,14 +189,10 @@
 
 (defn annual-cashflow-rows
   "Full-year cash-flow fact rows (quarterly repeats removed)."
-  [cik fiscal-year-end form concepts]
-  (let [rows (ds/mapseq-reader
-              (e/cashflow cik :form form :view :standardized :concepts concepts))
-        mm (or (fye-month fiscal-year-end)
-               (fye-month (some->> rows (map :end) (map str) sort last)))]
-    (->> rows
-         (filter annual-duration?)
-         (filter #(fiscal-period-end? (:end %) mm)))))
+  [cik _fiscal-year-end form concepts]
+  (->> (ds/mapseq-reader
+        (e/cashflow cik :form form :view :standardized :concepts concepts))
+       (filter annual-duration?)))
 
 (defn annual-line-values
   "Map of period-end string → value for one statement line item."
@@ -525,6 +507,8 @@
                 true
                 (as-> xs (vec (distinct (conj xs "Depreciation")))))
         columns (into [:field] col-labels)
+        year-end (into {:field "year-end"}
+                       (map (fn [end label] [label (str end)]) ends col-labels))
         pl-items (concat (filter (set items) pl-column-order)
                          (sort (remove (set pl-column-order) items)))
         bs-items (filter (fn [item]
@@ -538,7 +522,8 @@
         pl-rows (insert-after (map #(field-row % by-pl ends col-labels) pl-items)
                               "Shares Diluted"
                               div-row)
-        rows (vec (concat pl-rows
+        rows (vec (concat [year-end]
+                          pl-rows
                           [blank]
                           (map #(field-row % by-bs ends col-labels) bs-items)))]
     {:columns columns :rows rows}))
@@ -556,10 +541,10 @@
        vec))
 
 (defn column-labels
-  "One label per end. Annual labels are the year. Quarterly labels are \"2025 Q1\"."
+  "One label per end. Annual labels are the period-end date. Quarterly labels are \"2025 Q1\"."
   [ends period fye-mm]
   (if-not (= period :quarterly)
-    (mapv #(subs (str %) 0 4) ends)
+    (mapv str ends)
     (let [labels (map #(fiscal-quarter-label % fye-mm) ends)
           counts (frequencies labels)]
       (mapv (fn [end label]
@@ -767,11 +752,7 @@
            meta (e/company-metadata cik)
            fye (:fiscal-year-end meta)
            reported (ds/mapseq-reader (e/income cik :form "10-K" :view :as-reported))
-           mm (or (fye-month fye)
-                  (fye-month (some->> reported (map :end) (map str) sort last)))
-           annual (->> reported
-                       (filter annual-duration?)
-                       (filter #(fiscal-period-end? (:end %) mm)))
+           annual (filter annual-duration? reported)
            latest-end (->> annual (map #(str (:end %))) sort last)
            line-by-concept (->> (annual-statement-rows cik fye)
                                 (filter #(= latest-end (str (:end %))))

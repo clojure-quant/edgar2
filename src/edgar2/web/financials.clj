@@ -148,6 +148,7 @@
   [{:key :sales-growth-yoy :digits 1}
    {:key :revenue-score :digits 1}
    {:key :operating-income-score :digits 1}
+   {:key :return-on-assets :digits 4}
    {:key :return-on-capital :digits 4}
    {:key :price-earnings :digits 1}
    {:key :dividend-yield :digits 1}
@@ -182,6 +183,14 @@
           [:div.fin-ratio-label (ratio-label field)]
           [:div.fin-ratio-value (ratio-cell row field)]])])))
 
+(defn- col-heading
+  "Annual columns are keyed by yyyy-mm-dd. The heading is the year."
+  [col]
+  (let [s (str col)]
+    (if (re-matches #"\d{4}-\d{2}-\d{2}" s)
+      (subs s 0 4)
+      s)))
+
 (defn- financials-table
   [{:keys [columns rows]}]
   [:div.table-wrap
@@ -191,7 +200,7 @@
       (for [col columns]
         [:th {:key (str col)
               :class (when-not (= col :field) "num")}
-         (str col)])]]
+         (col-heading col)])]]
     [:tbody
      (mapcat
       (fn [[i row]]
@@ -201,7 +210,9 @@
               ;; Two rules between the last addend and its total.
               rule? (= (get sum-line field) next-field)
               below? (= (get sum-line prev-field) field)
-              class (row-class field rule? below?)]
+              class (if (= field "year-end")
+                      "fin-year-end"
+                      (row-class field rule? below?))]
           (cond-> [[:tr (cond-> {:key i}
                           class (assoc :class class))
                     (for [col columns]

@@ -71,6 +71,11 @@ th.num {
   font-variant-numeric: tabular-nums;
 }
 
+tr.fin-year-end td {
+  font-size: 50%;
+  line-height: 1;
+}
+
 tr.fin-result td {
   background: #e3f6e3;
 }

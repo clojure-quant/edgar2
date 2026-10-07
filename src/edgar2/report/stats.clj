@@ -43,6 +43,21 @@
   [[:us-gaap :Assets]
    [:ifrs-full :Assets]])
 
+(def total-equity-tags
+  "Total equity, already including noncontrolling interest."
+  [[:us-gaap :StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest]
+   [:ifrs-full :Equity]])
+
+(def parent-equity-tags
+  "Equity attributable to the parent. This is total equity when
+  noncontrolling interest is not tagged."
+  [[:us-gaap :StockholdersEquity]
+   [:ifrs-full :EquityAttributableToOwnersOfParent]])
+
+(def nci-tags
+  [[:us-gaap :MinorityInterest]
+   [:ifrs-full :NoncontrollingInterests]])
+
 (def ebit-tags
   "Operating income. Fallback is net income + interest + tax."
   [[:us-gaap :OperatingIncomeLoss]
@@ -136,6 +151,15 @@
                 (annual-forms (str (:form %))))
            (prefer-unit (observations facts tag-pairs) unit))))
 
+(defn first-annual-stocks
+  "Annual instant series from the first tag pair that has data (do not mix tags)."
+  [facts tag-pairs unit]
+  (or (some (fn [pair]
+              (let [s (annual-stocks facts [pair] unit)]
+                (when (seq s) s)))
+            tag-pairs)
+      []))
+
 (defn yoy-pct
   [prev cur]
   (when (and (number? prev) (number? cur) (not (zero? (double prev))))
@@ -174,6 +198,28 @@
 (defn by-end
   [series]
   (into {} (map (juxt #(str (:end %)) :val) series)))
+
+(defn plus-at-end
+  "Add `extra` onto `base` where both share a period-end."
+  [base extra]
+  (if (empty? extra)
+    (vec base)
+    (let [extra-by (by-end extra)]
+      (mapv (fn [row]
+              (if-let [v (get extra-by (str (:end row)))]
+                (update row :val #(+ (double %) (double v)))
+                row))
+            base))))
+
+(defn total-equity
+  "Total equity. Prefer a tag that already includes noncontrolling interest.
+  Otherwise parent equity, plus noncontrolling interest on years that tag it."
+  [facts unit]
+  (let [inclusive (first-annual-stocks facts total-equity-tags unit)]
+    (if (seq inclusive)
+      inclusive
+      (plus-at-end (first-annual-stocks facts parent-equity-tags unit)
+                   (first-annual-stocks facts nci-tags unit)))))
 
 (defn aligned-ends
   "Period-ends present in both series, oldest first."
@@ -419,8 +465,10 @@
         margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score revenue)
         oi-score (direction-score oi)
+        equity (total-equity facts revenue-unit)
         margin (latest-aligned ni rev)
-        roc (latest-aligned ni assets)
+        roa (latest-aligned ni assets)
+        roc (latest-aligned ni equity)
         debt (interest-bearing-debt facts revenue-unit bs-end)
         cash (cash-at facts revenue-unit bs-end)
         preferred (stock-at facts [[:us-gaap :PreferredStockValue]] revenue-unit bs-end)
@@ -441,9 +489,13 @@
       (:avg-profit-margin margins)
       (assoc :avg-profit-margin (:avg-profit-margin margins)
              :avg-profit-margin-years (:avg-profit-margin-years margins))
+      roa
+      (assoc :return-on-assets (ratio (:num roa) (:den roa))
+             :assets (:den roa)
+             :roa-end (:end roa))
       roc
       (assoc :return-on-capital (ratio (:num roc) (:den roc))
-             :assets (:den roc)
+             :equity (:den roc)
              :roc-end (:end roc))
       (and eps (number? (:val eps)))
       (assoc :eps (:val eps)
@@ -534,10 +586,12 @@
    :net-profit
    :eps
    :assets
+   :return-on-assets
+   :equity
+   :return-on-capital
    :sales-growth-yoy
    :revenue-score
    :operating-income-score
-   :return-on-capital
    :price-earnings
    :dividend-yield
    :enterprise-value
@@ -580,8 +634,8 @@
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
   with 7-year mean YoY sales growth (%), profit margin, 10-year mean
-  profit margin (Net Income / revenue), return on capital
-  (Net Income / assets), plus :shares, :price, :marketcap, :price-sales,
+  profit margin (Net Income / revenue), return on assets (Net Income / assets),
+  return on capital (Net Income / total equity), plus :shares, :price, :marketcap, :price-sales,
   :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
   :ev-ebit, :revenue-score, and :operating-income-score
@@ -619,11 +673,12 @@
                         (select-keys row [:ticker :exchange :cik :entityName])))
                  i' (inc i)]
              (when (or (zero? (mod i' 250)) (= i' total))
-               (println (format "  %d/%d  %s  growth=%s  margin=%s  roc=%s"
+               (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roc=%s"
                                 i' total
                                 (or (:ticker st) (:cik st))
                                 (fmt-growth (:sales-growth-yoy st))
                                 (some-> (:profit-margin st) (* 100) (#(format "%.1f" %)))
+                                (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
                                 (some-> (:return-on-capital st) (* 100) (#(format "%.1f" %)))))
                (flush))
              (recur i' (conj! acc st) (next rows)))
@@ -632,22 +687,24 @@
              (println)
              (pprint/print-table
               [:ticker :price :marketcap :price-sales :price-earnings
-               :sales-growth-yoy :profit-margin :return-on-capital]
+               :sales-growth-yoy :profit-margin :return-on-assets :return-on-capital]
               (take 25
                     (map (fn [r]
                            (-> r
                                (update :sales-growth-yoy round1)
                                (update :profit-margin round4)
+                               (update :return-on-assets round4)
                                (update :return-on-capital round4)
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  rev-score=%d  oi-score=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  rev-score=%d  oi-score=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
                               (count (filter :profit-margin out))
                               (count (filter :avg-profit-margin out))
+                              (count (filter :return-on-assets out))
                               (count (filter :return-on-capital out))
                               (count (filter :price out))
                               (count (filter :marketcap out))

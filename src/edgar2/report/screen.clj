@@ -52,44 +52,44 @@
   (keep (fn [r] (when (number? (k r)) (k r))) rows))
 
 (defn cheap-growth-on
-  "Bottom 30% of positive `k`, top 30% 7y mean YoY sales growth, top 50% ROC.
+  "Bottom 30% of positive `k`, top 30% 7y mean YoY sales growth, top 50% ROA.
   `keep?` further restricts the cheap set (growth and ROC cuts stay on all rows)."
   ([rows k] (cheap-growth-on rows k (constantly true)))
   ([rows k keep?]
    (let [with-k (filter #(and (number? (k %)) (pos? (double (k %))) (keep? %)) rows)
          with-g (filter #(number? (:sales-growth-yoy %)) rows)
-         with-roc (filter #(number? (:return-on-capital %)) rows)
+         with-roa (filter #(number? (:return-on-assets %)) rows)
          k-cut (when (seq with-k) (cutoff-max-bottom (numeric k with-k) 0.30))
          g-cut (when (seq with-g) (cutoff-min-top (numeric :sales-growth-yoy with-g) 0.30))
-         roc-cut (when (seq with-roc) (cutoff-min-top (numeric :return-on-capital with-roc) 0.50))
-         hits (if (and k-cut g-cut roc-cut)
+         roa-cut (when (seq with-roa) (cutoff-min-top (numeric :return-on-assets with-roa) 0.50))
+         hits (if (and k-cut g-cut roa-cut)
                 (->> rows
                      (filter (fn [r]
                                (and (number? (k r))
                                     (pos? (double (k r)))
                                     (keep? r)
                                     (number? (:sales-growth-yoy r))
-                                    (number? (:return-on-capital r))
+                                    (number? (:return-on-assets r))
                                     (<= (double (k r)) k-cut)
                                     (>= (double (:sales-growth-yoy r)) g-cut)
-                                    (>= (double (:return-on-capital r)) roc-cut))))
+                                    (>= (double (:return-on-assets r)) roa-cut))))
                      (sort-by (juxt k (comp - :sales-growth-yoy))))
                 [])]
      {:cut k-cut
       :growth-cut g-cut
-      :roc-cut roc-cut
+      :roa-cut roa-cut
       :n-cheap (count with-k)
       :n-growth (count with-g)
-      :n-roc (count with-roc)
+      :n-roa (count with-roa)
       :rows hits})))
 
 (defn cheap-growth
-  "Bottom 30% PE (positive only), top 30% 7y mean YoY sales growth, top 50% ROC."
+  "Bottom 30% PE (positive only), top 30% 7y mean YoY sales growth, top 50% ROA."
   [rows]
   (cheap-growth-on rows :price-earnings))
 
 (defn cheap-growth-ev-ebit
-  "Bottom 30% EV/EBIT (positive EBIT only), top 30% 7y mean YoY sales growth, top 50% ROC."
+  "Bottom 30% EV/EBIT (positive EBIT only), top 30% 7y mean YoY sales growth, top 50% ROA."
   [rows]
   (cheap-growth-on rows :ev-ebit #(and (number? (:ebit %)) (pos? (double (:ebit %))))))
 
@@ -197,6 +197,7 @@
     (number? (:revenue-score r)) (assoc :rev-score (stats/round1 (:revenue-score r)))
     (number? (:operating-income-score r)) (assoc :oi-score (stats/round1 (:operating-income-score r)))
     (number? (:avg-profit-margin r)) (assoc :avg-margin (stats/round4 (:avg-profit-margin r)))
+    (number? (:return-on-assets r)) (assoc :roa (stats/round4 (:return-on-assets r)))
     (number? (:return-on-capital r)) (assoc :roc (stats/round4 (:return-on-capital r)))
     (number? (:dividend-yield r))
     (assoc :dyld (format "%.1f" (double (:dividend-yield r))))))
@@ -211,8 +212,8 @@
                    (double (:cut screen)) positive-label)
            (format "  top 30%% s-yoy (7y mean YoY; n=%d, >= %.1f%%)"
                    (:n-growth screen) (double (:growth-cut screen)))
-           (format "  top 50%% roc (n=%d, >= %.2f%%)"
-                   (:n-roc screen) (* 100.0 (double (:roc-cut screen))))
+           (format "  top 50%% roa (n=%d, >= %.2f%%)"
+                   (:n-roa screen) (* 100.0 (double (:roa-cut screen))))
            (format "  %d names" (count (:rows screen)))])))
 
 (defn- pct-label
@@ -264,7 +265,7 @@
         consistent (cheap-consistent rows)
         consistent-margin (cheap-consistent-margin rows)
         growth (high-revenue-growth rows 50)
-        cheap-cols [:ticker :entityName :price :mc :ev :pe :ev-ebit :s-yoy :roc :dyld]
+        cheap-cols [:ticker :entityName :price :mc :ev :pe :ev-ebit :s-yoy :roa :roc :dyld]
         consistent-cols [:ticker :entityName :price :mc :pe :rev-score :oi-score :dyld]
         margin-cols [:ticker :entityName :price :mc :pe :rev-score :oi-score :avg-margin :dyld]
         growth-cols [:ticker :entityName :price :mc :s-yoy :dyld]
