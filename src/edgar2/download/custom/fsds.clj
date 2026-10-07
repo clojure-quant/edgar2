@@ -317,8 +317,8 @@
   "Build an overview of all primary filers from a few SEC bulk files
   (FSDS quarters + company_tickers_exchange.json), not one API call per CIK.
 
-  Usage: clj -X:filer-info
-         clj -X:filer-info :limit 10"
+  Usage: clj -X:download-universe-fsds
+         clj -X:download-universe-fsds :limit 10"
   ([] (filer-info {}))
   ([{:keys [limit]}]
    (e/init! dl/identity-header)

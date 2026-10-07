@@ -3,6 +3,7 @@
             [hyper.core :as h]
             [hyper.effects :as effects]
             [edgar2.filing :as filing]
+            [edgar2.report.screen :as screen]
             [edgar2.web.fsds :as fsds]
             [edgar2.web.nav :refer [nav]]))
 
@@ -107,6 +108,56 @@
     (result-fields field) "fin-result"
     (asset-fields field) "fin-asset"
     (passive-fields field) "fin-passive"))
+
+(def stats-by-ticker
+  "ticker → row from data/stats.edn. Empty when that file is missing."
+  (delay
+    (try
+      (into {}
+            (map (fn [row]
+                   [(str/upper-case (str (:ticker row))) row]))
+            (screen/load-stats))
+      (catch Throwable _
+        {}))))
+
+(def ratio-fields
+  "One column per ratio, in display order. `:pe` is price-earnings.
+  Market cap and enterprise value are shown in millions of dollars."
+  [{:key :sales-growth-yoy :digits 1}
+   {:key :revenue-score :digits 1}
+   {:key :operating-income-score :digits 1}
+   {:key :return-on-capital :digits 4}
+   {:key :price-earnings :digits 1}
+   {:key :dividend-yield :digits 1}
+   {:key :marketcap :millions? true}
+   {:key :enterprise-value :millions? true}
+   {:key :pe :source :price-earnings :digits 1}
+   {:key :ev-ebit :digits 1}
+   {:key :price-sales :digits 2}
+   {:key :profit-margin :digits 4}])
+
+(defn- ratio-label
+  [{:keys [key millions?]}]
+  (if millions? (str (name key) " ($M)") (name key)))
+
+(defn- ratio-cell
+  [row {:keys [key source digits millions?]}]
+  (let [v (get row (or source key))]
+    (cond
+      (not (number? v)) ""
+      millions? (str (Math/round (/ (double v) 1.0e6)))
+      :else (format (str "%." digits "f") (double v)))))
+
+(defn- ratios-table
+  [ticker]
+  (let [row (get @stats-by-ticker (str/upper-case (str ticker)))]
+    (if-not row
+      [:p.fin-ratios-missing "No ratios in stats.edn."]
+      [:div.fin-ratios
+       (for [field ratio-fields]
+         [:div.fin-ratio {:key (ratio-label field)}
+          [:div.fin-ratio-label (ratio-label field)]
+          [:div.fin-ratio-value (ratio-cell row field)]])])))
 
 (defn- financials-table
   [{:keys [columns rows]}]
@@ -229,6 +280,7 @@
                     (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
                             (:ticker data) (:name data) (:cik data) (:form data))]
                    (sector-line ticker)
+                   (ratios-table ticker)
                    (financials-table data)
                    (filing-links ticker (:form data))]
            nil)]))))

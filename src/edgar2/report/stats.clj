@@ -463,7 +463,7 @@
 (defn load-universe
   []
   (when-not (.exists (io/file universe/universe-path))
-    (throw (ex-info "Missing universe file; run clj -X:universe first"
+    (throw (ex-info "Missing universe file; run clj -X:universe-facts first"
                     {:path universe/universe-path})))
   (edn/read-string (slurp universe/universe-path)))
 
@@ -526,7 +526,7 @@
   (when x (/ (Math/round (* (double x) 10000.0)) 10000.0)))
 
 (defn stats
-  "From data/universe.edn + companyfacts.zip + prices.edn, write data/stats.edn
+  "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
   with 7-year mean YoY sales growth (%), profit margin, return on capital
   (Net Income / assets), plus :shares, :price, :marketcap, :price-sales,
   :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income),

@@ -9,7 +9,7 @@
             [jsonista.core :as json])
   (:import [java.util.zip ZipFile]))
 
-(def universe-path "data/universe.edn")
+(def universe-path "data/universe-facts.edn")
 
 (def common-share-tags
   [[:dei :EntityCommonStockSharesOutstanding]
@@ -201,14 +201,14 @@
 
 (defn universe
   "Download companyfacts.zip (with progress), join listed ticker/exchange by CIK,
-  and write data/universe.edn (unlisted CIKs omitted).
+  and write data/universe-facts.edn (unlisted CIKs omitted).
 
   Reuses a zip already on disk. Pass :force true to download again.
   :limit N parses only the first N JSON files (zip is still the full archive).
 
-  Usage: clj -X:universe
-         clj -X:universe :force true
-         clj -X:universe :limit 20"
+  Usage: clj -X:universe-facts
+         clj -X:universe-facts :force true
+         clj -X:universe-facts :limit 20"
   ([] (universe {}))
   ([{:keys [force limit]}]
    (e/init! dl/identity-header)

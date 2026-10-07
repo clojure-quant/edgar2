@@ -106,6 +106,41 @@ tr.fin-double-rule td {
   margin: 0 0 0.75rem;
 }
 
+.fin-ratios,
+.fin-ratios-missing {
+  margin: 0 0 1rem;
+}
+
+.fin-ratios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  width: max-content;
+  max-width: 200rem;
+  border-top: 1px solid #ccc;
+  border-left: 1px solid #ccc;
+}
+
+.fin-ratio {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;
+}
+
+.fin-ratio-label,
+.fin-ratio-value {
+  padding: 0.25rem 0.5rem;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.fin-ratio-label {
+  font-weight: 700;
+  border-bottom: 1px solid #ccc;
+}
+
 .fin-sic {
   display: inline-block;
   border: 1px solid #333;
