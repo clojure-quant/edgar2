@@ -65,6 +65,8 @@ V Visa Inc
 - growth stock.
 - pe 8
 
+MRSH  MARSH & MCLENNAN
+- reinsurance. good return on equity.
 
 SPRO Spero Therapeutics NO - they sold it all to KKR. next deal is risk.
 - biotec with approved drug and GSK distribution deal.

@@ -4,6 +4,8 @@
 (defn nav
   []
   [:nav.app-nav
+   [:a (h/navigate :stats) "Stats"]
+   " · "
    [:a (h/navigate :screen) "Screen"]
    " · "
    [:a (h/navigate :financials-home) "Financials"]])

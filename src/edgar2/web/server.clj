@@ -2,12 +2,16 @@
   (:require [hyper.core :as h]
             [edgar2.web.filing :refer [annual-report-page]]
             [edgar2.web.financials :refer [financials-page]]
+            [edgar2.web.overview :refer [overview-page]]
             [edgar2.web.screen :refer [screen-page]]))
 
 (def routes
-  [["/" {:name :screen
-         :title "Screen"
-         :get #'screen-page}]
+  [["/" {:name :stats
+         :title "Stats"
+         :get #'overview-page}]
+   ["/screen" {:name :screen
+               :title "Screen"
+               :get #'screen-page}]
    ["/financials" {:name :financials-home
                    :title "Financials"
                    :get #'financials-page}]
