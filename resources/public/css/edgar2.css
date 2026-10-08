@@ -115,6 +115,10 @@ tr.fin-double-rule td {
   margin: 0 0 1rem;
 }
 
+h2.stats-section {
+  margin: 2rem 0 0.75rem;
+}
+
 tr.quintile-group th {
   background: #f3f3f3;
   font-weight: 700;

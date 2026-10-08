@@ -1,6 +1,7 @@
 (ns edgar2.web.overview
   "Universe quintiles from data/stats.edn."
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats :as stats]
             [edgar2.web.nav :refer [nav]]))
@@ -72,6 +73,42 @@
      (cell :q4 q4)
      [:td.num {:key :q5} (if q4 (str "> " (format-value fmt q4)) "")]]))
 
+(defn sic-summary
+  "One row per :sic-description. :n is the company count. :avg-mkt-cap is
+  the mean :marketcap of companies in that description that have one."
+  [rows]
+  (->> rows
+       (filter #(not-empty (some-> (:sic-description %) str str/trim)))
+       (group-by #(str/trim (str (:sic-description %))))
+       (map (fn [[desc xs]]
+              (let [mcaps (filterv number? (keep :marketcap xs))]
+                {:sic-description desc
+                 :n (count xs)
+                 :avg-mkt-cap (when (seq mcaps)
+                                (/ (reduce + (map double mcaps)) (count mcaps)))})))
+       (sort-by (juxt (comp - :n) :sic-description))
+       vec))
+
+(defn- sic-table
+  [rows]
+  (let [groups (sic-summary rows)]
+    [:div.table-wrap
+     [:table
+      [:thead
+       [:tr
+        [:th "sic-description"]
+        [:th.num "n"]
+        [:th.num "avg-mkt-cap ($M)"]]]
+      (into [:tbody]
+            (map (fn [{:keys [sic-description n avg-mkt-cap]}]
+                   [:tr {:key sic-description}
+                    [:td sic-description]
+                    [:td.num n]
+                    [:td.num (if avg-mkt-cap
+                               (format-value :millions avg-mkt-cap)
+                               "")]]))
+            groups)]]))
+
 (defn- quintile-table
   [rows]
   [:div.table-wrap
@@ -106,4 +143,6 @@
         [:p.quintile-note
          (format "%s companies. Q1–Q4 are the top of each quintile; Q5 is above Q4."
                  (format "%,d" (count (:rows loaded))))]
-        (quintile-table (:rows loaded))])]))
+        (quintile-table (:rows loaded))
+        [:h2.stats-section "SIC"]
+        (sic-table (:rows loaded))])]))

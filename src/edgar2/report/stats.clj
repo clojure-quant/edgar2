@@ -6,6 +6,7 @@
             [clojure.set :as set]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar2.download.custom.fsds :as fsds]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
             [edgar2.download.custom.universe :as universe]
@@ -579,8 +580,40 @@
         (with-open [in (.getInputStream zf entry)]
           (json/read-value in json/keyword-keys-object-mapper))))))
 
+(defn load-sic-index
+  "Lookups from data/universe-fsds.edn: :by-cik and :by-ticker, each
+  {:sic :sic-description}. Empty when that file is missing."
+  []
+  (let [f (io/file fsds/filer-info-path)]
+    (if-not (.exists f)
+      (do (println (format "  no %s; sic left blank" fsds/filer-info-path))
+          {:by-cik {} :by-ticker {}})
+      (reduce (fn [idx row]
+                (let [sic (some-> (:sic row) str str/trim not-empty)
+                      desc (some-> (:sic-description row) str str/trim not-empty)
+                      info (cond-> {}
+                             sic (assoc :sic sic)
+                             desc (assoc :sic-description desc))
+                      cik (some-> (:cik row) str str/trim not-empty)
+                      ticker (some-> (:ticker row) str str/trim not-empty str/upper-case)]
+                  (cond-> idx
+                    (and cik (seq info)) (update :by-cik assoc cik info)
+                    (and ticker (seq info)) (update :by-ticker assoc ticker info))))
+              {:by-cik {} :by-ticker {}}
+              (edn/read-string (slurp f))))))
+
+(defn with-sic
+  "Copy :sic and :sic-description from universe-fsds onto a stats row.
+  CIK wins; ticker is the fallback."
+  [st {:keys [by-cik by-ticker]}]
+  (let [info (or (get by-cik (some-> (:cik st) str str/trim))
+                 (get by-ticker (some-> (:ticker st) str str/trim str/upper-case)))]
+    (cond-> st
+      (:sic info) (assoc :sic (:sic info))
+      (:sic-description info) (assoc :sic-description (:sic-description info)))))
+
 (def stats-field-order
-  [:ticker :exchange :cik :entityName :price
+  [:ticker :exchange :cik :entityName :sic :sic-description :price
    :shares :marketcap
    :revenue :revenue-unit
    :net-profit
@@ -619,6 +652,20 @@
     (spit tmp (with-out-str (pprint/pprint ordered)))
     (.renameTo (io/file tmp) (io/file stats-path))))
 
+(defn merge-sic!
+  "Add :sic and :sic-description from universe-fsds.edn onto the current
+  data/stats.edn, without rebuilding fundamentals."
+  []
+  (let [rows (mapv #(with-sic % (load-sic-index))
+                   (edn/read-string (slurp stats-path)))]
+    (save-stats! rows)
+    (println (format "Wrote %s  (%d companies; sic=%d  sic-description=%d)"
+                     stats-path
+                     (count rows)
+                     (count (filter :sic rows))
+                     (count (filter :sic-description rows))))
+    rows))
+
 (defn fmt-growth
   [x]
   (when x (format "%.1f" (double x))))
@@ -640,6 +687,7 @@
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
   :ev-ebit, :revenue-score, and :operating-income-score
   (0–100 share of annual years that did not fall versus the prior year).
+  :sic and :sic-description come from data/universe-fsds.edn.
 
   Usage: clj -X:stats
          clj -X:stats :limit 25"
@@ -649,6 +697,7 @@
    (let [zip-path (dl/ensure-zip! {:force force})
          all (load-universe)
          prices (load-price-by-ticker)
+         sic-index (load-sic-index)
          filers (vec (cond->> all limit (take (long limit))))
          total (count filers)]
      (println (format "stats  %d of %d universe  ← %s"
@@ -663,14 +712,16 @@
                            (catch Exception ex
                              (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
                              nil))
-                 st (try
-                      (-> (if data
-                            (company-stats (:facts data) row)
-                            (select-keys row [:ticker :exchange :cik :entityName]))
-                          (with-valuation prices (:shares-outstanding row)))
-                      (catch Exception ex
-                        (println (format "  stats-fail %s (%s)" (:ticker row) (.getMessage ex)))
-                        (select-keys row [:ticker :exchange :cik :entityName])))
+                 st (with-sic
+                      (try
+                        (-> (if data
+                              (company-stats (:facts data) row)
+                              (select-keys row [:ticker :exchange :cik :entityName]))
+                            (with-valuation prices (:shares-outstanding row)))
+                        (catch Exception ex
+                          (println (format "  stats-fail %s (%s)" (:ticker row) (.getMessage ex)))
+                          (select-keys row [:ticker :exchange :cik :entityName])))
+                      sic-index)
                  i' (inc i)]
              (when (or (zero? (mod i' 250)) (= i' total))
                (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roc=%s"
@@ -698,7 +749,7 @@
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  rev-score=%d  oi-score=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  rev-score=%d  oi-score=%d  sic=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
@@ -712,5 +763,6 @@
                               (count (filter :enterprise-value out))
                               (count (filter :ev-ebit out))
                               (count (filter :revenue-score out))
-                              (count (filter :operating-income-score out))))
+                              (count (filter :operating-income-score out))
+                              (count (filter :sic out))))
              out)))))))
