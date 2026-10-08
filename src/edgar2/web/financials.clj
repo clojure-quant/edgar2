@@ -142,24 +142,25 @@
       (catch Throwable _
         {}))))
 
-(def ratio-fields
-  "One column per ratio, in display order. `:pe` is price-earnings.
+(def ratio-groups
+  "Ratio columns, grouped. `:pe` is price-earnings.
   Market cap and enterprise value are shown in millions of dollars."
-  [{:key :sales-growth-yoy :digits 1}
-   {:key :revenue-score :digits 1}
-   {:key :operating-income-score :digits 1}
-   {:key :return-on-assets :digits 4}
-   {:key :return-on-capital :digits 4}
-   {:key :price-earnings :digits 1}
-   {:key :dividend-yield :digits 1}
-   {:key :dividend-coverage :digits 1}
-   {:key :marketcap :millions? true}
-   {:key :enterprise-value :millions? true}
-   {:key :pe :source :price-earnings :digits 1}
-   {:key :ev-ebit :digits 1}
-   {:key :price-sales :digits 2}
-   {:key :profit-margin :digits 4}
-   {:key :avg-profit-margin :digits 4}])
+  [{:label "Price"
+    :fields [{:key :price :digits 2}
+             {:key :marketcap :millions? true}
+             {:key :enterprise-value :millions? true}]}
+   {:label "Quality"
+    :fields [{:key :return-on-capital :digits 4}
+             {:key :revenue-score :digits 1}
+             {:key :operating-income-score :digits 1}
+             {:key :avg-profit-margin :digits 4}]}
+   {:label "Growth"
+    :fields [{:key :sales-growth-yoy :digits 1}]}
+   {:label "Valuation"
+    :fields [{:key :ev-ebit :digits 1}
+             {:key :pe :source :price-earnings :digits 1}
+             {:key :price-sales :digits 2}
+             {:key :dividend-yield :digits 1}]}])
 
 (defn- ratio-label
   [{:keys [key millions?]}]
@@ -179,10 +180,14 @@
     (if-not row
       [:p.fin-ratios-missing "No ratios in stats.edn."]
       [:div.fin-ratios
-       (for [field ratio-fields]
-         [:div.fin-ratio {:key (ratio-label field)}
-          [:div.fin-ratio-label (ratio-label field)]
-          [:div.fin-ratio-value (ratio-cell row field)]])])))
+       (for [{:keys [label fields]} ratio-groups]
+         [:div.fin-ratio-group {:key label}
+          [:div.fin-ratio-group-label label]
+          [:div.fin-ratio-group-fields
+           (for [field fields]
+             [:div.fin-ratio {:key (ratio-label field)}
+              [:div.fin-ratio-label (ratio-label field)]
+              [:div.fin-ratio-value (ratio-cell row field)]])]])])))
 
 (defn- col-heading
   "Annual columns are keyed by yyyy-mm-dd. The heading is the year."
