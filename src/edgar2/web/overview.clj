@@ -2,6 +2,7 @@
   "Universe quintiles from data/stats.edn."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [hyper.core :as h]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats :as stats]
             [edgar2.web.nav :refer [nav]]))
@@ -45,7 +46,7 @@
     :percent (format "%.1f" (* 100.0 (double x)))
     :number (format "%.1f" (double x))))
 
-(defn- load-rows
+(defn load-rows
   []
   (let [f (io/file stats/stats-path)]
     (when-not (.exists f)
@@ -65,7 +66,7 @@
         [q1 q2 q3 q4] (quintile-cuts xs)
         cell (fn [k x] [:td.num {:key k} (if x (format-value fmt x) "")])]
     [:tr {:key label}
-     [:td label]
+     [:td [:a (h/navigate :segment {} {:metric (name key)}) label]]
      [:td.num (count xs)]
      (cell :q1 q1)
      (cell :q2 q2)
@@ -102,7 +103,8 @@
       (into [:tbody]
             (map (fn [{:keys [sic-description n avg-mkt-cap]}]
                    [:tr {:key sic-description}
-                    [:td sic-description]
+                    [:td [:a (h/navigate :segment {} {:sic sic-description})
+                          sic-description]]
                     [:td.num n]
                     [:td.num (if avg-mkt-cap
                                (format-value :millions avg-mkt-cap)

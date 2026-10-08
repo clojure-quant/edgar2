@@ -3,7 +3,8 @@
             [edgar2.web.filing :refer [annual-report-page]]
             [edgar2.web.financials :refer [financials-page]]
             [edgar2.web.overview :refer [overview-page]]
-            [edgar2.web.screen :refer [screen-page]]))
+            [edgar2.web.screen :refer [screen-page]]
+            [edgar2.web.segment :refer [segment-page]]))
 
 (def routes
   [["/" {:name :stats
@@ -12,6 +13,9 @@
    ["/screen" {:name :screen
                :title "Screen"
                :get #'screen-page}]
+   ["/segment" {:name :segment
+                :title "Segment"
+                :get #'segment-page}]
    ["/financials" {:name :financials-home
                    :title "Financials"
                    :get #'financials-page}]
