@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [edgar.download :as dl]
+            [edgar2.derived :as derived]
             [clojure.pprint :as pprint]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]
@@ -450,34 +451,6 @@
       (double val)
       (long (/ val 1.0e6)))))
 
-(defn derived-operating-expenses
-  "When filers (esp. E&P) do not tag OperatingExpenses: pretax ≈
-  revenue − cogs − opex − interest + other income + asset gains."
-  [by-item end]
-  (let [g (fn [item] (get (by-item item) end))
-        rev (g "Revenue")
-        pretax (g "Pre-Tax Income")]
-    (when (and rev pretax)
-      (- (+ rev
-            (or (g "Non-Operating Income") 0)
-            (or (g "Gain (Loss) on Sale of Assets") 0))
-         pretax
-         (or (g "Cost of Revenue") 0)
-         (or (g "Interest Expense") 0)))))
-
-(defn with-derived-opex
-  [by-item ends]
-  (let [existing (or (by-item "Operating Expenses") {})
-        filled (reduce (fn [m end]
-                         (if (get m end)
-                           m
-                           (if-let [v (derived-operating-expenses by-item end)]
-                             (assoc m end v)
-                             m)))
-                       existing
-                       ends)]
-    (assoc by-item "Operating Expenses" filled)))
-
 (defn field-row
   [item by-item ends year-cols]
   (into {:field item}
@@ -500,10 +473,12 @@
 (defn statement-rows
   "P&L, a blank line, then the balance sheet. `col-labels` names each period in `ends`."
   [by-pl* by-bs dividends ends col-labels]
-  (let [by-pl (with-derived-opex by-pl* ends)
+  (let [by-pl (derived/with-derived-lines by-pl* ends)
         items (cond-> (vec (keys by-pl*))
-                (seq (by-pl "Operating Expenses"))
-                (as-> xs (vec (distinct (conj xs "Operating Expenses"))))
+                (seq (by-pl derived/operating-expenses))
+                (as-> xs (vec (distinct (conj xs derived/operating-expenses))))
+                (seq (by-pl derived/operating-income))
+                (as-> xs (vec (distinct (conj xs derived/operating-income))))
                 true
                 (as-> xs (vec (distinct (conj xs "Depreciation")))))
         columns (into [:field] col-labels)

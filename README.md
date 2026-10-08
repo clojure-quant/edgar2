@@ -53,7 +53,7 @@ clj -X:stats
 clj -X:stats :limit 25
 ```
 
-From `universe-facts.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on assets (Net Income / assets), return on capital (Net Income / total equity), `:shares`, `:price`, `:marketcap` (price × shares), `:price-sales` (USD market cap / USD revenue), `:price-earnings` (USD price / USD EPS, else USD market cap / USD Net Income), and `:dividend-yield` (USD dividend per share / price, %).
+From `universe-facts.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on assets (Net Income / assets), return on capital (Net Income / total equity), `:shares`, `:price`, `:marketcap` (price × shares), `:price-sales` (USD market cap / USD revenue), `:price-earnings` (USD price / USD EPS, else USD market cap / USD Net Income), `:dividend-yield` (USD dividend per share / price, %), and `:dividend-coverage` (net income / dividends paid, only when a dividend was paid).
 
 ```bash
 clj -X:web
@@ -89,3 +89,9 @@ FSDS
 
 
 operating expenses (selling, general and administrative, research and development, and usually depreciation) → operating income
+
+
+
+588 listed companies report a revenue concept and a net-income concept, and report neither us-gaap:OperatingIncomeLoss nor ifrs-full:ProfitLossFromOperatingActivities. CLX is one of them: it has NetIncomeLoss and revenue tags, and no operating-income tag.
+
+Of those 588, 480 have NetIncomeLoss and 108 have only IFRS ProfitLoss

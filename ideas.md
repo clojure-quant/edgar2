@@ -68,13 +68,13 @@ V Visa Inc
 MRSH  MARSH & MCLENNAN
 - reinsurance. good return on equity.
 
-SPRO Spero Therapeutics NO - they sold it all to KKR. next deal is risk.
-- biotec with approved drug and GSK distribution deal.
-- 70 mio market cap.
-- GSK also bought 7,450,000 shares at $1.20805, or $9 million.
-- What is still owed by GSK
-  - $51 million on the first U.S. commercial sale.
-  - $25 million on the second anniversary of that sale.
-  - $25 million on the first sale in two European countries.
-  - $225 million of one-time sales milestones: $25 million at each of $200 million, $300 million, and $400 million of annual net sales, then $50 million at each of $500 million, $750 million, and $1 billion.
-Healthcare Royalty, a KKR business, bought $105 million of senior notes from a Spero subsidiary. Spero received about $103.4 million of cash: the notes were issued at a $3.15 million discount, and Healthcare Royalty paid another $1.575 million for the tail described below. The notes pay 10% interest and mature nine years later, in July 2035.
+
+CLX Clorox Co
+- stable cleaning chems
+- pe 17. dy 6
+- didvidend will be cut; at 30% more down could be interesting
+
+
+- PFH:NYSE junior notes 4.125 due 2060
+- Prudential Financial
+- 6.875% yield, 7.3% yield to maturity.

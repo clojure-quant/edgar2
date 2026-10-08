@@ -163,6 +163,24 @@
        (take n)
        vec))
 
+(defn dividend-yield-screen
+  "Top 10% of positive dividend yields, highest yield first."
+  [rows]
+  (let [with-dy (filterv #(and (number? (:dividend-yield %))
+                               (pos? (double (:dividend-yield %))))
+                         rows)
+        cut (when (seq with-dy)
+              (cutoff-min-top (numeric :dividend-yield with-dy) 0.10))
+        hits (if cut
+               (->> with-dy
+                    (filter #(>= (double (:dividend-yield %)) (double cut)))
+                    (sort-by :dividend-yield >)
+                    vec)
+               [])]
+    {:cut cut
+     :n (count with-dy)
+     :rows hits}))
+
 (defn cap-name
   [s]
   (let [s (str s)]
@@ -189,7 +207,9 @@
            :entityName (cap-name (:entityName r))}
     (number? (:price r))
     (assoc :price (->> (:price r) double (format "%.2f") Double/parseDouble))
-    (number? (:marketcap r)) (assoc :mc (millions (:marketcap r)))
+    (number? (:marketcap r))
+    (assoc :mc (millions (:marketcap r))
+           :market-cap (millions (:marketcap r)))
     (number? (:enterprise-value r)) (assoc :ev (millions (:enterprise-value r)))
     (number? (:price-earnings r)) (assoc :pe (stats/round1 (:price-earnings r)))
     (number? (:ev-ebit r)) (assoc :ev-ebit (stats/round1 (:ev-ebit r)))
@@ -200,7 +220,10 @@
     (number? (:return-on-assets r)) (assoc :roa (stats/round4 (:return-on-assets r)))
     (number? (:return-on-capital r)) (assoc :roc (stats/round4 (:return-on-capital r)))
     (number? (:dividend-yield r))
-    (assoc :dyld (format "%.1f" (double (:dividend-yield r))))))
+    (assoc :dyld (format "%.1f" (double (:dividend-yield r)))
+           :dividend-yield (stats/round1 (:dividend-yield r)))
+    (number? (:dividend-coverage r))
+    (assoc :dividend-coverage (stats/round1 (:dividend-coverage r)))))
 
 (defn- cheap-lines
   [metric-label positive-label screen notes]
@@ -219,6 +242,17 @@
 (defn- pct-label
   [p]
   (long (Math/round (* 100.0 (double p)))))
+
+(defn- dividend-yield-lines
+  [screen]
+  (if-not (:cut screen)
+    ["  no positive dividend-yield"]
+    [(format "  top 10%% dividend-yield (n=%d, >= %.1f%%, positive only)"
+             (:n screen) (double (:cut screen)))
+     "  sorted by dividend-yield descending"
+     "  dividend-coverage = net income / dividends paid"
+     "  market-cap in $ millions"
+     (format "  %d names" (count (:rows screen)))]))
 
 (defn- consistent-lines
   [screen]
@@ -265,10 +299,12 @@
         consistent (cheap-consistent rows)
         consistent-margin (cheap-consistent-margin rows)
         growth (high-revenue-growth rows 50)
+        yield-screen (dividend-yield-screen rows)
         cheap-cols [:ticker :entityName :price :mc :ev :pe :ev-ebit :s-yoy :roa :roc :dyld]
         consistent-cols [:ticker :entityName :price :mc :pe :rev-score :oi-score :dyld]
         margin-cols [:ticker :entityName :price :mc :pe :rev-score :oi-score :avg-margin :dyld]
         growth-cols [:ticker :entityName :price :mc :s-yoy :dyld]
+        yield-cols [:ticker :market-cap :pe :ev-ebit :dividend-yield :dividend-coverage]
         cheap-spec (fn [id title metric positive screen notes]
                      {:id id
                       :title title
@@ -298,7 +334,13 @@
       :lines ["  50 names with the highest 7-year mean YoY sales-growth"]
       :columns growth-cols
       :rows (mapv table-row growth)
-      :table? true}]))
+      :table? true}
+     {:id :dividend-yield
+      :title "Dividend yield"
+      :lines (dividend-yield-lines yield-screen)
+      :columns yield-cols
+      :rows (mapv table-row (:rows yield-screen))
+      :table? (boolean (:cut yield-screen))}]))
 
 (defn- print-spec
   [{:keys [title lines columns rows table?]}]

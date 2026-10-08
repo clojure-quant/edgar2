@@ -6,6 +6,7 @@
             [clojure.set :as set]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar2.derived :as derived]
             [edgar2.download.custom.fsds :as fsds]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
@@ -39,6 +40,14 @@
   [[:us-gaap :CommonStockDividendsPerShare]
    [:us-gaap :CommonStockDividendsPerShareDeclared]
    [:ifrs-full :DividendsPaidOrdinaryShares]])
+
+(def dividends-paid-tags
+  "Total cash dividends. US-GAAP total, then common-only, then IFRS financing."
+  [[:us-gaap :PaymentsOfDividends]
+   [:us-gaap :PaymentsOfDividendsCommonStock]
+   [:ifrs-full :DividendsPaidClassifiedAsFinancingActivities]
+   [:ifrs-full :DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities]
+   [:ifrs-full :DividendsPaid]])
 
 (def asset-tags
   [[:us-gaap :Assets]
@@ -396,20 +405,76 @@
   (when end
     (some #(stock-at facts [%] unit end) cash-tag-pairs)))
 
+(defn first-present
+  "Period-end → value. Earlier maps win when an end is in more than one."
+  [maps]
+  (reduce (fn [acc m] (merge m acc)) {} maps))
+
+(defn statement-by-item
+  "Annual {line {end value}} for the lines edgar2.derived fills.
+  Per period, the first concept in the line's chain that has an annual fact."
+  [facts unit]
+  (into {}
+        (keep (fn [[label tags]]
+                (let [by-end (first-present
+                              (keep (fn [pair]
+                                      (let [series (annual-flows facts [pair] unit)]
+                                        (when (seq series)
+                                          (into {} (map (juxt #(str (:end %)) :val) series)))))
+                                    tags))]
+                  (when (seq by-end)
+                    [label by-end])))
+              derived/statement-lines)))
+
+(defn with-derived-income
+  "Reported lines plus derived operating expenses and, where those
+  expenses were derived and operating income is absent, operating income
+  = gross profit − operating expenses.
+
+  `:derived-oi` is only the operating-income periods this call filled."
+  [facts unit]
+  (let [by-item (statement-by-item facts unit)
+        ends (->> (vals by-item) (mapcat keys) distinct sort vec)
+        filled (derived/with-derived-lines by-item ends)
+        before (get by-item derived/operating-income)]
+    {:lines filled
+     :derived-oi (into {}
+                       (keep (fn [[end v]]
+                               (when (and (number? v)
+                                          (not (number? (get before end))))
+                                 [end v]))
+                             (get filled derived/operating-income)))}))
+
+(defn series-plus
+  "Reported rows, then values from `extra` on period-ends the series lacks."
+  [reported extra]
+  (let [have (set (map #(str (:end %)) reported))]
+    (->> (concat reported
+                 (keep (fn [[end v]]
+                         (when (and (number? v) (not (have (str end))))
+                           {:end (str end) :val (double v)}))
+                       extra))
+         (sort-by #(str (:end %)))
+         vec)))
+
 (defn annual-ebit
-  "Operating income at the last report `end`. Otherwise net income +
-  interest + tax at that same date."
-  [facts unit end]
-  (if-let [reported (fact-at facts ebit-tags unit end)]
-    {:ebit (:val reported) :ebit-end (:end reported)}
-    (let [ni (fact-at facts net-income-tags unit end)
-          interest (fact-at facts interest-expense-tags unit end)
-          tax (fact-at facts income-tax-tags unit end)]
-      (when (and ni (or interest tax))
-        {:ebit (+ (double (:val ni))
-                  (double (or (:val interest) 0))
-                  (double (or (:val tax) 0)))
-         :ebit-end (str end)}))))
+  "Operating income at the last report `end`. Otherwise derived operating
+  income at that date (gross profit − derived operating expenses).
+  Otherwise net income + interest + tax at that same date."
+  [facts unit end derived-oi]
+  (or (when-let [reported (fact-at facts ebit-tags unit end)]
+        {:ebit (:val reported) :ebit-end (:end reported)})
+      (when-let [v (get derived-oi (str end))]
+        (when (number? v)
+          {:ebit (double v) :ebit-end (str end)}))
+      (let [ni (fact-at facts net-income-tags unit end)
+            interest (fact-at facts interest-expense-tags unit end)
+            tax (fact-at facts income-tax-tags unit end)]
+        (when (and ni (or interest tax))
+          {:ebit (+ (double (:val ni))
+                    (double (or (:val interest) 0))
+                    (double (or (:val tax) 0)))
+           :ebit-end (str end)}))))
 
 (defn flow-or-stock
   [facts pair unit]
@@ -451,6 +516,24 @@
          :end (str end)
          :unit (when (usd-unit? revenue-unit) "USD/shares")})))
 
+(defn annual-dividends-paid
+  "Cash dividends paid at period-end `end`, as a positive amount in `unit`.
+  Nil when that fact is missing, zero, or in another currency.
+  A negative cash-flow sign is treated as the amount paid."
+  [facts unit end]
+  (when-let [paid (fact-at facts dividends-paid-tags unit end)]
+    (when (and (number? (:val paid))
+               (or (str/blank? (str unit))
+                   (= (str unit) (str (:unit paid)))))
+      (let [amount (Math/abs (double (:val paid)))]
+        (when (pos? amount) amount)))))
+
+(defn dividend-coverage
+  "Net income / dividends paid at `end`. Nil when no dividend was paid."
+  [facts unit end net-income]
+  (when-let [paid (annual-dividends-paid facts unit end)]
+    (ratio net-income paid)))
+
 (defn company-stats
   [facts {:keys [revenue-unit] :as row}]
   (let [rev (annual-flows facts universe/revenue-tags revenue-unit)
@@ -460,7 +543,9 @@
         last-end (later-end (some-> (latest-obs rev) :end str) bs-end)
         eps (latest-obs (annual-eps facts))
         dps (annual-dps facts last-end revenue-unit)
-        oi (annual-flows facts ebit-tags revenue-unit)
+        income (with-derived-income facts revenue-unit)
+        oi (series-plus (annual-flows facts ebit-tags revenue-unit)
+                        (:derived-oi income))
         revenue (annual-revenue facts revenue-unit)
         growth (avg-sales-growth revenue sales-growth-window)
         margins (avg-profit-margin ni rev profit-margin-window)
@@ -475,7 +560,13 @@
         preferred (stock-at facts [[:us-gaap :PreferredStockValue]] revenue-unit bs-end)
         nci (or (stock-at facts [[:us-gaap :MinorityInterest]] revenue-unit bs-end)
                 (stock-at facts [[:ifrs-full :NoncontrollingInterests]] revenue-unit bs-end))
-        ebit (annual-ebit facts revenue-unit last-end)]
+        ebit (annual-ebit facts revenue-unit last-end
+                             (:derived-oi income))
+        coverage-end (or (:end margin) last-end)
+        coverage-ni (if margin
+                      (:num margin)
+                      (:val (fact-at facts net-income-tags revenue-unit coverage-end)))
+        coverage (dividend-coverage facts revenue-unit coverage-end coverage-ni)]
     (cond-> (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
       (:sales-growth-yoy growth)
       (assoc :sales-growth-yoy (:sales-growth-yoy growth)
@@ -511,7 +602,8 @@
       (number? cash) (assoc :cash cash)
       (number? preferred) (assoc :preferred-stock preferred)
       (number? nci) (assoc :noncontrolling-interest nci)
-      (:ebit ebit) (assoc :ebit (:ebit ebit) :ebit-end (:ebit-end ebit)))))
+      (:ebit ebit) (assoc :ebit (:ebit ebit) :ebit-end (:ebit-end ebit))
+      (number? coverage) (assoc :dividend-coverage coverage))))
 
 (defn load-price-by-ticker
   "ticker → close from data/prices.edn."
@@ -627,6 +719,7 @@
    :operating-income-score
    :price-earnings
    :dividend-yield
+   :dividend-coverage
    :enterprise-value
    :ev-ebit
    :ebit
@@ -684,9 +777,12 @@
   profit margin (Net Income / revenue), return on assets (Net Income / assets),
   return on capital (Net Income / total equity), plus :shares, :price, :marketcap, :price-sales,
   :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income),
+  :dividend-coverage (net income / dividends paid; omitted when none was paid),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
   :ev-ebit, :revenue-score, and :operating-income-score
   (0–100 share of annual years that did not fall versus the prior year).
+  When operating income is not tagged, a year whose operating expenses were
+  derived uses gross profit minus those expenses.
   :sic and :sic-description come from data/universe-fsds.edn.
 
   Usage: clj -X:stats
@@ -749,7 +845,7 @@
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  rev-score=%d  oi-score=%d  sic=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  rev-score=%d  oi-score=%d  sic=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
@@ -762,6 +858,7 @@
                               (count (filter :price-earnings out))
                               (count (filter :enterprise-value out))
                               (count (filter :ev-ebit out))
+                              (count (filter :dividend-coverage out))
                               (count (filter :revenue-score out))
                               (count (filter :operating-income-score out))
                               (count (filter :sic out))))

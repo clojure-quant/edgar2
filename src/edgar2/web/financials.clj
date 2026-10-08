@@ -152,6 +152,7 @@
    {:key :return-on-capital :digits 4}
    {:key :price-earnings :digits 1}
    {:key :dividend-yield :digits 1}
+   {:key :dividend-coverage :digits 1}
    {:key :marketcap :millions? true}
    {:key :enterprise-value :millions? true}
    {:key :pe :source :price-earnings :digits 1}
