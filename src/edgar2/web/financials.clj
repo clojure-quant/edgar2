@@ -150,9 +150,11 @@
              {:key :marketcap :millions? true}
              {:key :enterprise-value :millions? true}]}
    {:label "Quality"
-    :fields [{:key :return-on-capital :digits 4}
+    :fields [{:key :return-on-assets :digits 4}
+             {:key :return-on-capital :digits 4}
              {:key :revenue-score :digits 1}
              {:key :operating-income-score :digits 1}
+             {:key :profit-margin :digits 4}
              {:key :avg-profit-margin :digits 4}]}
    {:label "Growth"
     :fields [{:key :sales-growth-yoy :digits 1}]}
@@ -160,7 +162,8 @@
     :fields [{:key :ev-ebit :digits 1}
              {:key :pe :source :price-earnings :digits 1}
              {:key :price-sales :digits 2}
-             {:key :dividend-yield :digits 1}]}])
+             {:key :dividend-yield :digits 1}
+             {:key :dividend-coverage :digits 1}]}])
 
 (defn- ratio-label
   [{:keys [key millions?]}]

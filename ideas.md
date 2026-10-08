@@ -75,6 +75,13 @@ CLX Clorox Co
 - didvidend will be cut; at 30% more down could be interesting
 
 
-- PFH:NYSE junior notes 4.125 due 2060
+PFH:NYSE junior notes 4.125 due 2060
 - Prudential Financial
 - 6.875% yield, 7.3% yield to maturity.
+
+
+CIM Chimera Investment Corp
+- 15% yield. pe 6
+- mortgage investment company.
+- Acquisition of HomeXpress Mortgage Corp.
+- At December 31, 2025 and 2024, our ratio of debt-to-equity was 5.1:1 and 4.0:1,
