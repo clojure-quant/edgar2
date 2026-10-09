@@ -1,6 +1,7 @@
 (ns edgar2.web.server
   (:require [hyper.core :as h]
-            [edgar2.web.filing :refer [annual-report-page]]
+            [edgar2.web.filing :refer [annual-report-page raw-filing-page]]
+            [edgar2.web.filings :refer [filings-page]]
             [edgar2.web.financials :refer [financials-page]]
             [edgar2.web.overview :refer [overview-page]]
             [edgar2.web.screen :refer [screen-page]]
@@ -28,9 +29,18 @@
    ["/financials/:ticker/:n/:period" {:name :financials-period
                                           :title "Financials"
                                           :get #'financials-page}]
+   ["/filings" {:name :filings
+                :title "Filings"
+                :get #'filings-page}]
    ["/filing/:ticker" {:name :annual-report
                        :title "Annual report"
-                       :get #'annual-report-page}]])
+                       :get #'annual-report-page}]
+   ["/filing/:cik/:accession" {:name :filing-raw
+                               :title "Filing"
+                               :get #'raw-filing-page}]
+   ["/filing/:cik/:accession/:doc" {:name :filing-doc
+                                    :title "Filing"
+                                    :get #'raw-filing-page}]])
 
 (defn web
   "Start the Hyper UI and block until the process stops.

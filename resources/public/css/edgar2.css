@@ -215,6 +215,24 @@ tr.quintile-group th {
   margin: 0.35rem 0;
 }
 
+tr.filings-cat {
+  cursor: pointer;
+}
+
+tr.filings-cat.selected td {
+  background: #fff6cc;
+  font-weight: 700;
+}
+
+.filings-detail {
+  margin-top: 1.5rem;
+}
+
+.filings-detail h2 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
 .error {
   color: #a00;
 }

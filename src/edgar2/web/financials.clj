@@ -62,7 +62,7 @@
        desc])))
 
 (defn- filing-links
-  "Google Finance and the cached annual-report link."
+  "Google Finance, the cached annual report, and the filings index."
   [ticker form]
   (let [{:keys [exchange]} (fsds/company ticker)]
     [:div.fin-extra
@@ -73,7 +73,10 @@
        "Google Finance"]
       " · "
       [:a {:href (str "/filing/" ticker)}
-       (str "Latest " (or form "annual report"))]]]))
+       (str "Latest " (or form "annual report"))]
+      " · "
+      [:a (h/navigate :filings {} {:ticker ticker})
+       "FILINGS"]]]))
 
 (defn- description-view
   "Company blurb loaded for this page's ticker."
