@@ -2,22 +2,14 @@
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [hyper.effects :as effects]
-            [edgar2.description :as description]
             [edgar2.filing :as filing]
             [edgar2.report.screen :as screen]
             [edgar2.web.fsds :as fsds]
-            [edgar2.web.nav :refer [nav]]))
+            [edgar2.web.nav :refer [nav]]
+            [edgar2.web.ticker :as ticker]))
 
 (def n-choices
   [5 10 15 20 25 30 35 40 45 50])
-
-(defn- ticker-param
-  [req]
-  (some-> (get-in req [:hyper/route :path-params :ticker])
-          str
-          str/trim
-          not-empty
-          str/upper-case))
 
 (defn- parse-n
   "One of `n-choices`, or nil."
@@ -35,20 +27,6 @@
   [v]
   (if (nil? v) "" (str v)))
 
-(def google-exchange
-  {"NYSE" "NYSE"
-   "Nasdaq" "NASDAQ"
-   "OTC" "OTCMKTS"
-   "CBOE" "CBOE"})
-
-(defn google-finance-url
-  [ticker exchange]
-  (let [t (str/upper-case (str ticker))
-        x (get google-exchange exchange)]
-    (if x
-      (str "https://www.google.com/finance/quote/" t ":" x)
-      (str "https://www.google.com/finance/quote/" t))))
-
 (defn- sector-line
   "SIC code, boxed, then the description."
   [ticker]
@@ -60,35 +38,6 @@
        (when code [:span.fin-sic code])
        (when (and code desc) " ")
        desc])))
-
-(defn- filing-links
-  "Google Finance, the cached annual report, and the filings index."
-  [ticker form]
-  (let [{:keys [exchange]} (fsds/company ticker)]
-    [:div.fin-extra
-     [:p
-      [:a {:href (google-finance-url ticker exchange)
-           :target "_blank"
-           :rel "noopener noreferrer"}
-       "Google Finance"]
-      " · "
-      [:a {:href (str "/filing/" ticker)}
-       (str "Latest " (or form "annual report"))]
-      " · "
-      [:a (h/navigate :filings {} {:ticker ticker})
-       "FILINGS"]]]))
-
-(defn- description-view
-  "Company blurb loaded for this page's ticker."
-  [{:keys [status text]}]
-  (case status
-    :loading [:p {:class "fin-description fin-description-loading"} "Loading description…"]
-    :ready (if-let [text (some-> text str/trim not-empty)]
-             [:div.fin-description
-              (for [[i para] (map-indexed vector (str/split text #"\n\n+"))]
-                [:p {:key i} (str/trim para)])]
-             [:p {:class "fin-description fin-description-loading"} "No company description."])
-    nil))
 
 (def result-fields
   "Subtotals drawn with a light green row."
@@ -247,42 +196,36 @@
   (filing/parse-period (get-in req [:hyper/route :path-params :period])))
 
 (defn- go-financials!
-  "Open financials for a ticker, count, and period. The path includes both
-  so a new choice remounts the page and refetches. Annual omits the period
-  segment. `:n` is years when annual and quarters when quarterly."
-  [ticker n period]
-  (let [n (parse-n n)
-        period (name (filing/parse-period period))]
+  "Open financials for the tab's ticker, count, and period. The path includes
+  the count and period so a new choice remounts the page and refetches.
+  Annual omits the period segment. `:n` is years when annual and quarters
+  when quarterly. The ticker stays in tab state."
+  [n period]
+  (let [ticker (ticker/current)
+        n (parse-n n)
+        period (name (filing/parse-period period))
+        q (when ticker {:ticker ticker})]
     (when (and ticker n)
       (if (= period "quarterly")
-        (effects/navigate! :financials-period
-                           {:ticker ticker
-                            :n (str n)
-                            :period "quarterly"})
-        (effects/navigate! :financials-n
-                           {:ticker ticker
-                            :n (str n)})))))
+        (effects/navigate! :company-financials-period
+                           {:n (str n)
+                            :period "quarterly"}
+                           q)
+        (effects/navigate! :company-financials-n
+                           {:n (str n)}
+                           q)))))
 
-(defn- ticker-form
-  [ticker n period]
+(defn- period-form
+  [n period]
   [:form.ticker-form
    {:data-on:submit__prevent
     (h/action
-     (go-financials! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
-                     (:n $form-data)
-                     (:period $form-data)))}
-   [:label "Ticker "
-    [:input {:type "text"
-             :name "ticker"
-             :value (or ticker "")
-             :autofocus true}]]
+     (go-financials! (:n $form-data) (:period $form-data)))}
    [:label "n "
     [:select {:name "n"
               :data-on:change
               (h/action
-               (go-financials! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
-                               (:n $form-data)
-                               (:period $form-data)))}
+               (go-financials! (:n $form-data) (:period $form-data)))}
      (for [choice n-choices]
        [:option (cond-> {:key choice :value (str choice)}
                   (= choice n) (assoc :selected true))
@@ -291,9 +234,7 @@
     [:select {:name "period"
               :data-on:change
               (h/action
-               (go-financials! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
-                               (:n $form-data)
-                               (:period $form-data)))}
+               (go-financials! (:n $form-data) (:period $form-data)))}
      (for [[value label] period-choices]
        [:option (cond-> {:key value :value value}
                   (= value (name period)) (assoc :selected true))
@@ -302,47 +243,30 @@
 
 (defn financials-page
   [req]
-  (let [ticker (ticker-param req)
-        n (n-param req)
-        period (period-param req)
-        result* (atom (when ticker {:status :loading}))
-        desc* (atom (when ticker {:status :loading :ticker ticker}))]
-    (when ticker
-      (h/watch! result*)
-      (h/watch! desc*)
-      (future
-        (reset! result*
-                (try
-                  {:status :ready
-                   :data (filing/financials-data {:ticker ticker
-                                                  :n n
-                                                  :period period})}
-                  (catch Throwable e
-                    {:status :error
-                     :message (or (ex-message e) (str e))}))))
-      (future
-        (let [text (try
-                     (:text (description/preferred ticker))
-                     (catch Throwable _ nil))]
-          (when (= ticker (:ticker @desc*))
-            (reset! desc* {:status :ready
-                           :ticker ticker
-                           :text text})))))
-    (fn [_req]
-      (let [{:keys [status data message]} @result*]
-        [:div.page
-         (nav)
-         (ticker-form ticker n period)
-         (case status
-           :loading [:p (str "Loading " ticker " (n=" n ", " (name period) ")…")]
-           :error [:p.error message]
-           :ready [:div
-                   [:p.fin-header
-                    (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
-                            (:ticker data) (:name data) (:cik data) (:form data))]
-                   (sector-line ticker)
-                   (ratios-table ticker)
-                   (financials-table data)
-                   (filing-links ticker (:form data))
-                   (description-view @desc*)]
-           nil)]))))
+  (let [n (n-param req)
+        period (period-param req)]
+    (h/view
+      {:mount (fn []
+                (ticker/seed! req)
+                (ticker/begin
+                  (fn [t]
+                    (filing/financials-data {:ticker t
+                                             :n n
+                                             :period period}))))
+       :render (fn [{:keys [result*]} req]
+                 (let [{:keys [status data message ticker]} @result*]
+                   [:div.page
+                    (nav req)
+                    (period-form n period)
+                    (case status
+                      :loading [:p (str "Loading " ticker " (n=" n ", " (name period) ")…")]
+                      :error [:p.error message]
+                      :ready [:div
+                              [:p.fin-header
+                               (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
+                                       (:ticker data) (:name data) (:cik data) (:form data))]
+                              (sector-line ticker)
+                              (ratios-table ticker)
+                              (financials-table data)]
+                      [:p "Enter a ticker."])]))
+       :unmount (fn [{:keys [stop]}] (stop))})))

@@ -5,6 +5,7 @@
             [edgar2.report.screen :as screen]
             [edgar2.report.stats :as stats]
             [edgar2.web.nav :refer [nav]]
+            [edgar2.web.ticker :as ticker]
             [edgar2.web.overview :as overview]))
 
 (def columns
@@ -49,7 +50,7 @@
   [col row]
   (case col
     :ticker (if-let [ticker (:ticker row)]
-              [:a (h/navigate :financials {:ticker ticker}) (str ticker)]
+              [:a (ticker/company-link ticker) (str ticker)]
               "")
     :entityName (str (:entityName row ""))
     :price (or (fmt (:price row) 2) "")
@@ -86,7 +87,7 @@
                     (catch Exception e
                       {:error (or (ex-message e) (str e))}))]
     [:div.page
-     (nav)
+     (nav req)
      (cond
        (:error loaded) [:p.error (:error loaded)]
        sic (let [rows (vec (companies (:rows loaded) {:sic sic}))]

@@ -132,12 +132,12 @@
                   groups))]])
 
 (defn overview-page
-  [_req]
+  [req]
   (let [loaded (try {:rows (load-rows)}
                     (catch Exception e
                       {:error (or (ex-message e) (str e))}))]
     [:div.page
-     (nav)
+     (nav req)
      [:h1 "Stats"]
      (if-let [err (:error loaded)]
        [:p.error err]

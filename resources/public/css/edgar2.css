@@ -4,8 +4,28 @@ body {
   color: #1a1a1a;
 }
 
-.app-nav {
+.app-nav-wrap {
   margin-bottom: 1rem;
+}
+
+.app-nav a.active,
+.app-subnav a.active {
+  font-weight: 700;
+}
+
+.ticker-form.company-ticker {
+  margin: 0.45rem 0 0.35rem;
+}
+
+.app-subnav {
+  margin-top: 0.15rem;
+}
+
+.annual-frame {
+  width: 100%;
+  height: calc(100vh - 9rem);
+  border: 1px solid #ccc;
+  background: #fff;
 }
 
 .screen-controls {

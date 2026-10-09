@@ -2,7 +2,8 @@
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [edgar2.report.screen :as screen]
-            [edgar2.web.nav :refer [nav]]))
+            [edgar2.web.nav :refer [nav]]
+            [edgar2.web.ticker :as ticker]))
 
 (defn- cell
   [v]
@@ -26,7 +27,7 @@
                 :class (when-not (#{:ticker :entityName} col) "num")}
            (if (= col :ticker)
              (if-let [ticker (:ticker row)]
-               [:a (h/navigate :financials {:ticker ticker}) (str ticker)]
+               [:a (ticker/company-link ticker) (str ticker)]
                "")
              (cell (get row col)))])])]]])
 
@@ -51,7 +52,7 @@
         cache* (atom {})
         tab* (h/tab-cursor :screen :cheap-growth)
         mc* (h/tab-cursor :min-mc screen/default-min-mc)]
-    (fn [_req]
+    (fn [req]
       (let [min-mc (or (screen/parse-min-mc @mc*) screen/default-min-mc)
             specs (when (:rows loaded)
                     (or (get @cache* min-mc)
@@ -61,7 +62,7 @@
             current (or (some #(when (= (:id %) @tab*) %) specs)
                         (first specs))]
         [:div.page
-         (nav)
+         (nav req)
          (if-let [err (:error loaded)]
            [:p.error err]
            [:div

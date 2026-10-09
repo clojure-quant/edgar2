@@ -60,7 +60,7 @@ clj -X:web
 clj -X:web :port 8080
 ```
 
-Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first). `/screen` is the screen tabs, same tables as `clj -X:screen`. `/financials` is one ticker, same tables as `clj -X:financials`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
+Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first). `/screen` is the screen tabs, same tables as `clj -X:screen`. `/company/financials` is one ticker, same tables as `clj -X:financials`. The ticker stays with the browser tab across `/company/financials`, `/company/google-finance`, `/company/filings`, `/company/current-annual`, and `/company/description`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
 
 `:ticker` and `:years` work on the download and report aliases. `:financials` takes `:n`: fiscal years when annual, quarters when `:period` is quarterly. `:years` is still accepted there as a synonym for `:n`.
 

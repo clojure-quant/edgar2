@@ -37,6 +37,8 @@
    :headers {"Content-Type" "text/plain; charset=utf-8"}
    :body body})
 
+(declare redirect)
+
 (defn annual-report-file
   "Path of the latest 10-K, 20-F, or 40-F primary document.
   Downloads it into data/filings when it is not already there."
@@ -58,13 +60,18 @@
             (io/file saved)))))))
 
 (defn annual-report-page
-  "Hyper handler. Returns the cached filing as a raw response."
+  "Hyper handler. Redirects to the cached primary document so relative
+  image links in the filing resolve next to it."
   [req]
   (let [ticker (some-> (get-in req [:hyper/route :path-params :ticker])
                        str str/trim not-empty str/upper-case)]
     (try
       (if-let [file (and ticker (annual-report-file ticker))]
-        (file-response file)
+        (let [accession (.getParentFile file)
+              cik (.getParentFile accession)]
+          (redirect (str "/filing/" (.getName cik)
+                         "/" (.getName accession)
+                         "/" (.getName file))))
         (text-response 404 (str "No annual report for " ticker)))
       (catch Throwable e
         (text-response 502 (or (ex-message e) (str e)))))))

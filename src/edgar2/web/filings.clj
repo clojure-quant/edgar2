@@ -3,9 +3,9 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [hyper.core :as h]
-            [hyper.effects :as effects]
             [edgar2.filing :as filing]
-            [edgar2.web.nav :refer [nav]]))
+            [edgar2.web.nav :refer [nav]]
+            [edgar2.web.ticker :as ticker]))
 
 (def default-category
   :quarterly)
@@ -56,10 +56,6 @@
 (defn- param
   [q k]
   (some-> (or (get q k) (get q (name k))) str str/trim not-empty))
-
-(defn- ticker-param
-  [q]
-  (some-> (param q :ticker) str/upper-case))
 
 (defn- date-span
   "Earliest and latest :filingDate, plus the row count."
@@ -112,31 +108,6 @@
      :name (:name company)
      :filings filings}))
 
-(defn- go-filings!
-  "Open /filings with one query param. A typed ticker wins over a CIK."
-  [ticker cik]
-  (cond
-    ticker (effects/navigate! :filings {} {:ticker ticker})
-    cik (effects/navigate! :filings {} {:cik cik})))
-
-(defn- lookup-form
-  [ticker cik]
-  [:form.ticker-form
-   {:data-on:submit__prevent
-    (h/action
-     (go-filings! (some-> (:ticker $form-data) str str/trim not-empty str/upper-case)
-                  (some-> (:cik $form-data) str str/trim not-empty)))}
-   [:label "Ticker "
-    [:input {:type "text"
-             :name "ticker"
-             :value (or ticker "")
-             :autofocus true}]]
-   [:label "CIK "
-    [:input {:type "text"
-             :name "cik"
-             :value (or cik "")}]]
-   [:button {:type "submit"} "Show"]])
-
 (defn- summary-table
   [rows selected cat*]
   [:div.table-wrap
@@ -181,46 +152,55 @@
             "OPEN"])]])]]])
 
 (defn filings-page
-  "Company filings. Query param is `ticker` or `cik`."
+  "Company filings. The ticker comes from tab state. A `cik` query param
+  is used when the tab has no ticker."
   [req]
-  (let [q (query req)
-        ticker (ticker-param q)
-        cik (param q :cik)
-        result* (atom (when (or ticker cik) {:status :loading}))
-        cat* (atom default-category)]
-    (when (or ticker cik)
-      (h/watch! result*)
-      (h/watch! cat*)
-      (future
-        (reset! result*
-                (try
-                  {:status :ready
-                   :data (load-filings ticker cik)}
-                  (catch Throwable e
-                    {:status :error
-                     :message (or (ex-message e) (str e))})))))
-    (fn [_req]
-      (let [{:keys [status data message]} @result*
-            selected @cat*
-            filings (:filings data)]
-        [:div.page
-         (nav)
-         [:h1 "Filings"]
-         (lookup-form ticker cik)
-         (case status
-           :loading [:p (str "Loading filings for " (or ticker cik) "…")]
-           :error [:p.error message]
-           :ready [:div
-                   [:p.fin-header
-                    (format "%s  %s  CIK=%s"
-                            (or (:ticker data) "")
-                            (or (:name data) "")
-                            (:cik data))]
-                   (summary-table (summary-rows filings) selected cat*)
-                   [:div.filings-detail
-                    [:h2 (category-label selected)]
-                    (let [rows (selected-filings filings selected)]
-                      (if (seq rows)
-                        (filings-table (:cik data) rows)
-                        [:p "No filings."]))]]
-           [:p "Enter a ticker or CIK."])]))))
+  (let [cik (param (query req) :cik)]
+    (h/view
+      {:mount (fn []
+                (ticker/seed! req)
+                (let [result* (atom {:status :idle})
+                      cat* (atom default-category)
+                      alive? (atom true)
+                      gen (atom 0)
+                      stop (ticker/watch!
+                            (fn [t]
+                              (reset! cat* default-category)
+                              (cond
+                                t (ticker/load! result* alive? gen t
+                                                #(load-filings t nil))
+                                cik (ticker/load! result* alive? gen nil
+                                                 #(load-filings nil cik))
+                                :else (do (swap! gen inc)
+                                          (reset! result* {:status :empty})))))]
+                  (h/watch! result*)
+                  (h/watch! cat*)
+                  {:result* result*
+                   :cat* cat*
+                   :stop (fn []
+                           (reset! alive? false)
+                           (stop))}))
+       :render (fn [{:keys [result* cat*]} req]
+                 (let [{:keys [status data message ticker]} @result*
+                       selected @cat*
+                       filings (:filings data)]
+                   [:div.page
+                    (nav req)
+                    (case status
+                      :loading [:p (str "Loading filings for " (or ticker cik) "…")]
+                      :error [:p.error message]
+                      :ready [:div
+                              [:p.fin-header
+                               (format "%s  %s  CIK=%s"
+                                       (or (:ticker data) "")
+                                       (or (:name data) "")
+                                       (:cik data))]
+                              (summary-table (summary-rows filings) selected cat*)
+                              [:div.filings-detail
+                               [:h2 (category-label selected)]
+                               (let [rows (selected-filings filings selected)]
+                                 (if (seq rows)
+                                   (filings-table (:cik data) rows)
+                                   [:p "No filings."]))]]
+                      [:p "Enter a ticker."])]))
+       :unmount (fn [{:keys [stop]}] (stop))})))
