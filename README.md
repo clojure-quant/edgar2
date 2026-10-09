@@ -53,7 +53,7 @@ clj -X:stats
 clj -X:stats :limit 25
 ```
 
-From `universe-facts.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on assets (Net Income / assets), return on capital (Net Income / total equity), `:shares`, `:price`, `:marketcap` (price × shares), `:price-sales` (USD market cap / USD revenue), `:price-earnings` (USD price / USD EPS, else USD market cap / USD Net Income), `:dividend-yield` (USD dividend per share / price, %), and `:dividend-coverage` (net income / dividends paid, only when a dividend was paid).
+From `universe-facts.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on assets (Net Income / assets), return on capital (Net Income / total equity), `:shares` (most recent 10-Q when that quarter is at least as recent as the annual report; otherwise the annual report), `:price`, `:marketcap` (price × shares), `:price-sales` (USD market cap / USD revenue), `:price-earnings` (USD price / USD EPS, else USD market cap / USD Net Income), `:dividend-yield` (USD dividend per share / price, %), and `:dividend-coverage` (net income / dividends paid, only when a dividend was paid).
 
 ```bash
 clj -X:web

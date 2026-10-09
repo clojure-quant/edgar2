@@ -61,32 +61,72 @@
            (sort-by #(str (:filed %) "|" (:end %)))
            last))
 
-(defn most-recent-share-count
-  "Latest positive fact whose unit is shares."
+(def quarterly-share-forms
+  #{"10-Q" "10-Q/A"})
+
+(def annual-share-forms
+  #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"})
+
+(defn- positive-share-obs
   [facts tag-pairs]
-  (some->> tag-pairs
-           (mapcat (fn [[tax tag]] (concept-observations facts tax tag)))
-           (filter #(and (number? (:val %))
-                         (= "shares" (:unit %))
-                         (pos? (double (:val %)))))
-           seq
-           (sort-by #(str (:filed %) "|" (:end %)))
-           last
-           :val))
+  (filter #(and (number? (:val %))
+                (= "shares" (:unit %))
+                (pos? (double (:val %))))
+          (mapcat (fn [[tax tag]] (concept-observations facts tax tag))
+                  tag-pairs)))
+
+(defn- latest-share-obs
+  "Observation with the latest period-end. A later filing breaks a tie."
+  [obs]
+  (when-let [xs (seq obs)]
+    (->> xs
+         (sort-by (fn [{:keys [end filed accn]}]
+                    [(str end) (str filed) (str accn)]))
+         last)))
+
+(defn- share-obs
+  "Latest positive share observation on `forms`. nil means any form."
+  [facts tag-pairs forms]
+  (latest-share-obs
+   (let [obs (positive-share-obs facts tag-pairs)]
+     (if forms
+       (filter #(forms (str (:form %))) obs)
+       obs))))
+
+(defn most-recent-share-count
+  "Latest positive share count on `forms`. nil means any form."
+  ([facts tag-pairs] (most-recent-share-count facts tag-pairs nil))
+  ([facts tag-pairs forms]
+   (:val (share-obs facts tag-pairs forms))))
+
+(defn- shares-obs-on
+  "Common-share observation on `forms`, else weighted-average, else IFRS."
+  [facts forms]
+  (or (share-obs facts common-share-tags forms)
+      (some #(share-obs facts [%] forms) weighted-average-share-tags)
+      (share-obs facts ifrs-share-tags forms)))
 
 (defn shares-outstanding
-  "Common shares when dei or us-gaap reports them.
+  "Common shares from the most recent 10-Q.
 
-  A US-GAAP filer with no common-share fact then uses the weighted-average
-  share count (basic, then basic-and-diluted, then diluted). Otherwise the
-  IFRS shares-outstanding fact.
+  The annual report (10-K, 20-F, 40-F) is used when its period-end is
+  later than the 10-Q, or when no 10-Q reports a share count. A 10-Q
+  from an older year does not replace a later annual report. Any other
+  form is used only when neither a 10-Q nor an annual report has a count.
 
-  Cover-page public float is an aggregate market value in dollars, not a
-  share count, so it is not used here."
+  dei or us-gaap common shares win over a weighted-average count. IFRS
+  shares outstanding are last. Cover-page public float is a dollar amount,
+  not a share count, so it is not used."
   [facts]
-  (or (most-recent-share-count facts common-share-tags)
-      (some #(most-recent-share-count facts [%]) weighted-average-share-tags)
-      (most-recent-share-count facts ifrs-share-tags)))
+  (let [quarterly (shares-obs-on facts quarterly-share-forms)
+        annual (shares-obs-on facts annual-share-forms)
+        annual-later? (and annual quarterly
+                           (pos? (compare (str (:end annual))
+                                          (str (:end quarterly)))))]
+    (:val (cond
+            (and quarterly (not annual-later?)) quarterly
+            annual annual
+            :else (shares-obs-on facts nil)))))
 
 (defn reporting-standard
   "us-gaap, ifrs-full, and/or ffd (filing-fee disclosure)."

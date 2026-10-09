@@ -147,9 +147,11 @@
 
 (def ratio-groups
   "Ratio columns, grouped. `:pe` is price-earnings.
-  Market cap and enterprise value are shown in millions of dollars."
+  Market cap and enterprise value are millions of dollars.
+  Shares are millions of shares."
   [{:label "Price"
     :fields [{:key :price :digits 2}
+             {:key :shares :millions? true :label "shares (M)"}
              {:key :marketcap :millions? true}
              {:key :enterprise-value :millions? true}]}
    {:label "Quality"
@@ -169,8 +171,9 @@
              {:key :dividend-coverage :digits 1}]}])
 
 (defn- ratio-label
-  [{:keys [key millions?]}]
-  (if millions? (str (name key) " ($M)") (name key)))
+  [{:keys [key label millions?]}]
+  (or label
+      (if millions? (str (name key) " ($M)") (name key))))
 
 (defn- ratio-cell
   [row {:keys [key source digits millions?]}]

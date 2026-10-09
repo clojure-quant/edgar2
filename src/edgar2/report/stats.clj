@@ -775,7 +775,9 @@
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
   with 7-year mean YoY sales growth (%), profit margin, 10-year mean
   profit margin (Net Income / revenue), return on assets (Net Income / assets),
-  return on capital (Net Income / total equity), plus :shares, :price, :marketcap, :price-sales,
+  return on capital (Net Income / total equity), plus :shares (most recent 10-Q
+  when that quarter is at least as recent as the annual report; otherwise
+  the annual report), :price, :marketcap, :price-sales,
   :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
@@ -808,12 +810,15 @@
                            (catch Exception ex
                              (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
                              nil))
+                 shares (or (when data
+                              (universe/shares-outstanding (:facts data)))
+                            (:shares-outstanding row))
                  st (with-sic
                       (try
                         (-> (if data
                               (company-stats (:facts data) row)
                               (select-keys row [:ticker :exchange :cik :entityName]))
-                            (with-valuation prices (:shares-outstanding row)))
+                            (with-valuation prices shares))
                         (catch Exception ex
                           (println (format "  stats-fail %s (%s)" (:ticker row) (.getMessage ex)))
                           (select-keys row [:ticker :exchange :cik :entityName])))
