@@ -85,3 +85,10 @@ CIM Chimera Investment Corp
 - mortgage investment company.
 - Acquisition of HomeXpress Mortgage Corp.
 - At December 31, 2025 and 2024, our ratio of debt-to-equity was 5.1:1 and 4.0:1,
+- not now. will have to go down more. but then at some point could be 
+very interesting.
+
+GAING Gladstone Investment 7 125 Notes Due 2031
+- mid-market lender as investment company.
+- seems a niche
+- I would trust the 7.125 notes.

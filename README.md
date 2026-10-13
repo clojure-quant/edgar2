@@ -81,12 +81,21 @@ dei:EntityCommonStockSharesOutstanding or us-gaap:CommonStockSharesOutstanding
 ifrs-full:NumberOfSharesOutstanding
 
 
-FSDS
+FSDS 60MB each
 - 1 zip per quarter for all companies
+- xbrl financial statements
 - sub.txt submission summary
 - pre.txt presentation rows. accounting standard / fields
 - tag.txt tag dictionary (all reported fields)
 
+FACTS 1.3 GIG
+- It is the full XBRL history for those companies, rebuilt nightly, not one quarter.
+- Under facts the numbers are grouped by standard taxonomy (us-gaap, ifrs-full, dei), then by tag. A tag such as revenue holds every whole-company observation the SEC kept: period start and end, value, unit (USD, JPY, shares), accession number, form, fiscal year, fiscal period, the date it was filed, and sometimes a calendar frame such as CY2016. Custom tags and segment breakdowns are left out. There is no entityType and no filing list.
+
+SUBMISSIONS 1.5 gig
+- nightly snapshot https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip
+- submissions.zip is the filing index for every EDGAR filer
+- The main file keeps the newest filings, at least one year or 1,000 filings, whichever is more
 
 operating expenses (selling, general and administrative, research and development, and usually depreciation) → operating income
 

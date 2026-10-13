@@ -7,6 +7,7 @@
             [clojure.string :as str]
             [edgar.api :as e]
             [edgar2.derived :as derived]
+            [edgar2.filing :as filing]
             [edgar2.download.custom.fsds :as fsds]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
@@ -315,16 +316,53 @@
   "First annual fact among `tag-pairs` whose period-end is `end`."
   [facts tag-pairs unit end]
   (when-not (str/blank? (str end))
-    (some (fn [pair]
+    (some (fn [[tax tag]]
             (some (fn [series]
-                    (when-let [v (value-at series end)]
-                      (when (number? v)
-                        {:val v
-                         :end (str end)
-                         :unit (:unit (some #(when (= (str end) (str (:end %))) %) series))})))
-                  [(annual-flows facts [pair] unit)
-                   (annual-stocks facts [pair] unit)]))
+                    (when-let [row (some #(when (= (str end) (str (:end %))) %) series)]
+                      (when (number? (:val row))
+                        (assoc row
+                               :taxonomy tax
+                               :tag tag
+                               :end (str end)))))
+                  [(annual-flows facts [[tax tag]] unit)
+                   (annual-stocks facts [[tax tag]] unit)]))
           tag-pairs)))
+
+(defn- whole-dollar?
+  "True when v is a positive whole number. A split ($.98 …) tag lands here as 98."
+  [v]
+  (and (number? v)
+       (>= (double v) 1.0)
+       (< (Math/abs (- (double v) (Math/rint (double v)))) 1e-6)))
+
+(defn- primary-html
+  "Primary filing document, cached under data/ix-html."
+  [cik accn]
+  (let [f (io/file "data/ix-html" (str accn ".htm"))]
+    (or (when (.exists f) (slurp f))
+        (when-let [html (e/html {:cik (universe/pad-cik cik)
+                                 :accessionNumber (str accn)})]
+          (.mkdirs (.getParentFile f))
+          (spit f html)
+          html))))
+
+(defn- absorb-currency-decimal
+  "Read ($.98 per share) as 0.98 when the tagged fact is the whole number 98."
+  [cik {:keys [val end accn taxonomy tag] :as fact}]
+  (if-not (and cik accn taxonomy tag (whole-dollar? val))
+    fact
+    (try
+      (if-let [html (primary-html cik accn)]
+        (if-let [v (filing/leading-currency-decimal
+                    html
+                    (str (name taxonomy) ":" (name tag))
+                    end
+                    val)]
+          (assoc fact :val v)
+          fact)
+        fact)
+      (catch Throwable _
+        fact))))
 
 (defn approx=
   "True when a and b are within 2% or 1 unit (tag double-counts)."
@@ -507,14 +545,19 @@
 
 (defn annual-dps
   "Per-share dividend at the last report `end`. Cash paid wins. No fact
-  on that date is 0."
-  [facts end revenue-unit]
-  (or (fact-at facts dps-cash-tags nil end)
-      (fact-at facts dps-other-tags nil end)
-      (when end
-        {:val 0.0
-         :end (str end)
-         :unit (when (usd-unit? revenue-unit) "USD/shares")})))
+  on that date is 0.
+
+  A filing that shows ($.98 per share) with only 98 inside the tag is
+  read as 0.98."
+  [facts end revenue-unit cik]
+  (absorb-currency-decimal
+   cik
+   (or (fact-at facts dps-cash-tags nil end)
+       (fact-at facts dps-other-tags nil end)
+       (when end
+         {:val 0.0
+          :end (str end)
+          :unit (when (usd-unit? revenue-unit) "USD/shares")}))))
 
 (defn annual-dividends-paid
   "Cash dividends paid at period-end `end`, as a positive amount in `unit`.
@@ -542,7 +585,7 @@
         bs-end (balance-sheet-end assets)
         last-end (later-end (some-> (latest-obs rev) :end str) bs-end)
         eps (latest-obs (annual-eps facts))
-        dps (annual-dps facts last-end revenue-unit)
+        dps (annual-dps facts last-end revenue-unit (:cik row))
         income (with-derived-income facts revenue-unit)
         oi (series-plus (annual-flows facts ebit-tags revenue-unit)
                         (:derived-oi income))

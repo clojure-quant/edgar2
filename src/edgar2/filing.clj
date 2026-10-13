@@ -563,7 +563,71 @@
           [id {:member (some-> (re-find #"StatementClassOfStockAxis\">(?:[^<:\"]+:)?([^<]+)" body)
                                second)
                :start (second (re-find #"<xbrli:startDate>([^<]+)" body))
-               :end (second (re-find #"<xbrli:endDate>([^<]+)" body))}])))
+               :end (or (second (re-find #"<xbrli:endDate>([^<]+)" body))
+                        (second (re-find #"<xbrli:instant>([^<]+)" body)))}])))
+
+(defn- visible-before
+  "Visible text immediately before `idx`, with tags removed."
+  [html idx]
+  (let [s (str html)
+        from (max 0 (- idx 8000))]
+    (-> (subs s from idx)
+        (str/replace #"^[^<]*>" "")
+        (str/replace #"<[^>]*>" " ")
+        (str/replace #"&#160;|&nbsp;" " ")
+        (str/replace #"&#36;|&#x24;|(?i)&dollar;" "$")
+        (str/replace #"&amp;" "&")
+        str/trim)))
+
+(defn- parse-ix-number
+  "Number from an ix:nonFraction body, times 10^scale.
+
+  A '$' decimal point left outside the tag is part of the number.
+  ($.98 per share) is 0.98, not 98. ($1. followed by a tag of 25) is 1.25."
+  [visible text scale]
+  (let [raw (-> text str str/trim (str/replace "," ""))
+        joined (cond
+                 (not (re-matches #"-?[0-9]+(?:\.[0-9]+)?" raw)) nil
+                 (re-matches #"[0-9]+" raw)
+                 (cond
+                   (re-find #"\$\s*(\d+)\.\s*$" visible)
+                   (str (second (re-find #"\$\s*(\d+)\.\s*$" visible)) "." raw)
+                   (re-find #"\$\s*\.\s*$" visible) (str "0." raw)
+                   :else raw)
+                 :else raw)
+        v (when joined
+            (try (Double/parseDouble joined)
+                 (catch Exception _ nil)))]
+    (when v
+      (* v (Math/pow 10 (or scale 0))))))
+
+(defn leading-currency-decimal
+  "Corrected per-share amount when `concept-name` at period-end `end` is
+  tagged with the decimal point outside the fact, as in ($.98 per share).
+  nil when the filing does not split the number that way."
+  [html concept-name end reported-val]
+  (let [s (str html)
+        contexts (xbrl-contexts s)
+        m (re-matcher #"<ix:nonFraction\b([^>]*)>([^<]*)" s)]
+    (loop []
+      (when (.find m)
+        (let [attrs (.group m 1)
+              text (.group m 2)
+              scale (try (parse-long (or (ix-attr attrs "scale") "0"))
+                         (catch Exception _ nil))
+              plain (when scale (parse-ix-number "" text scale))
+              ctx-end (:end (get contexts (ix-attr attrs "contextRef")))]
+          (if (and scale
+                   (= concept-name (ix-attr attrs "name"))
+                   (= (str end) (str ctx-end))
+                   plain
+                   (< (Math/abs (- (double plain) (double reported-val))) 1e-4))
+            (let [corrected (parse-ix-number (visible-before s (.start m)) text scale)]
+              (if (and corrected
+                       (> (Math/abs (- corrected (double reported-val))) 1e-4))
+                corrected
+                (recur)))
+            (recur)))))))
 
 (def weighted-share-names
   {"us-gaap:WeightedAverageNumberOfSharesOutstandingBasic" "Shares Basic"
@@ -571,17 +635,29 @@
 
 (defn- ix-share-facts
   "Weighted-average share facts from inline XBRL. Nested tags with no text
-  are skipped; the inner tag carries the number."
+  are skipped; the inner tag carries the number. A '$' decimal point left
+  outside the tag is part of the number."
   [html]
-  (for [[_ attrs text] (re-seq #"<ix:nonFraction\b([^>]*)>([^<]*)" (str html))
-        :let [name (ix-attr attrs "name")
-              raw (-> text str str/trim (str/replace "," ""))
-              val (try (Double/parseDouble raw) (catch Exception _ nil))
-              scale (parse-long (or (ix-attr attrs "scale") "0"))]
-        :when (and val (contains? weighted-share-names name) scale)]
-    {:name name
-     :context (ix-attr attrs "contextRef")
-     :val (* val (Math/pow 10 scale))}))
+  (let [s (str html)
+        m (re-matcher #"<ix:nonFraction\b([^>]*)>([^<]*)" s)]
+    (loop [acc []]
+      (if-not (.find m)
+        acc
+        (let [attrs (.group m 1)
+              name (ix-attr attrs "name")]
+          (if-not (contains? weighted-share-names name)
+            (recur acc)
+            (let [scale (try (parse-long (or (ix-attr attrs "scale") "0"))
+                             (catch Exception _ nil))
+                  val (when scale
+                        (parse-ix-number (visible-before s (.start m))
+                                         (.group m 2)
+                                         scale))]
+              (recur (if val
+                       (conj acc {:name name
+                                  :context (ix-attr attrs "contextRef")
+                                  :val val})
+                       acc)))))))))
 
 (defn- annual-share-rows
   [facts contexts concept]
