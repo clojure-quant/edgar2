@@ -6,7 +6,7 @@
             [clojure.string :as str]
             [edgar.api :as e]
             [edgar.core :as edgar]
-            [edgar2.download.tickers :as tickers]))
+            [edgar2.util.ticker-info :as ticker-info]))
 
 (def identity-header
   (or (System/getenv "EDGAR_IDENTITY")
@@ -17,40 +17,12 @@
 
 (def exchanges-path "data/ticker-exchange.edn")
 
-(def category-words
-  "Fund, Trust, and Preferred. The rightmost match in the name wins, so
-  \"Preferred Income Fund\" is a Fund and \"Funds Trust\" is a Trust."
-  [["Fund" #"(?i)\bFunds?\b"]
-   ["Trust" #"(?i)\bTrust\b"]
-   ["Preferred" #"(?i)\bPreferred\b"]])
-
-(defn name-category
-  "ADR, ETF, Trust, Fund, or Preferred from the SEC registrant name.
-  Nil when the name says none of those.
-
-  `/ADR` (also `/ ADR` and `/ADR/`) is an ADR even when the issuer is a trust.
-  The word ETF is an ETF, including \"Trust ETF\" and \"ETF Trust\"."
-  [name]
-  (let [s (str name)]
-    (cond
-      (re-find #"(?i)/\s*ADR\b" s) "ADR"
-      (re-find #"(?i)\bETF\b" s) "ETF"
-      :else
-      (->> category-words
-           (keep (fn [[label re]]
-                   (let [m (re-matcher re s)]
-                     (when (.find m)
-                       [(.start m) label]))))
-           (sort-by first)
-           last
-           second))))
-
 (defn with-category
   [{:keys [ticker cik name exchange]}]
   {:ticker ticker
    :cik cik
    :name name
-   :category (name-category name)
+   :category (ticker-info/name-category name)
    :exchange exchange})
 
 (defn fetch-exchange-rows
@@ -63,7 +35,7 @@
                 (let [m (zipmap fields row)]
                   (with-category
                     {:ticker (str/upper-case (str (:ticker m)))
-                     :cik (tickers/pad-cik (:cik m))
+                     :cik (ticker-info/pad-cik (:cik m))
                      :name (:name m)
                      :exchange (:exchange m)}))))
          (sort-by :ticker)
@@ -73,19 +45,11 @@
   [row]
   (not (str/blank? (str (:exchange row)))))
 
-(defn common-ticker?
-  "False for NYSE class / preferred / unit / warrant tickers (BRK-A, SCE-PG, KCA-UN)."
-  [row]
-  (not (str/includes? (str (:ticker row)) "-")))
-
 (defn select-exchange-rows
-  "One main unhyphenated ticker per CIK, dropping rows with no listing venue."
+  "Every listed ticker, including non-primary share classes.
+  Rows with no listing venue are dropped."
   [rows]
-  (->> rows
-       tickers/filter-primary-filers
-       (filter listed-exchange?)
-       ;(filter common-ticker?)
-       vec))
+  (filterv listed-exchange? rows))
 
 (defn fetch-exchanges
   "ticker → exchange from company_tickers_exchange.json (one request)."
@@ -108,8 +72,9 @@
     (vec (select-exchange-rows (fetch-exchange-rows)))))
 
 (defn download-exchanges
-  "Download company_tickers_exchange.json and write data/ticker-exchange.edn
-  (one main ticker per CIK; skip hyphenated class/preferred/units and no exchange).
+  "Download company_tickers_exchange.json and write data/ticker-exchange.edn.
+  Every listed ticker is kept, including non-primary share classes.
+  Rows with no exchange are skipped.
 
   Usage: clj -X:download-exchanges"
   ([] (download-exchanges {}))
@@ -119,7 +84,7 @@
          rows (select-exchange-rows all)
          by-ex (frequencies (map :exchange rows))]
      (save-exchanges! rows)
-     (println (format "SEC ticker exchanges: %d symbols → %d listed primary (from %s)"
+     (println (format "SEC ticker exchanges: %d symbols → %d listed (from %s)"
                       (count all) (count rows) exchange-url))
      (println "venues" (sort-by val > by-ex))
      (println "categories" (sort-by val > (frequencies (map :category rows))))

@@ -18,11 +18,6 @@ clj -X:business :ticker OXY    ; Print the latest 10-K Item 1 business descripti
 
 
 ```bash
-clj -X:download-tickers
-```
-Download the SEC listed-ticker directory (one main ticker per CIK) and write `data/tickers.edn`:
-
-```bash
 clj -X:download-exchanges
 ```
 Download listing venue per ticker (`data/ticker-exchange.edn`, one main ticker per CIK; hyphenated class/preferred/units and symbols with no exchange omitted):

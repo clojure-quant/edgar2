@@ -3,7 +3,7 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [edgar2.download.tickers :as tickers]))
+            [edgar2.util.ticker-info :as ticker-info]))
 
 (def path "data/universe-fsds.edn")
 
@@ -17,16 +17,8 @@
             (edn/read-string (slurp path)))
       {})))
 
-(def cik-by-ticker
-  (delay
-    (into {}
-          (keep (fn [{:keys [ticker cik]}]
-                  (when (and ticker cik)
-                    [(str/upper-case (str ticker)) (str cik)])))
-          (tickers/load-tickers))))
-
 (defn company
   "FSDS row for `ticker`, or nil. The row is stored by CIK."
   [ticker]
-  (when-let [cik (get @cik-by-ticker (str/upper-case (str ticker)))]
+  (when-let [cik (ticker-info/ticker->cik ticker)]
     (get @by-cik cik)))

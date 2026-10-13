@@ -1,11 +1,11 @@
-(ns edgar2.download.custom.universe
-  "Companyfacts extract joined to listed ticker / exchange by CIK."
+(ns edgar2.download.facts-universe
+  "Companyfacts extract joined to the primary listed ticker by CIK."
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
             [edgar2.download.facts :as dl]
-            [edgar2.download.ticker-exchange :as exchanges]
+            [edgar2.util.ticker-info :as ticker-info]
             [jsonista.core :as json])
   (:import [java.util.zip ZipFile]))
 
@@ -151,31 +151,12 @@
       (:fp rev) (assoc :revenue-fp (:fp rev))
       (contains? facts :ffd) (assoc :note "filing-fee disclosure"))))
 
-(defn listing-by-cik
-  "CIK → {:ticker :exchange} from data/ticker-exchange.edn."
-  []
-  (into {}
-        (keep (fn [{:keys [cik ticker exchange]}]
-                (when cik
-                  [cik {:ticker ticker :exchange exchange}]))
-              (exchanges/load-exchanges))))
-
 (defn with-listing
-  [by-cik row]
-  (if-let [listing (get by-cik (:cik row))]
-    (merge row listing)
+  [row]
+  (if-let [listing (ticker-info/primary-ticker-for-cik (:cik row))]
+    (assoc (merge row listing)
+           :tickers (ticker-info/tickers-for-cik (:cik row)))
     row))
-
-(defn etf-name?
-  "True when the entity name is an ETF / ETF Trust / Trust ETF (word-boundary)."
-  [name]
-  (let [s (str/trim (str name))]
-    (boolean
-     (or (re-find #"(?i)\bETF\s+Trust\b" s)
-         (re-find #"(?i)\bTrust\s+ETF\b" s)
-         (re-find #"(?i)\bExchange[\s-]+Traded\s+(?:Fund|Trust)\b" s)
-         (re-find #"(?i)\bETFS\b" s)
-         (re-find #"(?i)\bETF\s*(?:II|III)?\s*[.,]?\s*$" s)))))
 
 (defn empty-facts?
   "True when companyfacts.json had no taxonomies (facts: {})."
@@ -190,7 +171,7 @@
   and CIKs whose companyfacts file is empty."
   [{:keys [entityName revenue note] :as row}]
   (not (or (empty-facts? row)
-           (and (nil? revenue) (etf-name? entityName))
+           (and (nil? revenue) (ticker-info/etf-name? entityName))
            (and (nil? revenue) (= note "filing-fee disclosure")))))
 
 (defn zip-json-names
@@ -240,8 +221,9 @@
     (.renameTo (io/file tmp) (io/file universe-path))))
 
 (defn universe
-  "Download companyfacts.zip (with progress), join listed ticker/exchange by CIK,
-  and write data/universe-facts.edn (unlisted CIKs omitted).
+  "Download companyfacts.zip (with progress), join the primary listed
+  ticker and exchange by CIK, and write data/universe-facts.edn.
+  :tickers is every listed symbol for that CIK. Unlisted CIKs are omitted.
 
   Reuses a zip already on disk. Pass :force true to download again.
   :limit N parses only the first N JSON files (zip is still the full archive).
@@ -253,12 +235,11 @@
   ([{:keys [force limit]}]
    (e/init! dl/identity-header)
    (let [zip-path (dl/ensure-zip! {:force force})
-         by-cik (listing-by-cik)
          parsed (parse-companyfacts-zip zip-path limit)
          kept (filter keep-fact? parsed)
          dropped (- (count parsed) (count kept))
          listed (->> kept
-                     (map #(with-listing by-cik %))
+                     (map with-listing)
                      (filter #(not (str/blank? (str (:ticker %)))))
                      (sort-by :cik)
                      vec)
