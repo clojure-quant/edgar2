@@ -3,9 +3,17 @@
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [edgar2.description :as description]
-            [edgar2.web.fsds :as fsds]
+            [edgar2.download.ticker-exchange :as exchanges]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
+
+(def exchange-by-ticker
+  (delay
+    (into {}
+          (keep (fn [{:keys [ticker exchange]}]
+                  (when (and ticker exchange)
+                    [(str/upper-case (str ticker)) exchange])))
+          (exchanges/load-exchanges))))
 
 (def google-exchange
   {"NYSE" "NYSE"
@@ -38,7 +46,7 @@
        (nav req)
        (if-not t
          [:p "Enter a ticker."]
-         (let [{:keys [exchange]} (fsds/company t)
+         (let [exchange (get @exchange-by-ticker t)
                url (google-finance-url t exchange)]
            [:p [:a {:href url
                     :target "_blank"

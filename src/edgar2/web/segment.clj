@@ -31,7 +31,7 @@
   [rows {:keys [sic metric]}]
   (cond
     sic (->> rows
-             (filter #(= sic (some-> (:sic-description %) str str/trim)))
+             (filter #(= sic (overview/sic-label %)))
              (sort-by (fn [r]
                         [(if (number? (:marketcap r)) 0 1)
                          (- (double (or (:marketcap r) 0)))

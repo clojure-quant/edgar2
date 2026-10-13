@@ -8,7 +8,7 @@
             [edgar.api :as e]
             [edgar2.derived :as derived]
             [edgar2.filing :as filing]
-            [edgar2.download.custom.fsds :as fsds]
+            [edgar2.download.fsds-universe :as fsds]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
             [edgar2.download.custom.universe :as universe]
@@ -716,21 +716,25 @@
           (json/read-value in json/keyword-keys-object-mapper))))))
 
 (defn load-sic-index
-  "Lookups from data/universe-fsds.edn: :by-cik and :by-ticker, each
-  {:sic :sic-description}. Empty when that file is missing."
+  "Lookups from data/universe-fsds.edn: :by-cik and :by-ticker.
+  Each value carries :sic, :sector, :industry, and :subindustry.
+  Empty when that file is missing."
   []
   (let [f (io/file fsds/filer-info-path)]
     (if-not (.exists f)
       (do (println (format "  no %s; sic left blank" fsds/filer-info-path))
           {:by-cik {} :by-ticker {}})
       (reduce (fn [idx row]
-                (let [sic (some-> (:sic row) str str/trim not-empty)
-                      desc (some-> (:sic-description row) str str/trim not-empty)
+                (let [text (fn [k]
+                             (some-> (get row k) str str/trim not-empty))
                       info (cond-> {}
-                             sic (assoc :sic sic)
-                             desc (assoc :sic-description desc))
-                      cik (some-> (:cik row) str str/trim not-empty)
-                      ticker (some-> (:ticker row) str str/trim not-empty str/upper-case)]
+                             (text :sic) (assoc :sic (text :sic))
+                             (text :sector) (assoc :sector (text :sector))
+                             (text :industry) (assoc :industry (text :industry))
+                             (text :subindustry) (assoc :subindustry (text :subindustry))
+                             (text :sic-description) (assoc :sic-description (text :sic-description)))
+                      cik (text :cik)
+                      ticker (some-> (text :ticker) str/upper-case)]
                   (cond-> idx
                     (and cik (seq info)) (update :by-cik assoc cik info)
                     (and ticker (seq info)) (update :by-ticker assoc ticker info))))
@@ -738,17 +742,20 @@
               (edn/read-string (slurp f))))))
 
 (defn with-sic
-  "Copy :sic and :sic-description from universe-fsds onto a stats row.
+  "Copy SIC names from universe-fsds onto a stats row.
   CIK wins; ticker is the fallback."
   [st {:keys [by-cik by-ticker]}]
   (let [info (or (get by-cik (some-> (:cik st) str str/trim))
                  (get by-ticker (some-> (:ticker st) str str/trim str/upper-case)))]
     (cond-> st
       (:sic info) (assoc :sic (:sic info))
+      (:sector info) (assoc :sector (:sector info))
+      (:industry info) (assoc :industry (:industry info))
+      (:subindustry info) (assoc :subindustry (:subindustry info))
       (:sic-description info) (assoc :sic-description (:sic-description info)))))
 
 (def stats-field-order
-  [:ticker :exchange :cik :entityName :sic :sic-description :price
+  [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
    :shares :marketcap
    :revenue :revenue-unit
    :net-profit
@@ -789,17 +796,19 @@
     (.renameTo (io/file tmp) (io/file stats-path))))
 
 (defn merge-sic!
-  "Add :sic and :sic-description from universe-fsds.edn onto the current
-  data/stats.edn, without rebuilding fundamentals."
+  "Add :sic, :sector, :industry, and :subindustry from universe-fsds.edn
+  onto the current data/stats.edn, without rebuilding fundamentals."
   []
   (let [rows (mapv #(with-sic % (load-sic-index))
                    (edn/read-string (slurp stats-path)))]
     (save-stats! rows)
-    (println (format "Wrote %s  (%d companies; sic=%d  sic-description=%d)"
+    (println (format "Wrote %s  (%d companies; sic=%d  sector=%d  industry=%d  subindustry=%d)"
                      stats-path
                      (count rows)
                      (count (filter :sic rows))
-                     (count (filter :sic-description rows))))
+                     (count (filter :sector rows))
+                     (count (filter :industry rows))
+                     (count (filter :subindustry rows))))
     rows))
 
 (defn fmt-growth
@@ -828,7 +837,7 @@
   (0–100 share of annual years that did not fall versus the prior year).
   When operating income is not tagged, a year whose operating expenses were
   derived uses gross profit minus those expenses.
-  :sic and :sic-description come from data/universe-fsds.edn.
+  :sic, :sector, :industry, and :subindustry come from data/universe-fsds.edn.
 
   Usage: clj -X:stats
          clj -X:stats :limit 25"

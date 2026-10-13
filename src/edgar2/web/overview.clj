@@ -74,20 +74,26 @@
      (cell :q4 q4)
      [:td.num {:key :q5} (if q4 (str "> " (format-value fmt q4)) "")]]))
 
+(defn sic-label
+  "Industry name, or the older :sic-description when that is all a row has."
+  [row]
+  (or (some-> (:industry row) str str/trim not-empty)
+      (some-> (:sic-description row) str str/trim not-empty)))
+
 (defn sic-summary
-  "One row per :sic-description. :n is the company count. :avg-mkt-cap is
-  the mean :marketcap of companies in that description that have one."
+  "One row per industry. :n is the company count. :avg-mkt-cap is
+  the mean :marketcap of companies in that industry that have one."
   [rows]
   (->> rows
-       (filter #(not-empty (some-> (:sic-description %) str str/trim)))
-       (group-by #(str/trim (str (:sic-description %))))
+       (filter #(sic-label %))
+       (group-by sic-label)
        (map (fn [[desc xs]]
               (let [mcaps (filterv number? (keep :marketcap xs))]
-                {:sic-description desc
+                {:industry desc
                  :n (count xs)
                  :avg-mkt-cap (when (seq mcaps)
                                 (/ (reduce + (map double mcaps)) (count mcaps)))})))
-       (sort-by (juxt (comp - :n) :sic-description))
+       (sort-by (juxt (comp - :n) :industry))
        vec))
 
 (defn- sic-table
@@ -97,14 +103,14 @@
      [:table
       [:thead
        [:tr
-        [:th "sic-description"]
+        [:th "industry"]
         [:th.num "n"]
         [:th.num "avg-mkt-cap ($M)"]]]
       (into [:tbody]
-            (map (fn [{:keys [sic-description n avg-mkt-cap]}]
-                   [:tr {:key sic-description}
-                    [:td [:a (h/navigate :segment {} {:sic sic-description})
-                          sic-description]]
+            (map (fn [{:keys [industry n avg-mkt-cap]}]
+                   [:tr {:key industry}
+                    [:td [:a (h/navigate :segment {} {:sic industry})
+                          industry]]
                     [:td.num n]
                     [:td.num (if avg-mkt-cap
                                (format-value :millions avg-mkt-cap)

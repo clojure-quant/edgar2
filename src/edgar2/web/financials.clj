@@ -28,11 +28,15 @@
   (if (nil? v) "" (str v)))
 
 (defn- sector-line
-  "SIC code, boxed, then the description."
+  "SIC code, then sector, industry, and subindustry."
   [ticker]
-  (let [{:keys [sic sic-description]} (fsds/company ticker)
+  (let [{:keys [sic sector industry subindustry sic-description]} (fsds/company ticker)
         code (some-> sic str str/trim not-empty)
-        desc (some-> sic-description str str/trim not-empty)]
+        names (->> [sector industry subindustry]
+                   (keep #(some-> % str str/trim not-empty)))
+        desc (if (seq names)
+               (str/join " · " names)
+               (some-> sic-description str str/trim not-empty))]
     (when (or code desc)
       [:p.fin-sector
        (when code [:span.fin-sic code])
