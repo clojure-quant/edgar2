@@ -1,0 +1,4018 @@
+[
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0111"
+  :subindustry "Wheat"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0112"
+  :subindustry "Rice"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0115"
+  :subindustry "Corn"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0116"
+  :subindustry "Soybeans"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0119"
+  :subindustry "Cash Grains, Not Elsewhere Classified"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0131"
+  :subindustry "Cotton"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0132"
+  :subindustry "Tobacco"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0133"
+  :subindustry "Sugarcane and Sugar Beets"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0134"
+  :subindustry "Irish Potatoes"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0139"
+  :subindustry "Field Crops, Except Cash Grains, Not Elsewhere Classified"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0161"
+  :subindustry "Vegetables and Melons"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0171"
+  :subindustry "Berry Crops"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0172"
+  :subindustry "Grapes"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0173"
+  :subindustry "Tree Nuts"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0174"
+  :subindustry "Citrus Fruits"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0175"
+  :subindustry "Deciduous Tree Fruits"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0179"
+  :subindustry "Fruits and Tree Nuts, Not Elsewhere Classified"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0181"
+  :subindustry "Ornamental Floriculture and Nursery Products"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0182"
+  :subindustry "Food Crops Grown Under Cover"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Production Crops"
+  :sic "0191"
+  :subindustry "General Farms, Primarily Crop"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0211"
+  :subindustry "Beef Cattle Feedlots"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0212"
+  :subindustry "Beef Cattle, Except Feedlots"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0213"
+  :subindustry "Hogs"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0214"
+  :subindustry "Sheep and Goats"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0219"
+  :subindustry "General Livestock, Except Dairy and Poultry"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0241"
+  :subindustry "Dairy Farms"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0251"
+  :subindustry "Broiler, Fryer, and Roaster Chickens"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0252"
+  :subindustry "Chicken Eggs"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0253"
+  :subindustry "Turkeys and Turkey Eggs"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0254"
+  :subindustry "Poultry Hatcheries"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0259"
+  :subindustry "Poultry and Eggs, Not Elsewhere Classified"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0271"
+  :subindustry "Fur-Bearing Animals and Rabbits"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0272"
+  :subindustry "Horses and Other Equines"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0273"
+  :subindustry "Animal Aquaculture"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0279"
+  :subindustry "Animal Specialties, Not Elsewhere Classified"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agriculture Production Livestock And Animal Specialties"
+  :sic "0291"
+  :subindustry "General Farms, Primarily Livestock and Animal Specialties"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0711"
+  :subindustry "Soil Preparation Services"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0721"
+  :subindustry "Crop Planting, Cultivating, and Protecting"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0722"
+  :subindustry "Crop Harvesting, Primarily by Machine"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0723"
+  :subindustry "Crop Preparation Services for Market, Except Cotton Ginning"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0724"
+  :subindustry "Cotton Ginning"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0741"
+  :subindustry "Veterinary Services for Livestock"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0742"
+  :subindustry "Veterinary Services for Animal Specialties"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0751"
+  :subindustry "Livestock Services, Except Veterinary"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0752"
+  :subindustry "Animal Specialty Services, Except Veterinary"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0761"
+  :subindustry "Farm Labor Contractors and Crew Leaders"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0762"
+  :subindustry "Farm Management Services"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0781"
+  :subindustry "Landscape Counseling and Planning"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0782"
+  :subindustry "Lawn and Garden Services"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Agricultural Services"
+  :sic "0783"
+  :subindustry "Ornamental Shrub and Tree Services"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Forestry"
+  :sic "0811"
+  :subindustry "Timber Tracts"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Forestry"
+  :sic "0831"
+  :subindustry "Forest Nurseries and Gathering of Forest Products"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Forestry"
+  :sic "0851"
+  :subindustry "Forestry Services"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Fishing, Hunting, And Trapping"
+  :sic "0912"
+  :subindustry "Finfish"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Fishing, Hunting, And Trapping"
+  :sic "0913"
+  :subindustry "Shellfish"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Fishing, Hunting, And Trapping"
+  :sic "0919"
+  :subindustry "Miscellaneous Marine Products"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Fishing, Hunting, And Trapping"
+  :sic "0921"
+  :subindustry "Fish Hatcheries and Preserves"}
+ {:sector "Agriculture, Forestry, And Fishing"
+  :industry "Fishing, Hunting, And Trapping"
+  :sic "0971"
+  :subindustry "Hunting and Trapping, and Game Propagation"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1011"
+  :subindustry "Iron Ores"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1021"
+  :subindustry "Copper Ores"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1031"
+  :subindustry "Lead and Zinc Ores"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1041"
+  :subindustry "Gold Ores"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1044"
+  :subindustry "Silver Ores"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1061"
+  :subindustry "Ferroalloy Ores, Except Vanadium"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1081"
+  :subindustry "Metal Mining Services"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1094"
+  :subindustry "Uranium-Radium-Vanadium Ores"}
+ {:sector "Mining"
+  :industry "Metal Mining"
+  :sic "1099"
+  :subindustry "Miscellaneous Metal Ores, Not Elsewhere Classified"}
+ {:sector "Mining"
+  :industry "Coal Mining"
+  :sic "1221"
+  :subindustry "Bituminous Coal and Lignite Surface Mining"}
+ {:sector "Mining"
+  :industry "Coal Mining"
+  :sic "1222"
+  :subindustry "Bituminous Coal Underground Mining"}
+ {:sector "Mining"
+  :industry "Coal Mining"
+  :sic "1231"
+  :subindustry "Anthracite Mining"}
+ {:sector "Mining"
+  :industry "Coal Mining"
+  :sic "1241"
+  :subindustry "Coal Mining Services"}
+ {:sector "Mining"
+  :industry "Oil And Gas Extraction"
+  :sic "1311"
+  :subindustry "Crude Petroleum and Natural Gas"}
+ {:sector "Mining"
+  :industry "Oil And Gas Extraction"
+  :sic "1321"
+  :subindustry "Natural Gas Liquids"}
+ {:sector "Mining"
+  :industry "Oil And Gas Extraction"
+  :sic "1381"
+  :subindustry "Drilling Oil and Gas Wells"}
+ {:sector "Mining"
+  :industry "Oil And Gas Extraction"
+  :sic "1382"
+  :subindustry "Oil and Gas Field Exploration Services"}
+ {:sector "Mining"
+  :industry "Oil And Gas Extraction"
+  :sic "1389"
+  :subindustry "Oil and Gas Field Services, Not Elsewhere Classified"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1411"
+  :subindustry "Dimension Stone"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1422"
+  :subindustry "Crushed and Broken Limestone"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1423"
+  :subindustry "Crushed and Broken Granite"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1429"
+  :subindustry "Crushed and Broken Stone, Not Elsewhere Classified"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1442"
+  :subindustry "Construction Sand and Gravel"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1446"
+  :subindustry "Industrial Sand"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1455"
+  :subindustry "Kaolin and Ball Clay"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1459"
+  :subindustry "Clay, Ceramic, and Refractory Minerals, Not Elsewhere Classified"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1474"
+  :subindustry "Potash, Soda, and Borate Minerals"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1475"
+  :subindustry "Phosphate Rock"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1479"
+  :subindustry "Chemical and Fertilizer Mineral Mining, Not Elsewhere Classified"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1481"
+  :subindustry "Nonmetallic Minerals Services, Except Fuels"}
+ {:sector "Mining"
+  :industry "Mining And Quarrying Of Nonmetallic Minerals, Except Fuels"
+  :sic "1499"
+  :subindustry "Miscellaneous Nonmetallic Minerals, Except Fuels"}
+ {:sector "Construction"
+  :industry "Building Construction General Contractors And Operative Builders"
+  :sic "1521"
+  :subindustry "General Contractors-Single-Family Houses"}
+ {:sector "Construction"
+  :industry "Building Construction General Contractors And Operative Builders"
+  :sic "1522"
+  :subindustry "General Contractors-Residential Buildings, Other Than Single-Family"}
+ {:sector "Construction"
+  :industry "Building Construction General Contractors And Operative Builders"
+  :sic "1531"
+  :subindustry "Operative Builders"}
+ {:sector "Construction"
+  :industry "Building Construction General Contractors And Operative Builders"
+  :sic "1541"
+  :subindustry "General Contractors-Industrial Buildings and Warehouses"}
+ {:sector "Construction"
+  :industry "Building Construction General Contractors And Operative Builders"
+  :sic "1542"
+  :subindustry "General Contractors-Nonresidential Buildings, Other than Industrial Buildings and Warehouses"}
+ {:sector "Construction"
+  :industry "Heavy Construction Other Than Building Construction Contractors"
+  :sic "1611"
+  :subindustry "Highway and Street Construction, Except Elevated Highways"}
+ {:sector "Construction"
+  :industry "Heavy Construction Other Than Building Construction Contractors"
+  :sic "1622"
+  :subindustry "Bridge, Tunnel, and Elevated Highway Construction"}
+ {:sector "Construction"
+  :industry "Heavy Construction Other Than Building Construction Contractors"
+  :sic "1623"
+  :subindustry "Water, Sewer, Pipeline, and Communications and Power Line Construction"}
+ {:sector "Construction"
+  :industry "Heavy Construction Other Than Building Construction Contractors"
+  :sic "1629"
+  :subindustry "Heavy Construction, Not Elsewhere Classified"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1711"
+  :subindustry "Plumbing, Heating and Air-Conditioning"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1721"
+  :subindustry "Painting and Paper Hanging"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1731"
+  :subindustry "Electrical Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1741"
+  :subindustry "Masonry, Stone Setting, and Other Stone Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1742"
+  :subindustry "Plastering, Drywall, Acoustical, and Insulation Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1743"
+  :subindustry "Terrazzo, Tile, Marble, and Mosaic Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1751"
+  :subindustry "Carpentry Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1752"
+  :subindustry "Floor Laying and Other Floor Work, Not Elsewhere Classified"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1761"
+  :subindustry "Roofing, Siding, and Sheet Metal Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1771"
+  :subindustry "Concrete Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1781"
+  :subindustry "Water Well Drilling"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1791"
+  :subindustry "Structural Steel Erection"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1793"
+  :subindustry "Glass and Glazing Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1794"
+  :subindustry "Excavation Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1795"
+  :subindustry "Wrecking and Demolition Work"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1796"
+  :subindustry "Installation or Erection of Building Equipment, Not Elsewhere"}
+ {:sector "Construction"
+  :industry "Construction Special Trade Contractors"
+  :sic "1799"
+  :subindustry "Special Trade Contractors, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2011"
+  :subindustry "Meat Packing Plants"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2013"
+  :subindustry "Sausages and Other Prepared Meat Products"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2015"
+  :subindustry "Poultry Slaughtering and Processing"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2021"
+  :subindustry "Creamery Butter"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2022"
+  :subindustry "Natural, Processed, and Imitation Cheese"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2023"
+  :subindustry "Dry, Condensed, and Evaporated Dairy Products"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2024"
+  :subindustry "Ice Cream and Frozen Desserts"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2026"
+  :subindustry "Fluid Milk"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2032"
+  :subindustry "Canned Specialties"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2033"
+  :subindustry "Canned Fruits, Vegetables, Preserves, Jams, and Jellies"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2034"
+  :subindustry "Dried and Dehydrated Fruits, Vegetables, and Soup Mixes"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2035"
+  :subindustry "Pickled Fruits and Vegetables, Vegetable Sauces and Seasonings, and Salad Dressings"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2037"
+  :subindustry "Frozen Fruits, Fruit Juices, and Vegetables"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2038"
+  :subindustry "Frozen Specialties, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2041"
+  :subindustry "Flour and Other Grain Mill Products"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2043"
+  :subindustry "Cereal Breakfast Foods"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2044"
+  :subindustry "Rice Milling"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2045"
+  :subindustry "Prepared Flour Mixes and Doughs"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2046"
+  :subindustry "Wet Corn Milling"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2047"
+  :subindustry "Dog and Cat Food"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2048"
+  :subindustry "Prepared Feed and Feed Ingredients for Animals and Fowls, Except Dogs and Cats"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2051"
+  :subindustry "Bread and Other Bakery Products, Except Cookies and Crackers"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2052"
+  :subindustry "Cookies and Crackers"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2053"
+  :subindustry "Frozen Bakery Products, Except Bread"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2061"
+  :subindustry "Cane Sugar, Except Refining"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2062"
+  :subindustry "Cane Sugar Refining"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2063"
+  :subindustry "Beet Sugar"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2064"
+  :subindustry "Candy and Other Confectionery Products"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2066"
+  :subindustry "Chocolate and Cocoa Products"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2067"
+  :subindustry "Chewing Gum"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2068"
+  :subindustry "Salted and Roasted Nuts and Seeds"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2074"
+  :subindustry "Cottonseed Oil Mills"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2075"
+  :subindustry "Soybean Oil Mills"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2076"
+  :subindustry "Vegetable Oil Mills, Except Corn, Cottonseed, and Soybean"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2077"
+  :subindustry "Animal and Marine Fats and Oils"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2079"
+  :subindustry "Shortening, Table Oils, Margarine, and Other Edible Fats and Oils, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2082"
+  :subindustry "Malt Beverages"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2083"
+  :subindustry "Malt"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2084"
+  :subindustry "Wines, Brandy, and Brandy Spirits"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2085"
+  :subindustry "Distilled and Blended Liquors"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2086"
+  :subindustry "Bottled and Canned Soft Drinks and Carbonated Waters"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2087"
+  :subindustry "Flavoring Extracts and Flavoring Syrups, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2091"
+  :subindustry "Canned and Cured Fish and Seafoods"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2092"
+  :subindustry "Prepared Fresh or Frozen Fish and Seafoods"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2095"
+  :subindustry "Roasted Coffee"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2096"
+  :subindustry "Potato Chips, Corn Chips, and Similar Snacks"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2097"
+  :subindustry "Manufactured Ice"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2098"
+  :subindustry "Macaroni, Spaghetti, Vermicelli, and Noodles"}
+ {:sector "Manufacturing"
+  :industry "Food And Kindred Products"
+  :sic "2099"
+  :subindustry "Food Preparations, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Tobacco Products"
+  :sic "2111"
+  :subindustry "Cigarettes"}
+ {:sector "Manufacturing"
+  :industry "Tobacco Products"
+  :sic "2121"
+  :subindustry "Cigars"}
+ {:sector "Manufacturing"
+  :industry "Tobacco Products"
+  :sic "2131"
+  :subindustry "Chewing and Smoking Tobacco and Snuff"}
+ {:sector "Manufacturing"
+  :industry "Tobacco Products"
+  :sic "2141"
+  :subindustry "Tobacco Stemming and Redrying"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2211"
+  :subindustry "Broadwoven Fabric Mills, Cotton"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2221"
+  :subindustry "Broadwoven Fabric Mills, Manmade Fiber and Silk"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2231"
+  :subindustry "Broadwoven Fabric Mills, Wool (Including Dyeing and Finishing)"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2241"
+  :subindustry "Narrow Fabric and Other Smallware Mills: Cotton, Wool, Silk, and Manmade Fiber"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2251"
+  :subindustry "Women's Full-Length and Knee-Length Hosiery, Except Socks"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2252"
+  :subindustry "Hosiery, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2253"
+  :subindustry "Knit Outerwear Mills"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2254"
+  :subindustry "Knit Underwear and Nightwear Mills"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2257"
+  :subindustry "Weft Knit Fabric Mills"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2258"
+  :subindustry "Lace and Warp Knit Fabric Mills"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2259"
+  :subindustry "Knitting Mills, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2261"
+  :subindustry "Finishers of Broadwoven Fabrics of Cotton"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2262"
+  :subindustry "Finishers of Broadwoven Fabrics of Manmade Fiber and Silk"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2269"
+  :subindustry "Finishers of Textiles, Not elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2273"
+  :subindustry "Carpets and Rugs"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2281"
+  :subindustry "Yarn Spinning Mills"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2282"
+  :subindustry "Yarn Texturizing, Throwing, Twisting, and Winding Mills"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2284"
+  :subindustry "Thread Mills"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2295"
+  :subindustry "Coated Fabrics, Not Rubberized"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2296"
+  :subindustry "Tire Cord and Fabrics"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2297"
+  :subindustry "Non-woven Fabrics"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2298"
+  :subindustry "Cordage and Twine"}
+ {:sector "Manufacturing"
+  :industry "Textile Mill Products"
+  :sic "2299"
+  :subindustry "Textile goods, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2311"
+  :subindustry "Men's and Boys' Suits, Coats, and Overcoats"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2321"
+  :subindustry "Men's and Boys' Shirts, Except Work Shirts"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2322"
+  :subindustry "Men's and Boys' Underwear and Nightwear"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2323"
+  :subindustry "Men's and Boys' Neckwear"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2325"
+  :subindustry "Men's and Boys' Separate Trousers and Slacks"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2326"
+  :subindustry "Men's and Boys' Work Clothing"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2329"
+  :subindustry "Men's and Boys' Clothing, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2331"
+  :subindustry "Women's, Misses', and Juniors' Blouses and Shirts"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2335"
+  :subindustry "Women's, Misses', and Juniors' Dresses"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2337"
+  :subindustry "Women's, Misses', and Juniors' Suits, Skirts, and Coats"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2339"
+  :subindustry "Women's, Misses', and Juniors' Outerwear, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2341"
+  :subindustry "Women's, Misses', Children's, and Infants' Underwear and Nightwear"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2342"
+  :subindustry "Brassieres, Girdles, and Allied Garments"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2353"
+  :subindustry "Hats, Caps, and Millinery"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2361"
+  :subindustry "Girls', Children's, and Infants' Dresses, Blouses, and Shirts"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2369"
+  :subindustry "Girls', Children's, and Infants' Outerwear, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2371"
+  :subindustry "Fur Goods"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2381"
+  :subindustry "Dress and Work Gloves, Except Knit and All-Leather"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2384"
+  :subindustry "Robes and Dressing Gowns"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2385"
+  :subindustry "Waterproof Outerwear"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2386"
+  :subindustry "Leather and Sheep-Lined Clothing"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2387"
+  :subindustry "Apparel belts"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2389"
+  :subindustry "Apparel and Accessories, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2391"
+  :subindustry "Curtains and Draperies"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2392"
+  :subindustry "House furnishing, Except Curtains and Draperies"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2393"
+  :subindustry "Textile Bags"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2394"
+  :subindustry "Canvas and Related Products"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2395"
+  :subindustry "Pleating, Decorative and Novelty Stitching, and Tucking for the Trade"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2396"
+  :subindustry "Automotive Trimmings, Apparel Findings, and Related Products"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2397"
+  :subindustry "Schiffli Machine Embroideries"}
+ {:sector "Manufacturing"
+  :industry "Apparel And Other Finished Products Made From Fabrics And Similar Materials"
+  :sic "2399"
+  :subindustry "Fabricated Textile Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2411"
+  :subindustry "Logging"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2421"
+  :subindustry "Sawmills and Planing Mills, General"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2426"
+  :subindustry "Hardwood Dimension and Flooring Mills"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2429"
+  :subindustry "Special Product Sawmills, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2431"
+  :subindustry "Millwork"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2434"
+  :subindustry "Wood Kitchen Cabinets"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2435"
+  :subindustry "Hardwood Veneer and Plywood"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2436"
+  :subindustry "Softwood Veneer and Plywood"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2439"
+  :subindustry "Structural Wood Members, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2441"
+  :subindustry "Nailed and Lock Corner Wood Boxes and Shook"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2448"
+  :subindustry "Wood Pallets and Skids"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2449"
+  :subindustry "Wood Containers, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2451"
+  :subindustry "Mobile Homes"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2452"
+  :subindustry "Prefabricated Wood Buildings and Components"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2491"
+  :subindustry "Wood Preserving"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2493"
+  :subindustry "Reconstituted Wood Products"}
+ {:sector "Manufacturing"
+  :industry "Lumber And Wood Products, Except Furniture"
+  :sic "2499"
+  :subindustry "Wood Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2511"
+  :subindustry "Wood Household Furniture, Except Upholstered"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2512"
+  :subindustry "Wood Household Furniture, Upholstered"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2514"
+  :subindustry "Metal Household Furniture"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2515"
+  :subindustry "Mattresses, Foundations, and Convertible Beds"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2517"
+  :subindustry "Wood Television, Radio, Phonograph, and Sewing Machine Cabinets"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2519"
+  :subindustry "Household Furniture, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2521"
+  :subindustry "Wood Office Furniture"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2522"
+  :subindustry "Office Furniture, Except Wood"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2531"
+  :subindustry "Public Building and Related Furniture"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2541"
+  :subindustry "Wood Office and Store Fixtures, Partitions, Shelving, and Lockers"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2542"
+  :subindustry "Office and Store Fixtures, Partitions, Shelving, and Lockers, Except Wood"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2591"
+  :subindustry "Drapery Hardware and Window Blinds and Shades"}
+ {:sector "Manufacturing"
+  :industry "Furniture And Fixtures"
+  :sic "2599"
+  :subindustry "Furniture and Fixtures, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2611"
+  :subindustry "Pulp Mills"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2621"
+  :subindustry "Paper Mills"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2631"
+  :subindustry "Paperboard Mills"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2652"
+  :subindustry "Setup Paperboard Boxes"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2653"
+  :subindustry "Corrugated and Solid Fiber Boxes"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2655"
+  :subindustry "Fiber Cans, Tubes, Drums, and Similar Products"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2656"
+  :subindustry "Sanitary Food Containers, Except Folding"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2657"
+  :subindustry "Folding Paperboard Boxes, Including Sanitary"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2671"
+  :subindustry "Packaging Paper and Plastics Film, Coated and Laminated"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2672"
+  :subindustry "Coated and Laminated Paper, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2673"
+  :subindustry "Plastics, Foil, and Coated Paper Bags"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2674"
+  :subindustry "Uncoated Paper and Multiwall Bags"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2675"
+  :subindustry "Die-Cut Paper and Paperboard and Cardboard"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2676"
+  :subindustry "Sanitary Paper Products"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2677"
+  :subindustry "Envelopes"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2678"
+  :subindustry "Stationery, Tablets, and Related Products"}
+ {:sector "Manufacturing"
+  :industry "Paper And Allied Products"
+  :sic "2679"
+  :subindustry "Converted Paper and Paperboard Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2711"
+  :subindustry "Newspapers: Publishing, or Publishing and Printing"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2721"
+  :subindustry "Periodicals: Publishing, or Publishing and Printing"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2731"
+  :subindustry "Books: Publishing, or Publishing and Printing"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2732"
+  :subindustry "Book Printing"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2741"
+  :subindustry "Miscellaneous Publishing"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2752"
+  :subindustry "Commercial Printing, Lithographic"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2754"
+  :subindustry "Commercial Printing, Gravure"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2759"
+  :subindustry "Commercial Printing, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2761"
+  :subindustry "Manifold Business Forms"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2771"
+  :subindustry "Greeting Cards"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2782"
+  :subindustry "Blankbooks, Looseleaf Binders and Devices"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2789"
+  :subindustry "Bookbinding and Related Work"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2791"
+  :subindustry "Typesetting"}
+ {:sector "Manufacturing"
+  :industry "Printing, Publishing, And Allied Industries"
+  :sic "2796"
+  :subindustry "Platemaking and Related Services"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2812"
+  :subindustry "Alkalies and Chlorine"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2813"
+  :subindustry "Industrial Gases"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2816"
+  :subindustry "Inorganic Pigments"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2819"
+  :subindustry "Industrial Inorganic Chemicals, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2821"
+  :subindustry "Plastics Materials, Synthetic Resins, and Nonvulcanizable Elastomers"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2822"
+  :subindustry "Synthetic Rubber (Vulcanizable Elastomers)"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2823"
+  :subindustry "Cellulosic Manmade Fibers"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2824"
+  :subindustry "Manmade Organic Fibers, Except Cellulosic"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2833"
+  :subindustry "Medicinal Chemicals and Botanical Products"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2834"
+  :subindustry "Pharmaceutical Preparations"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2835"
+  :subindustry "In Vitro and In Vivo Diagnostic Substances"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2836"
+  :subindustry "Biological Products, Except Diagnostic Substances"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2841"
+  :subindustry "Soap and Other Detergents, Except Specialty Cleaners"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2842"
+  :subindustry "Specialty Cleaning, Polishing, and Sanitation Preparations"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2843"
+  :subindustry "Surface Active Agents, Finishing Agents, Sulfonated Oils, and Assistants"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2844"
+  :subindustry "Perfumes, Cosmetics, and Other Toilet Preparations"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2851"
+  :subindustry "Paints, Varnishes, Lacquers, Enamels, and Allied Products"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2861"
+  :subindustry "Gum and Wood Chemicals"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2865"
+  :subindustry "Cyclic Organic Crudes and Intermediates, and Organic Dyes and Pigments"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2869"
+  :subindustry "Industrial Organic Chemicals, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2873"
+  :subindustry "Nitrogenous Fertilizers"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2874"
+  :subindustry "Phosphatic Fertilizers"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2875"
+  :subindustry "Fertilizers, Mixing Only"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2879"
+  :subindustry "Pesticides and Agricultural Chemicals, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2891"
+  :subindustry "Adhesives and Sealants"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2892"
+  :subindustry "Explosives"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2893"
+  :subindustry "Printing Ink"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2895"
+  :subindustry "Carbon Black"}
+ {:sector "Manufacturing"
+  :industry "Chemicals And Allied Products"
+  :sic "2899"
+  :subindustry "Chemicals and Chemical Preparations, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Petroleum Refining And Related Industries"
+  :sic "2911"
+  :subindustry "Petroleum Refining"}
+ {:sector "Manufacturing"
+  :industry "Petroleum Refining And Related Industries"
+  :sic "2951"
+  :subindustry "Asphalt Paving Mixtures and Blocks"}
+ {:sector "Manufacturing"
+  :industry "Petroleum Refining And Related Industries"
+  :sic "2952"
+  :subindustry "Asphalt Felts and Coatings"}
+ {:sector "Manufacturing"
+  :industry "Petroleum Refining And Related Industries"
+  :sic "2992"
+  :subindustry "Lubricating Oils and Greases"}
+ {:sector "Manufacturing"
+  :industry "Petroleum Refining And Related Industries"
+  :sic "2999"
+  :subindustry "Products of Petroleum and Coal, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3011"
+  :subindustry "Tires and Inner Tubes"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3021"
+  :subindustry "Rubber and Plastics Footwear"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3052"
+  :subindustry "Rubber and Plastics Hose and Belting"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3053"
+  :subindustry "Gaskets, Packing, and Sealing Devices"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3061"
+  :subindustry "Molded, Extruded, and Lathe-Cut Mechanical Rubber Goods"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3069"
+  :subindustry "Fabricated Rubber Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3081"
+  :subindustry "Unsupported Plastics Film and Sheet"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3082"
+  :subindustry "Unsupported Plastics Profile Shapes"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3083"
+  :subindustry "Laminated Plastics Plate, Sheet, and Profile Shapes"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3084"
+  :subindustry "Plastics Pipe"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3085"
+  :subindustry "Plastics Bottles"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3086"
+  :subindustry "Plastics Foam Products"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3087"
+  :subindustry "Custom Compounding of Purchased Plastics Resins"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3088"
+  :subindustry "Plastics Plumbing Fixtures"}
+ {:sector "Manufacturing"
+  :industry "Rubber And Miscellaneous Plastics Products"
+  :sic "3089"
+  :subindustry "Plastics Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3111"
+  :subindustry "Leather Tanning and Finishing"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3131"
+  :subindustry "Boot and Shoe Cut Stock and Findings"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3142"
+  :subindustry "House Slippers"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3143"
+  :subindustry "Men's Footwear, Except Athletic"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3144"
+  :subindustry "Women's Footwear, Except Athletic"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3149"
+  :subindustry "Footwear, Except Rubber, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3151"
+  :subindustry "Leather Gloves and Mittens"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3161"
+  :subindustry "Luggage"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3171"
+  :subindustry "Women's Handbags and Purses"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3172"
+  :subindustry "Personal Leather Goods, Except Women's Handbags and Purses"}
+ {:sector "Manufacturing"
+  :industry "Leather And Leather Products"
+  :sic "3199"
+  :subindustry "Leather Goods, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3211"
+  :subindustry "Flat Glass"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3221"
+  :subindustry "Glass Containers"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3229"
+  :subindustry "Pressed and Blown Glass and Glassware, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3231"
+  :subindustry "Glass Products, Made of Purchased Glass"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3241"
+  :subindustry "Cement, Hydraulic"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3251"
+  :subindustry "Brick and Structural Clay Tile"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3253"
+  :subindustry "Ceramic Wall and Floor Tile"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3255"
+  :subindustry "Clay Refractories"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3259"
+  :subindustry "Structural Clay Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3261"
+  :subindustry "Vitreous China Plumbing Fixtures and China and Earthenware Fittings and Bathroom Accessories"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3262"
+  :subindustry "Vitreous China Table and Kitchen Articles"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3263"
+  :subindustry "Fine Earthenware (Whiteware) Table and Kitchen Articles"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3264"
+  :subindustry "Porcelain Electrical Supplies"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3269"
+  :subindustry "Pottery Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3271"
+  :subindustry "Concrete Block and Brick"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3272"
+  :subindustry "Concrete Products, Except Block and Brick"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3273"
+  :subindustry "Ready-Mixed Concrete"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3274"
+  :subindustry "Lime"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3275"
+  :subindustry "Gypsum Products"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3281"
+  :subindustry "Cut Stone and Stone Products"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3291"
+  :subindustry "Abrasive Products"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3292"
+  :subindustry "Asbestos Products"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3295"
+  :subindustry "Minerals and Earths, Ground or Otherwise Treated"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3296"
+  :subindustry "Mineral Wool"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3297"
+  :subindustry "Nonclay Refractories"}
+ {:sector "Manufacturing"
+  :industry "Stone, Clay, Glass, And Concrete Products"
+  :sic "3299"
+  :subindustry "Nonmetallic Mineral Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3312"
+  :subindustry "Steel Works, Blast Furnaces (Including Coke Ovens), and Rolling Mills"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3313"
+  :subindustry "Electrometallurgical Products, Except Steel"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3315"
+  :subindustry "Steel Wiredrawing and Steel Nails and Spikes"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3316"
+  :subindustry "Cold-Rolled Steel Sheet, Strip, and Bars"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3317"
+  :subindustry "Steel Pipe and Tubes"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3321"
+  :subindustry "Gray and Ductile Iron Foundries"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3322"
+  :subindustry "Malleable Iron Foundries"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3324"
+  :subindustry "Steel Investment Foundries"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3325"
+  :subindustry "Steel Foundries, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3331"
+  :subindustry "Primary Smelting and Refining of Copper"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3334"
+  :subindustry "Primary Production of Aluminum"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3339"
+  :subindustry "Primary Smelting and Refining of Nonferrous Metals, Except Copper and Aluminum"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3341"
+  :subindustry "Secondary Smelting and Refining of Nonferrous Metals"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3351"
+  :subindustry "Rolling, Drawing, and Extruding Of Copper"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3353"
+  :subindustry "Aluminum Sheet, Plate, and Foil"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3354"
+  :subindustry "Aluminum Extruded Products"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3355"
+  :subindustry "Aluminum Rolling and Drawing, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3356"
+  :subindustry "Rolling, Drawing, and Extruding of Nonferrous Metals, Except Copper and Aluminum"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3357"
+  :subindustry "Drawing and Insulating of Nonferrous Wire"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3363"
+  :subindustry "Aluminum Die-Castings"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3364"
+  :subindustry "Nonferrous Die-Castings, Except Aluminum"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3365"
+  :subindustry "Aluminum Foundries"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3366"
+  :subindustry "Copper Foundries"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3369"
+  :subindustry "Nonferrous Foundries, Except Aluminum and Copper"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3398"
+  :subindustry "Metal Heat Treating"}
+ {:sector "Manufacturing"
+  :industry "Primary Metal Industries"
+  :sic "3399"
+  :subindustry "Primary Metal Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3411"
+  :subindustry "Metal Cans"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3412"
+  :subindustry "Metal Shipping Barrels, Drums, Kegs, and Pails"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3421"
+  :subindustry "Cutlery"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3423"
+  :subindustry "Hand and Edge Tools, Except Machine Tools and Handsaws"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3425"
+  :subindustry "Saw Blades and Handsaws"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3429"
+  :subindustry "Hardware, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3431"
+  :subindustry "Enameled Iron and Metal Sanitary Ware"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3432"
+  :subindustry "Plumbing Fixture Fittings and Trim"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3433"
+  :subindustry "Heating Equipment, Except Electric and Warm Air Furnaces"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3441"
+  :subindustry "Fabricated Structural Metal"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3442"
+  :subindustry "Metal Doors, Sash, Frames, Molding, and Trim Manufacturing"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3443"
+  :subindustry "Fabricated Plate Work (Boiler Shops)"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3444"
+  :subindustry "Sheet Metal Work"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3446"
+  :subindustry "Architectural and Ornamental Metal Work"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3448"
+  :subindustry "Prefabricated Metal Buildings and Components"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3449"
+  :subindustry "Miscellaneous Structural Metal Work"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3451"
+  :subindustry "Screw Machine Products"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3452"
+  :subindustry "Bolts, Nuts, Screws, Rivets, and Washers"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3462"
+  :subindustry "Iron and Steel Forgings"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3463"
+  :subindustry "Nonferrous Forgings"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3465"
+  :subindustry "Automotive Stampings"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3466"
+  :subindustry "Crowns and Closures"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3469"
+  :subindustry "Metal Stampings, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3471"
+  :subindustry "Electroplating, Plating, Polishing, Anodizing, and Coloring"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3479"
+  :subindustry "Coating, Engraving, and Allied Services, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3482"
+  :subindustry "Small Arms Ammunition"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3483"
+  :subindustry "Ammunition, Except for Small Arms"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3484"
+  :subindustry "Small Arms"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3489"
+  :subindustry "Ordnance and Accessories, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3491"
+  :subindustry "Industrial Valves"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3492"
+  :subindustry "Fluid Power Valves and Hose Fittings"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3493"
+  :subindustry "Steel Springs, Except Wire"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3494"
+  :subindustry "Valves and Pipe Fittings, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3495"
+  :subindustry "Wire Springs"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3496"
+  :subindustry "Miscellaneous Fabricated Wire Products"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3497"
+  :subindustry "Metal Foil and Leaf"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3498"
+  :subindustry "Fabricated Pipe and Pipe Fittings"}
+ {:sector "Manufacturing"
+  :industry "Fabricated Metal Products, Except Machinery And Transportation Equipment"
+  :sic "3499"
+  :subindustry "Fabricated Metal Products, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3511"
+  :subindustry "Steam, Gas, and Hydraulic Turbines, and Turbine Generator Set Units"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3519"
+  :subindustry "Internal Combustion Engines, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3523"
+  :subindustry "Farm Machinery and Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3524"
+  :subindustry "Lawn and Garden Tractors and Home Lawn and Garden Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3531"
+  :subindustry "Construction Machinery and Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3532"
+  :subindustry "Mining Machinery and Equipment, Except Oil and Gas Field Machinery and Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3533"
+  :subindustry "Oil and Gas Field Machinery and Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3534"
+  :subindustry "Elevators and Moving Stairways"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3535"
+  :subindustry "Conveyors and Conveying Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3536"
+  :subindustry "Overhead Traveling Cranes, Hoists, and Monorail Systems"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3537"
+  :subindustry "Industrial Trucks, Tractors, Trailers, and Stackers"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3541"
+  :subindustry "Machine Tools, Metal Cutting Types"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3542"
+  :subindustry "Machine Tools, Metal Forming Types"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3543"
+  :subindustry "Industrial Patterns"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3544"
+  :subindustry "Special Dies and Tools, Die Sets, Jigs and Fixtures, and Industrial Molds"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3545"
+  :subindustry "Cutting Tools, Machine Tool Accessories, and Machinists' Precision Measuring Devices"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3546"
+  :subindustry "Power-Driven Handtools"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3547"
+  :subindustry "Rolling Mill Machinery and Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3548"
+  :subindustry "Electric and Gas Welding and Soldering Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3549"
+  :subindustry "Metalworking Machinery, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3552"
+  :subindustry "Textile Machinery"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3553"
+  :subindustry "Woodworking Machinery"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3554"
+  :subindustry "Paper Industries Machinery"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3555"
+  :subindustry "Printing Trades Machinery and Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3556"
+  :subindustry "Food Products Machinery"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3559"
+  :subindustry "Special Industry Machinery, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3561"
+  :subindustry "Pumps and Pumping Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3562"
+  :subindustry "Ball and Roller Bearings"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3563"
+  :subindustry "Air and Gas Compressors"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3564"
+  :subindustry "Industrial and Commercial Fans and Blowers and Air Purification Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3565"
+  :subindustry "Packaging Machinery"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3566"
+  :subindustry "Speed Changers, Industrial High-Speed Drives, and Gears"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3567"
+  :subindustry "Industrial Process Furnaces and Ovens"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3568"
+  :subindustry "Mechanical Power Transmission Equipment, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3569"
+  :subindustry "General Industrial Machinery and Equipment, Not Elsewhere"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3571"
+  :subindustry "Electronic Computers"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3572"
+  :subindustry "Computer Storage Devices"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3575"
+  :subindustry "Computer Terminals"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3577"
+  :subindustry "Computer Peripheral Equipment, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3578"
+  :subindustry "Calculating and Accounting Machines, Except Electronic Computers"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3579"
+  :subindustry "Office Machines, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3581"
+  :subindustry "Automatic Vending Machines"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3582"
+  :subindustry "Commercial Laundry, Drycleaning, and Pressing Machines"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3585"
+  :subindustry "Air-Conditioning and Warm Air Heating Equipment and Commercial and Industrial Refrigeration Equipment"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3586"
+  :subindustry "Measuring and Dispensing Pumps"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3589"
+  :subindustry "Service Industry Machinery, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3592"
+  :subindustry "Carburetors, Pistons, Piston Rings, and Valves"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3593"
+  :subindustry "Fluid Power Cylinders and Actuators"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3594"
+  :subindustry "Fluid Power Pumps and Motors"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3596"
+  :subindustry "Scales and Balances, Except Laboratory"}
+ {:sector "Manufacturing"
+  :industry "Industrial And Commercial Machinery And Computer Equipment"
+  :sic "3599"
+  :subindustry "Industrial and Commercial Machinery and Equipment, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3612"
+  :subindustry "Power, Distribution, and Specialty Transformers"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3613"
+  :subindustry "Switchgear and Switchboard Apparatus"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3621"
+  :subindustry "Motors and Generators"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3624"
+  :subindustry "Carbon and Graphite Products"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3625"
+  :subindustry "Relays and Industrial Controls"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3629"
+  :subindustry "Electrical Industrial Apparatus, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3631"
+  :subindustry "Household Cooking Equipment"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3632"
+  :subindustry "Household Refrigerators and Home and Farm Freezers"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3633"
+  :subindustry "Household Laundry Equipment"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3634"
+  :subindustry "Electric Housewares and Fans"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3635"
+  :subindustry "Household Vacuum Cleaners"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3639"
+  :subindustry "Household Appliances, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3641"
+  :subindustry "Electric Lamp Bulbs and Tubes"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3643"
+  :subindustry "Current-Carrying Wiring Devices"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3644"
+  :subindustry "Noncurrent-Carrying Wiring Devices"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3645"
+  :subindustry "Residential Electric Lighting Fixtures"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3646"
+  :subindustry "Commercial, Industrial, and Institutional Electric Lighting Fixtures"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3647"
+  :subindustry "Vehicular Lighting Equipment"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3648"
+  :subindustry "Lighting Equipment, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3651"
+  :subindustry "Household Audio and Video Equipment"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3652"
+  :subindustry "Phonograph Records and Prerecorded Audio Tapes and Disks"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3661"
+  :subindustry "Telephone and Telegraph Apparatus"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3663"
+  :subindustry "Radio and Television Broadcasting and Communications Equipment"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3669"
+  :subindustry "Communications Equipment, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3671"
+  :subindustry "Electron Tubes"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3672"
+  :subindustry "Printed Circuit Boards"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3674"
+  :subindustry "Semiconductors and Related Devices"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3675"
+  :subindustry "Electronic Capacitors"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3676"
+  :subindustry "Electronic Resistors"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3677"
+  :subindustry "Electronic Coils, Transformers, and Other Inductors"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3678"
+  :subindustry "Electronic Connectors"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3679"
+  :subindustry "Electronic Components, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3691"
+  :subindustry "Storage Batteries"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3692"
+  :subindustry "Primary Batteries, Dry and Wet"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3694"
+  :subindustry "Electrical Equipment for Internal Combustion Engines"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3695"
+  :subindustry "Magnetic And Optical Recording Media"}
+ {:sector "Manufacturing"
+  :industry "Electronic And Other Electrical Equipment And Components, Except Computer Equipment"
+  :sic "3699"
+  :subindustry "Electrical Machinery, Equipment, and Supplies, Not Elsewhere"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3711"
+  :subindustry "Motor Vehicles and Passenger Car Bodies"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3713"
+  :subindustry "Truck and Bus Bodies"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3714"
+  :subindustry "Motor Vehicle Parts and Accessories"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3715"
+  :subindustry "Truck Trailers"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3716"
+  :subindustry "Motor Homes"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3721"
+  :subindustry "Aircraft"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3724"
+  :subindustry "Aircraft Engines and Engine Parts"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3728"
+  :subindustry "Aircraft Parts and Auxiliary Equipment, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3731"
+  :subindustry "Ship Building and Repairing"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3732"
+  :subindustry "Boat Building and Repairing"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3743"
+  :subindustry "Railroad Equipment"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3751"
+  :subindustry "Motorcycles, Bicycles, and Parts"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3761"
+  :subindustry "Guided Missiles and Space Vehicles"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3764"
+  :subindustry "Guided Missile and Space Vehicle Propulsion Units and Propulsion Unit Parts"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3769"
+  :subindustry "Guided Missile Space Vehicle Parts and Auxiliary Equipment, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3792"
+  :subindustry "Travel Trailers and Campers"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3795"
+  :subindustry "Tanks and Tank Components"}
+ {:sector "Manufacturing"
+  :industry "Transportation Equipment"
+  :sic "3799"
+  :subindustry "Transportation Equipment, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3812"
+  :subindustry "Search, Detection, Navigation, Guidance, Aeronautical, and Nautical Systems and Instruments"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3821"
+  :subindustry "Laboratory Apparatus and Furniture"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3822"
+  :subindustry "Automatic Controls for Regulating Residential and Commercial Environments and Appliances"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3823"
+  :subindustry "Industrial Instruments for Measurement, Display, and Control of Process Variables; and Related Products"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3824"
+  :subindustry "Totalizing Fluid Meters and Counting Devices"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3825"
+  :subindustry "Instruments for Measuring and Testing of Electricity and Electrical Signals"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3826"
+  :subindustry "Laboratory Analytical Instruments"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3827"
+  :subindustry "Optical Instruments and Lenses"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3829"
+  :subindustry "Measuring and Controlling Devices, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3841"
+  :subindustry "Surgical and Medical Instruments and Apparatus"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3842"
+  :subindustry "Orthopedic, Prosthetic, and Surgical Appliances and Supplies"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3843"
+  :subindustry "Dental Equipment and Supplies"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3844"
+  :subindustry "X-Ray Apparatus and Tubes and Related Irradiation Apparatus"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3845"
+  :subindustry "Electromedical and Electrotherapeutic Apparatus"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3851"
+  :subindustry "Ophthalmic Goods"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3861"
+  :subindustry "Photographic Equipment and Supplies"}
+ {:sector "Manufacturing"
+  :industry "Measuring, Analyzing, And Controlling Instruments; Photographic, Medical And Optical Goods; Watches And Clocks"
+  :sic "3873"
+  :subindustry "Watches, Clocks, Clockwork Operated Devices, and Parts"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3911"
+  :subindustry "Jewelry, Precious Metal"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3914"
+  :subindustry "Silverware, Plated Ware, and Stainless Steel Ware"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3915"
+  :subindustry "Jewelers' Findings and Materials, and Lapidary Work"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3931"
+  :subindustry "Musical Instruments"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3942"
+  :subindustry "Dolls and Stuffed Toys"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3944"
+  :subindustry "Games, Toys, and Children's Vehicles, Except Dolls and Bicycles"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3949"
+  :subindustry "Sporting and Athletic Goods, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3951"
+  :subindustry "Pens, Mechanical Pencils, and Parts"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3952"
+  :subindustry "Lead Pencils, Crayons, and Artists' Materials"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3953"
+  :subindustry "Marking Devices"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3955"
+  :subindustry "Carbon Paper and Inked Ribbons"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3961"
+  :subindustry "Costume Jewelry and Costume Novelties, Except Precious Metal"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3965"
+  :subindustry "Fasteners, Buttons, Needles, and Pins"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3991"
+  :subindustry "Brooms and Brushes"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3993"
+  :subindustry "Signs and Advertising Specialties"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3995"
+  :subindustry "Burial Caskets"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3996"
+  :subindustry "Linoleum, Asphalted-Felt-Base, and Other Hard Surface Floor Coverings, Not Elsewhere Classified"}
+ {:sector "Manufacturing"
+  :industry "Miscellaneous Manufacturing Industries"
+  :sic "3999"
+  :subindustry "Manufacturing Industries, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Railroad Transportation"
+  :sic "4011"
+  :subindustry "Railroads, Line-Haul Operating"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Railroad Transportation"
+  :sic "4013"
+  :subindustry "Railroad Switching and Terminal Establishments"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Local And Suburban Transit And Interurban Highway Passenger Transportation"
+  :sic "4111"
+  :subindustry "Local and Suburban Transit"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Local And Suburban Transit And Interurban Highway Passenger Transportation"
+  :sic "4119"
+  :subindustry "Local Passenger Transportation, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Local And Suburban Transit And Interurban Highway Passenger Transportation"
+  :sic "4121"
+  :subindustry "Taxicabs"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Local And Suburban Transit And Interurban Highway Passenger Transportation"
+  :sic "4131"
+  :subindustry "Intercity and Rural Bus Transportation"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Local And Suburban Transit And Interurban Highway Passenger Transportation"
+  :sic "4141"
+  :subindustry "Local Bus Charter Service"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Local And Suburban Transit And Interurban Highway Passenger Transportation"
+  :sic "4142"
+  :subindustry "Bus Charter Service, Except Local"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Local And Suburban Transit And Interurban Highway Passenger Transportation"
+  :sic "4151"
+  :subindustry "School Buses"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Local And Suburban Transit And Interurban Highway Passenger Transportation"
+  :sic "4173"
+  :subindustry "Terminal and Service Facilities for Motor Vehicle Passenger Transportation"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4212"
+  :subindustry "Local Trucking Without Storage"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4213"
+  :subindustry "Trucking, Except Local"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4214"
+  :subindustry "Local Trucking With Storage"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4215"
+  :subindustry "Courier Services, Except by Air"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4221"
+  :subindustry "Farm Product Warehousing and Storage"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4222"
+  :subindustry "Refrigerated Warehousing and Storage"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4225"
+  :subindustry "General Warehousing and Storage"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4226"
+  :subindustry "Special Warehousing and Storage, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Motor Freight Transportation And Warehousing"
+  :sic "4231"
+  :subindustry "Terminal and Joint Terminal Maintenance Facilities for Motor Freight Transportation"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "United States Postal Service"
+  :sic "4311"
+  :subindustry "United States Postal Service"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4412"
+  :subindustry "Deep Sea Foreign Transportation of Freight"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4424"
+  :subindustry "Deep Sea Domestic Transportation of Freight"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4432"
+  :subindustry "Freight Transportation on the Great Lakes-St. Lawrence Seaway"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4449"
+  :subindustry "Water Transportation of Freight, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4481"
+  :subindustry "Deep Sea Transportation of Passengers, Except by Ferry"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4482"
+  :subindustry "Ferries"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4489"
+  :subindustry "Water Transportation of Passengers, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4491"
+  :subindustry "Marine Cargo Handling"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4492"
+  :subindustry "Towing and Tugboat Services"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4493"
+  :subindustry "Marinas"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Water Transportation"
+  :sic "4499"
+  :subindustry "Water Transportation Services, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation By Air"
+  :sic "4512"
+  :subindustry "Air Transportation, Scheduled"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation By Air"
+  :sic "4513"
+  :subindustry "Air Courier Services"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation By Air"
+  :sic "4522"
+  :subindustry "Air Transportation, Nonscheduled"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation By Air"
+  :sic "4581"
+  :subindustry "Airports, Flying Fields, and Airport Terminal Services"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Pipelines, Except Natural Gas"
+  :sic "4612"
+  :subindustry "Crude Petroleum Pipelines"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Pipelines, Except Natural Gas"
+  :sic "4613"
+  :subindustry "Refined Petroleum Pipelines"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Pipelines, Except Natural Gas"
+  :sic "4619"
+  :subindustry "Pipelines, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation Services"
+  :sic "4724"
+  :subindustry "Travel Agencies"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation Services"
+  :sic "4725"
+  :subindustry "Tour Operators"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation Services"
+  :sic "4729"
+  :subindustry "Arrangement of Passenger Transportation, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation Services"
+  :sic "4731"
+  :subindustry "Arrangement of Transportation of Freight and Cargo"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation Services"
+  :sic "4741"
+  :subindustry "Rental of Railroad Cars"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation Services"
+  :sic "4783"
+  :subindustry "Packing and Crating"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation Services"
+  :sic "4785"
+  :subindustry "Fixed Facilities and Inspection and Weighing Services for Motor Vehicle Transportation"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Transportation Services"
+  :sic "4789"
+  :subindustry "Transportation Services, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Communications"
+  :sic "4812"
+  :subindustry "Radiotelephone Communications"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Communications"
+  :sic "4813"
+  :subindustry "Telephone Communications, Except Radiotelephone"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Communications"
+  :sic "4822"
+  :subindustry "Telegraph and Other Message Communications"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Communications"
+  :sic "4832"
+  :subindustry "Radio Broadcasting Stations"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Communications"
+  :sic "4833"
+  :subindustry "Television Broadcasting Stations"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Communications"
+  :sic "4841"
+  :subindustry "Cable and Other Pay Television Services"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Communications"
+  :sic "4899"
+  :subindustry "Communications Services, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4911"
+  :subindustry "Electric Services"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4922"
+  :subindustry "Natural Gas Transmission"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4923"
+  :subindustry "Natural Gas Transmission and Distribution"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4924"
+  :subindustry "Natural Gas Distribution"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4925"
+  :subindustry "Mixed, Manufactured, or Liquefied Petroleum Gas Production and/or"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4931"
+  :subindustry "Electric and Other Services Combined"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4932"
+  :subindustry "Gas and Other Services Combined"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4939"
+  :subindustry "Combination Utilities, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4941"
+  :subindustry "Water Supply"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4952"
+  :subindustry "Sewerage Systems"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4953"
+  :subindustry "Refuse Systems"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4959"
+  :subindustry "Sanitary Services, Not Elsewhere Classified"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4961"
+  :subindustry "Steam and Air-Conditioning Supply"}
+ {:sector "Transportation, Communications, Electric, Gas, And Sanitary Services"
+  :industry "Electric, Gas, And Sanitary Services"
+  :sic "4971"
+  :subindustry "Irrigation Systems"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5012"
+  :subindustry "Automobiles and Other Motor Vehicles"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5013"
+  :subindustry "Motor Vehicle Supplies and New Parts"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5014"
+  :subindustry "Tires and Tubes"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5015"
+  :subindustry "Motor Vehicle Parts, Used"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5021"
+  :subindustry "Furniture"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5023"
+  :subindustry "Home furnishings"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5031"
+  :subindustry "Lumber, Plywood, Millwork, and Wood Panels"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5032"
+  :subindustry "Brick, Stone, and Related Construction Materials"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5033"
+  :subindustry "Roofing, Siding, and Insulation Materials"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5039"
+  :subindustry "Construction Materials, Not Elsewhere Classified"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5043"
+  :subindustry "Photographic Equipment and Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5044"
+  :subindustry "Office Equipment"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5045"
+  :subindustry "Computers and Computer Peripheral Equipment and Software"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5046"
+  :subindustry "Commercial Equipment, Not Elsewhere Classified"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5047"
+  :subindustry "Medical, Dental, and Hospital Equipment and Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5048"
+  :subindustry "Ophthalmic Goods"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5049"
+  :subindustry "Professional Equipment and Supplies, Not Elsewhere Classified"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5051"
+  :subindustry "Metals Service Centers and Offices"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5052"
+  :subindustry "Coal and Other Minerals and Ores"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5063"
+  :subindustry "Electrical Apparatus and Equipment Wiring Supplies, and Construction Materials"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5064"
+  :subindustry "Electrical Appliances, Television and Radio Sets"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5065"
+  :subindustry "Electronic Parts and Equipment, Not Elsewhere Classified"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5072"
+  :subindustry "Hardware"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5074"
+  :subindustry "Plumbing and Heating Equipment and Supplies (Hydronics)"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5075"
+  :subindustry "Warm Air Heating and Air-Conditioning Equipment and Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5078"
+  :subindustry "Refrigeration Equipment and Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5082"
+  :subindustry "Construction and Mining (Except Petroleum) Machinery and Equipment"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5083"
+  :subindustry "Farm and Garden Machinery and Equipment"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5084"
+  :subindustry "Industrial Machinery and Equipment"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5085"
+  :subindustry "Industrial Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5087"
+  :subindustry "Service Establishment Equipment and Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5088"
+  :subindustry "Transportation Equipment and Supplies, Except Motor Vehicles"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5091"
+  :subindustry "Sporting and Recreational Goods and Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5092"
+  :subindustry "Toys and Hobby Goods and Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5093"
+  :subindustry "Scrap and Waste Materials"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5094"
+  :subindustry "Jewelry, Watches, Precious Stones, and Precious Metals"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-durable Goods"
+  :sic "5099"
+  :subindustry "Durable Goods, Not Elsewhere Classified"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5111"
+  :subindustry "Printing and Writing Paper"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5112"
+  :subindustry "Stationery and Office Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5113"
+  :subindustry "Industrial and Personal Service Paper"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5122"
+  :subindustry "Drugs, Drug Proprietaries, and Druggists' Sundries"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5131"
+  :subindustry "Piece Goods, Notions, and Other Dry Good"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5136"
+  :subindustry "Men's and Boy's Clothing and Furnishings"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5137"
+  :subindustry "Women's, Children's, and Infants' Clothing and Accessories"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5139"
+  :subindustry "Footwear"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5141"
+  :subindustry "Groceries, General Line"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5142"
+  :subindustry "Packaged Frozen Foods"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5143"
+  :subindustry "Dairy Products, Except Dried or Canned"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5144"
+  :subindustry "Poultry and Poultry Products"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5145"
+  :subindustry "Confectionery"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5146"
+  :subindustry "Fish and Seafoods"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5147"
+  :subindustry "Meats and Meat Products"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5148"
+  :subindustry "Fresh Fruits and Vegetables"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5149"
+  :subindustry "Groceries and Related Products, Not Elsewhere Classified"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5153"
+  :subindustry "Grain and Field Beans"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5154"
+  :subindustry "Livestock"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5159"
+  :subindustry "Farm-Product Raw Materials, Not Elsewhere Classified"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5162"
+  :subindustry "Plastics Materials and Basic Forms and Shapes"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5169"
+  :subindustry "Chemicals and Allied Products, Not Elsewhere Classified"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5171"
+  :subindustry "Petroleum Bulk stations and Terminals"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5172"
+  :subindustry "Petroleum and Petroleum Products Wholesalers, Except Bulk Stations and Terminals"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5181"
+  :subindustry "Beer and Ale"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5182"
+  :subindustry "Wine and Distilled Alcoholic Beverages"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5191"
+  :subindustry "Farm Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5192"
+  :subindustry "Books, Periodicals, and Newspapers"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5193"
+  :subindustry "Flowers, Nursery Stock, and Florists' Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5194"
+  :subindustry "Tobacco and Tobacco Products"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5198"
+  :subindustry "Paints, Varnishes, and Supplies"}
+ {:sector "Wholesale Trade"
+  :industry "Wholesale Trade-non-durable Goods"
+  :sic "5199"
+  :subindustry "Nondurable Goods, Not Elsewhere Classified"}
+ {:sector "Retail Trade"
+  :industry "Building Materials, Hardware, Garden Supply, And Mobile Home Dealers"
+  :sic "5211"
+  :subindustry "Lumber and Other Building Materials Dealers"}
+ {:sector "Retail Trade"
+  :industry "Building Materials, Hardware, Garden Supply, And Mobile Home Dealers"
+  :sic "5231"
+  :subindustry "Paint, Glass, and Wallpaper Stores"}
+ {:sector "Retail Trade"
+  :industry "Building Materials, Hardware, Garden Supply, And Mobile Home Dealers"
+  :sic "5251"
+  :subindustry "Hardware Stores"}
+ {:sector "Retail Trade"
+  :industry "Building Materials, Hardware, Garden Supply, And Mobile Home Dealers"
+  :sic "5261"
+  :subindustry "Retail Nurseries, Lawn and Garden Supply Stores"}
+ {:sector "Retail Trade"
+  :industry "Building Materials, Hardware, Garden Supply, And Mobile Home Dealers"
+  :sic "5271"
+  :subindustry "Mobile Home Dealers"}
+ {:sector "Retail Trade"
+  :industry "General Merchandise Stores"
+  :sic "5311"
+  :subindustry "Department Stores"}
+ {:sector "Retail Trade"
+  :industry "General Merchandise Stores"
+  :sic "5331"
+  :subindustry "Variety Stores"}
+ {:sector "Retail Trade"
+  :industry "General Merchandise Stores"
+  :sic "5399"
+  :subindustry "Miscellaneous General Merchandise Stores"}
+ {:sector "Retail Trade"
+  :industry "Food Stores"
+  :sic "5411"
+  :subindustry "Grocery Stores"}
+ {:sector "Retail Trade"
+  :industry "Food Stores"
+  :sic "5421"
+  :subindustry "Meat and Fish (Seafood) Markets, Including Freezer Provisioners"}
+ {:sector "Retail Trade"
+  :industry "Food Stores"
+  :sic "5431"
+  :subindustry "Fruit and Vegetable Markets"}
+ {:sector "Retail Trade"
+  :industry "Food Stores"
+  :sic "5441"
+  :subindustry "Candy, Nut, and Confectionery Stores"}
+ {:sector "Retail Trade"
+  :industry "Food Stores"
+  :sic "5451"
+  :subindustry "Dairy Products Stores"}
+ {:sector "Retail Trade"
+  :industry "Food Stores"
+  :sic "5461"
+  :subindustry "Retail Bakeries"}
+ {:sector "Retail Trade"
+  :industry "Food Stores"
+  :sic "5499"
+  :subindustry "Miscellaneous Food Stores"}
+ {:sector "Retail Trade"
+  :industry "Automotive Dealers And Gasoline Service Stations"
+  :sic "5511"
+  :subindustry "Motor Vehicle Dealers (New and Used)"}
+ {:sector "Retail Trade"
+  :industry "Automotive Dealers And Gasoline Service Stations"
+  :sic "5521"
+  :subindustry "Motor Vehicle Dealers (Used Only)"}
+ {:sector "Retail Trade"
+  :industry "Automotive Dealers And Gasoline Service Stations"
+  :sic "5531"
+  :subindustry "Auto and Home Supply Stores"}
+ {:sector "Retail Trade"
+  :industry "Automotive Dealers And Gasoline Service Stations"
+  :sic "5541"
+  :subindustry "Gasoline Service Stations"}
+ {:sector "Retail Trade"
+  :industry "Automotive Dealers And Gasoline Service Stations"
+  :sic "5551"
+  :subindustry "Boat Dealers"}
+ {:sector "Retail Trade"
+  :industry "Automotive Dealers And Gasoline Service Stations"
+  :sic "5561"
+  :subindustry "Recreational Vehicle Dealers"}
+ {:sector "Retail Trade"
+  :industry "Automotive Dealers And Gasoline Service Stations"
+  :sic "5571"
+  :subindustry "Motorcycle Dealers"}
+ {:sector "Retail Trade"
+  :industry "Automotive Dealers And Gasoline Service Stations"
+  :sic "5599"
+  :subindustry "Automotive Dealers, Not Elsewhere Classified"}
+ {:sector "Retail Trade"
+  :industry "Apparel And Accessory Stores"
+  :sic "5611"
+  :subindustry "Men's and Boys' Clothing and Accessory Stores"}
+ {:sector "Retail Trade"
+  :industry "Apparel And Accessory Stores"
+  :sic "5621"
+  :subindustry "Women's Clothing Stores"}
+ {:sector "Retail Trade"
+  :industry "Apparel And Accessory Stores"
+  :sic "5632"
+  :subindustry "Women's Accessory and Specialty Stores"}
+ {:sector "Retail Trade"
+  :industry "Apparel And Accessory Stores"
+  :sic "5641"
+  :subindustry "Children's and Infants' Wear Stores"}
+ {:sector "Retail Trade"
+  :industry "Apparel And Accessory Stores"
+  :sic "5651"
+  :subindustry "Family Clothing Stores"}
+ {:sector "Retail Trade"
+  :industry "Apparel And Accessory Stores"
+  :sic "5661"
+  :subindustry "Shoe Stores"}
+ {:sector "Retail Trade"
+  :industry "Apparel And Accessory Stores"
+  :sic "5699"
+  :subindustry "Miscellaneous Apparel and Accessory Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5712"
+  :subindustry "Furniture Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5713"
+  :subindustry "Floor Covering Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5714"
+  :subindustry "Drapery, Curtain, and Upholstery Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5719"
+  :subindustry "Miscellaneous home furnishings Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5722"
+  :subindustry "Household Appliance Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5731"
+  :subindustry "Radio, Television, and Consumer Electronics Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5734"
+  :subindustry "Computer and Computer Software Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5735"
+  :subindustry "Record and Prerecorded Tape Stores"}
+ {:sector "Retail Trade"
+  :industry "Home Furniture, Furnishings, And Equipment Stores"
+  :sic "5736"
+  :subindustry "Musical Instrument Stores"}
+ {:sector "Retail Trade"
+  :industry "Eating And Drinking Places"
+  :sic "5812"
+  :subindustry "Eating Places"}
+ {:sector "Retail Trade"
+  :industry "Eating And Drinking Places"
+  :sic "5813"
+  :subindustry "Drinking Places (alcoholic Beverages)"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5912"
+  :subindustry "Drug Stores and Proprietary Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5921"
+  :subindustry "Liquor Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5932"
+  :subindustry "Used Merchandise Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5941"
+  :subindustry "Sporting Goods Stores and Bicycle Shops"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5942"
+  :subindustry "Book Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5943"
+  :subindustry "Stationery Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5944"
+  :subindustry "Jewelry Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5945"
+  :subindustry "Hobby, Toy, and Game Shops"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5946"
+  :subindustry "Camera and Photographic Supply Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5947"
+  :subindustry "Gift, Novelty, and Souvenir Shops"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5948"
+  :subindustry "Luggage and Leather Goods Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5949"
+  :subindustry "Sewing, Needlework, and Piece Goods Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5961"
+  :subindustry "Catalog and Mail-Order Houses"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5962"
+  :subindustry "Automatic Merchandising Machine Operators"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5963"
+  :subindustry "Direct Selling Establishments"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5983"
+  :subindustry "Fuel Oil Dealers"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5984"
+  :subindustry "Liquefied Petroleum Gas (Bottled Gas) Dealers"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5989"
+  :subindustry "Fuel Dealers, Not Elsewhere Classified"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5992"
+  :subindustry "Florists"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5993"
+  :subindustry "Tobacco Stores and Stands"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5994"
+  :subindustry "News Dealers and Newsstands"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5995"
+  :subindustry "Optical Goods Stores"}
+ {:sector "Retail Trade"
+  :industry "Miscellaneous Retail"
+  :sic "5999"
+  :subindustry "Miscellaneous Retail Stores, Not Elsewhere Classified"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6011"
+  :subindustry "Federal Reserve Banks"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6019"
+  :subindustry "Central Reserve Depository Institutions, Not Elsewhere Classified"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6021"
+  :subindustry "National Commercial Banks"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6022"
+  :subindustry "State Commercial Banks"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6029"
+  :subindustry "Commercial Banks, Not Elsewhere Classified"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6035"
+  :subindustry "Savings Institutions, Federally Chartered"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6036"
+  :subindustry "Savings Institutions, Not Federally Chartered"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6061"
+  :subindustry "Credit Unions, Federally Chartered"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6062"
+  :subindustry "Credit Unions, Not Federally Chartered"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6081"
+  :subindustry "Branches and Agencies of Foreign Banks"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6082"
+  :subindustry "Foreign Trade and International Banking Institutions"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6091"
+  :subindustry "Non-deposit Trust Facilities"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Depository Institutions"
+  :sic "6099"
+  :subindustry "Functions Related to Depository Banking, Not Elsewhere Classified"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Non-depository Credit Institutions"
+  :sic "6111"
+  :subindustry "Federal and Federally-Sponsored Credit Agencies"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Non-depository Credit Institutions"
+  :sic "6141"
+  :subindustry "Personal Credit Institutions"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Non-depository Credit Institutions"
+  :sic "6153"
+  :subindustry "Short-Term Business Credit Institutions, Except Agricultural"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Non-depository Credit Institutions"
+  :sic "6159"
+  :subindustry "Miscellaneous business Credit Institutions"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Non-depository Credit Institutions"
+  :sic "6162"
+  :subindustry "Mortgage Bankers and Loan Correspondents"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Non-depository Credit Institutions"
+  :sic "6163"
+  :subindustry "Loan Brokers"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Security And Commodity Brokers, Dealers, Exchanges, And Services"
+  :sic "6211"
+  :subindustry "Security Brokers, Dealers, and Flotation Companies"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Security And Commodity Brokers, Dealers, Exchanges, And Services"
+  :sic "6221"
+  :subindustry "Commodity Contracts Brokers and Dealers"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Security And Commodity Brokers, Dealers, Exchanges, And Services"
+  :sic "6231"
+  :subindustry "Security and Commodity Exchanges"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Security And Commodity Brokers, Dealers, Exchanges, And Services"
+  :sic "6282"
+  :subindustry "Investment Advice"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Security And Commodity Brokers, Dealers, Exchanges, And Services"
+  :sic "6289"
+  :subindustry "Services Allied With the Exchange of Securities or Commodities, Not Elsewhere Classified"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Carriers"
+  :sic "6311"
+  :subindustry "Life Insurance"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Carriers"
+  :sic "6321"
+  :subindustry "Accident and Health Insurance"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Carriers"
+  :sic "6324"
+  :subindustry "Hospital and Medical Service Plans"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Carriers"
+  :sic "6331"
+  :subindustry "Fire, Marine, and Casualty Insurance"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Carriers"
+  :sic "6351"
+  :subindustry "Surety Insurance"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Carriers"
+  :sic "6361"
+  :subindustry "Title Insurance"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Carriers"
+  :sic "6371"
+  :subindustry "Pension, Health, and Welfare Funds"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Carriers"
+  :sic "6399"
+  :subindustry "Insurance Carriers, Not Elsewhere Classified"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Insurance Agents, Brokers, And Service"
+  :sic "6411"
+  :subindustry "Insurance Agents, Brokers, and Service"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6512"
+  :subindustry "Operators of Nonresidential Buildings"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6513"
+  :subindustry "Operators of Apartment Buildings"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6514"
+  :subindustry "Operators of Dwellings Other Than Apartment Buildings"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6515"
+  :subindustry "Operators of Residential Mobile Home Sites"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6517"
+  :subindustry "Lessors of Railroad Property"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6519"
+  :subindustry "Lessors of Real Property, Not Elsewhere Classified"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6531"
+  :subindustry "Real Estate Agents and Managers"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6541"
+  :subindustry "Title Abstract Offices"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6552"
+  :subindustry "Land Subdividers and Developers, Except Cemeteries"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Real Estate"
+  :sic "6553"
+  :subindustry "Cemetery Subdividers and Developers"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6712"
+  :subindustry "Offices of Bank Holding Companies"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6719"
+  :subindustry "Offices of Holding Companies, Not Elsewhere Classified"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6722"
+  :subindustry "Management Investment Offices, Open-End"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6726"
+  :subindustry "Unit Investment Trusts, Face-Amount Certificate Offices, and Closed-End Management Investment Offices"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6732"
+  :subindustry "Educational, Religious, and Charitable Trusts"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6733"
+  :subindustry "Trusts, Except Educational, Religious, and Charitable"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6792"
+  :subindustry "Oil Royalty Traders"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6794"
+  :subindustry "Patent Owners and Lessors"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6798"
+  :subindustry "Real Estate Investment Trusts"}
+ {:sector "Finance, Insurance, And Real Estate"
+  :industry "Holding And Other Investment Offices"
+  :sic "6799"
+  :subindustry "Investors, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Hotels, Rooming Houses, Camps, And Other Lodging Places"
+  :sic "7011"
+  :subindustry "Hotels and Motels"}
+ {:sector "Services"
+  :industry "Hotels, Rooming Houses, Camps, And Other Lodging Places"
+  :sic "7021"
+  :subindustry "Rooming and Boarding Houses"}
+ {:sector "Services"
+  :industry "Hotels, Rooming Houses, Camps, And Other Lodging Places"
+  :sic "7032"
+  :subindustry "Sporting and Recreational Camps"}
+ {:sector "Services"
+  :industry "Hotels, Rooming Houses, Camps, And Other Lodging Places"
+  :sic "7033"
+  :subindustry "Recreational Vehicle Parks and Campsites"}
+ {:sector "Services"
+  :industry "Hotels, Rooming Houses, Camps, And Other Lodging Places"
+  :sic "7041"
+  :subindustry "Organization Hotels and Lodging Houses, on Membership Basis"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7211"
+  :subindustry "Power Laundries, Family and Commercial"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7212"
+  :subindustry "Garment Pressing, and Agents for Laundries and Drycleaners"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7213"
+  :subindustry "Linen Supply"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7215"
+  :subindustry "Coin-Operated Laundries and Drycleaning"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7216"
+  :subindustry "Drycleaning Plants, Except Rug Cleaning"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7217"
+  :subindustry "Carpet and Upholstery Cleaning"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7218"
+  :subindustry "Industrial Launderers"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7219"
+  :subindustry "Laundry and Garment Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7221"
+  :subindustry "Photographic Studios, Portrait"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7231"
+  :subindustry "Beauty Shops"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7241"
+  :subindustry "Barber Shops"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7251"
+  :subindustry "Shoe Repair Shops and Shoeshine Parlors"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7261"
+  :subindustry "Funeral Service and Crematories"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7291"
+  :subindustry "Tax Return Preparation Services"}
+ {:sector "Services"
+  :industry "Personal Services"
+  :sic "7299"
+  :subindustry "Miscellaneous Personal Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7311"
+  :subindustry "Advertising Agencies"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7312"
+  :subindustry "Outdoor Advertising Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7313"
+  :subindustry "Radio, Television, and Publishers' Advertising Representatives"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7319"
+  :subindustry "Advertising, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7322"
+  :subindustry "Adjustment and Collection Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7323"
+  :subindustry "Credit Reporting Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7331"
+  :subindustry "Direct Mail Advertising Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7334"
+  :subindustry "Photocopying and Duplicating Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7335"
+  :subindustry "Commercial Photography"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7336"
+  :subindustry "Commercial Art and Graphic Design"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7338"
+  :subindustry "Secretarial and Court Reporting Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7342"
+  :subindustry "Disinfecting and Pest Control Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7349"
+  :subindustry "Building Cleaning and Maintenance Services, Not Elsewhere"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7352"
+  :subindustry "Medical Equipment Rental and Leasing"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7353"
+  :subindustry "Heavy Construction Equipment Rental and Leasing"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7359"
+  :subindustry "Equipment Rental and Leasing, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7361"
+  :subindustry "Employment Agencies"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7363"
+  :subindustry "Help Supply Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7371"
+  :subindustry "Computer Programming Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7372"
+  :subindustry "Prepackaged Software"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7373"
+  :subindustry "Computer Integrated Systems Design"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7374"
+  :subindustry "Computer Processing and Data Preparation and Processing Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7375"
+  :subindustry "Information Retrieval Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7376"
+  :subindustry "Computer Facilities Management Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7377"
+  :subindustry "Computer Rental and Leasing"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7378"
+  :subindustry "Computer Maintenance and Repair"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7379"
+  :subindustry "Computer Related Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7381"
+  :subindustry "Detective, Guard, and Armored Car Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7382"
+  :subindustry "Security Systems Services"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7383"
+  :subindustry "News Syndicates"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7384"
+  :subindustry "Photofinishing Laboratories"}
+ {:sector "Services"
+  :industry "Business Services"
+  :sic "7389"
+  :subindustry "Business Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7513"
+  :subindustry "Truck Rental and Leasing, Without Drivers"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7514"
+  :subindustry "Passenger Car Rental"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7515"
+  :subindustry "Passenger Car Leasing"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7519"
+  :subindustry "Utility Trailer and Recreational Vehicle Rental"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7521"
+  :subindustry "Automobile Parking"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7532"
+  :subindustry "Top, Body, and Upholstery Repair Shops and Paint Shops"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7533"
+  :subindustry "Automotive Exhaust System Repair Shops"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7534"
+  :subindustry "Tire Retreading and Repair Shops"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7536"
+  :subindustry "Automotive Glass Replacement Shops"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7537"
+  :subindustry "Automotive Transmission Repair Shops"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7538"
+  :subindustry "General Automotive Repair Shops"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7539"
+  :subindustry "Automotive Repair Shops, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7542"
+  :subindustry "Carwashes"}
+ {:sector "Services"
+  :industry "Automotive Repair, Services, And Parking"
+  :sic "7549"
+  :subindustry "Automotive Services, Except Repair and Carwashes"}
+ {:sector "Services"
+  :industry "Miscellaneous Repair Services"
+  :sic "7622"
+  :subindustry "Radio and Television Repair Shops"}
+ {:sector "Services"
+  :industry "Miscellaneous Repair Services"
+  :sic "7623"
+  :subindustry "Refrigeration and Air-Conditioning Service and Repair Shops"}
+ {:sector "Services"
+  :industry "Miscellaneous Repair Services"
+  :sic "7629"
+  :subindustry "Electrical and Electronic Repair Shops, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Miscellaneous Repair Services"
+  :sic "7631"
+  :subindustry "Watch, Clock, and Jewelry Repair"}
+ {:sector "Services"
+  :industry "Miscellaneous Repair Services"
+  :sic "7641"
+  :subindustry "Reupholstery and Furniture Repair"}
+ {:sector "Services"
+  :industry "Miscellaneous Repair Services"
+  :sic "7692"
+  :subindustry "Welding Repair"}
+ {:sector "Services"
+  :industry "Miscellaneous Repair Services"
+  :sic "7694"
+  :subindustry "Armature Rewinding Shops"}
+ {:sector "Services"
+  :industry "Miscellaneous Repair Services"
+  :sic "7699"
+  :subindustry "Repair Shops and Related Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Motion Pictures"
+  :sic "7812"
+  :subindustry "Motion Picture and Video Tape Production"}
+ {:sector "Services"
+  :industry "Motion Pictures"
+  :sic "7819"
+  :subindustry "Services Allied to Motion Picture Production"}
+ {:sector "Services"
+  :industry "Motion Pictures"
+  :sic "7822"
+  :subindustry "Motion Picture and Video Tape Distribution"}
+ {:sector "Services"
+  :industry "Motion Pictures"
+  :sic "7829"
+  :subindustry "Services Allied to Motion Picture Distribution"}
+ {:sector "Services"
+  :industry "Motion Pictures"
+  :sic "7832"
+  :subindustry "Motion Picture Theaters, Except Drive-In"}
+ {:sector "Services"
+  :industry "Motion Pictures"
+  :sic "7833"
+  :subindustry "Drive-In Motion Picture Theaters"}
+ {:sector "Services"
+  :industry "Motion Pictures"
+  :sic "7841"
+  :subindustry "Video Tape Rental"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7911"
+  :subindustry "Dance Studios, Schools, and Halls"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7922"
+  :subindustry "Theatrical Producers (Except Motion Picture) and Miscellaneous Theatrical Services"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7929"
+  :subindustry "Bands, Orchestras, Actors, and Other Entertainers and Entertainment Groups"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7933"
+  :subindustry "Bowling Centers"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7941"
+  :subindustry "Professional Sports Clubs and Promoters"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7948"
+  :subindustry "7948 Racing, Including Track Operation"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7991"
+  :subindustry "Physical Fitness Facilities"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7992"
+  :subindustry "Public Golf Courses"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7993"
+  :subindustry "Coin-Operated Amusement Devices"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7996"
+  :subindustry "Amusement Parks"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7997"
+  :subindustry "Membership Sports and Recreation Clubs"}
+ {:sector "Services"
+  :industry "Amusement And Recreation Services"
+  :sic "7999"
+  :subindustry "Amusement and Recreation Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8011"
+  :subindustry "Offices and Clinics of Doctors of Medicine"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8021"
+  :subindustry "Offices and Clinics of Dentists"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8041"
+  :subindustry "Offices and Clinics of Chiropractors"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8042"
+  :subindustry "Offices and Clinics of Optometrists"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8043"
+  :subindustry "Offices and Clinics of Podiatrists"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8049"
+  :subindustry "Offices and Clinics of Health Practitioners, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8051"
+  :subindustry "Skilled Nursing Care Facilities"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8052"
+  :subindustry "Intermediate Care Facilities"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8059"
+  :subindustry "Nursing and Personal Care Facilities, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8062"
+  :subindustry "General Medical and Surgical Hospitals"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8063"
+  :subindustry "Psychiatric Hospitals"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8069"
+  :subindustry "Specialty Hospitals, Except Psychiatric"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8071"
+  :subindustry "Medical Laboratories"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8072"
+  :subindustry "Dental Laboratories"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8082"
+  :subindustry "Home Health Care Services"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8092"
+  :subindustry "Kidney Dialysis Centers"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8093"
+  :subindustry "Specialty Outpatient Facilities, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Health Services"
+  :sic "8099"
+  :subindustry "Health and Allied Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Legal Services"
+  :sic "8111"
+  :subindustry "Legal Services"}
+ {:sector "Services"
+  :industry "Educational Services"
+  :sic "8211"
+  :subindustry "Elementary and Secondary Schools"}
+ {:sector "Services"
+  :industry "Educational Services"
+  :sic "8221"
+  :subindustry "Colleges, Universities, and Professional Schools"}
+ {:sector "Services"
+  :industry "Educational Services"
+  :sic "8222"
+  :subindustry "Junior Colleges and Technical Institutes"}
+ {:sector "Services"
+  :industry "Educational Services"
+  :sic "8231"
+  :subindustry "Libraries"}
+ {:sector "Services"
+  :industry "Educational Services"
+  :sic "8243"
+  :subindustry "Data Processing Schools"}
+ {:sector "Services"
+  :industry "Educational Services"
+  :sic "8244"
+  :subindustry "Business and Secretarial Schools"}
+ {:sector "Services"
+  :industry "Educational Services"
+  :sic "8249"
+  :subindustry "Vocational Schools, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Educational Services"
+  :sic "8299"
+  :subindustry "Schools and Educational Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Social Services"
+  :sic "8322"
+  :subindustry "Individual and Family Social Services"}
+ {:sector "Services"
+  :industry "Social Services"
+  :sic "8331"
+  :subindustry "Job Training and Vocational Rehabilitation Services"}
+ {:sector "Services"
+  :industry "Social Services"
+  :sic "8351"
+  :subindustry "Child Day Care Services"}
+ {:sector "Services"
+  :industry "Social Services"
+  :sic "8361"
+  :subindustry "Residential Care"}
+ {:sector "Services"
+  :industry "Social Services"
+  :sic "8399"
+  :subindustry "Social Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Museums, Art Galleries, And Botanical And Zoological Gardens"
+  :sic "8412"
+  :subindustry "Museums and Art Galleries"}
+ {:sector "Services"
+  :industry "Museums, Art Galleries, And Botanical And Zoological Gardens"
+  :sic "8422"
+  :subindustry "Arboreta and Botanical or Zoological Gardens"}
+ {:sector "Services"
+  :industry "Membership Organizations"
+  :sic "8611"
+  :subindustry "Business Associations"}
+ {:sector "Services"
+  :industry "Membership Organizations"
+  :sic "8621"
+  :subindustry "Professional Membership Organizations"}
+ {:sector "Services"
+  :industry "Membership Organizations"
+  :sic "8631"
+  :subindustry "Labor Unions and Similar Labor Organizations"}
+ {:sector "Services"
+  :industry "Membership Organizations"
+  :sic "8641"
+  :subindustry "Civic, Social, and Fraternal Associations"}
+ {:sector "Services"
+  :industry "Membership Organizations"
+  :sic "8651"
+  :subindustry "Political Organizations"}
+ {:sector "Services"
+  :industry "Membership Organizations"
+  :sic "8661"
+  :subindustry "Religious Organizations"}
+ {:sector "Services"
+  :industry "Membership Organizations"
+  :sic "8699"
+  :subindustry "Membership Organizations, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8711"
+  :subindustry "Engineering Services"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8712"
+  :subindustry "Architectural Services"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8713"
+  :subindustry "Surveying Services"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8721"
+  :subindustry "Accounting, Auditing, and Bookkeeping Services"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8731"
+  :subindustry "Commercial Physical and Biological Research"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8732"
+  :subindustry "Commercial Economic, Sociological, and Educational Research"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8733"
+  :subindustry "Noncommercial Research Organizations"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8734"
+  :subindustry "Testing Laboratories"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8741"
+  :subindustry "Management Services"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8742"
+  :subindustry "Management Consulting Services"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8743"
+  :subindustry "Public Relations Services"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8744"
+  :subindustry "Facilities Support Management Services"}
+ {:sector "Services"
+  :industry "Engineering, Accounting, Research, Management, And Related Services"
+  :sic "8748"
+  :subindustry "Business Consulting Services, Not Elsewhere Classified"}
+ {:sector "Services"
+  :industry "Private Households"
+  :sic "8811"
+  :subindustry "Private Households"}
+ {:sector "Services"
+  :industry "Miscellaneous Services"
+  :sic "8999"
+  :subindustry "Services, Not Elsewhere Classified"}
+ {:sector "Public Administration"
+  :industry "Executive, Legislative, And General Government, Except Finance"
+  :sic "9111"
+  :subindustry "Executive Offices"}
+ {:sector "Public Administration"
+  :industry "Executive, Legislative, And General Government, Except Finance"
+  :sic "9121"
+  :subindustry "Legislative Bodies"}
+ {:sector "Public Administration"
+  :industry "Executive, Legislative, And General Government, Except Finance"
+  :sic "9131"
+  :subindustry "Executive and Legislative Offices Combined"}
+ {:sector "Public Administration"
+  :industry "Executive, Legislative, And General Government, Except Finance"
+  :sic "9199"
+  :subindustry "General Government, Not Elsewhere Classified"}
+ {:sector "Public Administration"
+  :industry "Justice, Public Order, And Safety"
+  :sic "9211"
+  :subindustry "Courts"}
+ {:sector "Public Administration"
+  :industry "Justice, Public Order, And Safety"
+  :sic "9221"
+  :subindustry "Police Protection"}
+ {:sector "Public Administration"
+  :industry "Justice, Public Order, And Safety"
+  :sic "9222"
+  :subindustry "Legal Counsel and Prosecution"}
+ {:sector "Public Administration"
+  :industry "Justice, Public Order, And Safety"
+  :sic "9223"
+  :subindustry "Correctional Institutions"}
+ {:sector "Public Administration"
+  :industry "Justice, Public Order, And Safety"
+  :sic "9224"
+  :subindustry "Fire Protection"}
+ {:sector "Public Administration"
+  :industry "Justice, Public Order, And Safety"
+  :sic "9229"
+  :subindustry "Public Order and Safety, Not Elsewhere Classified"}
+ {:sector "Public Administration"
+  :industry "Public Finance, Taxation, And Monetary Policy"
+  :sic "9311"
+  :subindustry "Public Finance, Taxation, and Monetary Policy"}
+ {:sector "Public Administration"
+  :industry "Administration Of Human Resource Programs"
+  :sic "9411"
+  :subindustry "Administration of Educational Programs"}
+ {:sector "Public Administration"
+  :industry "Administration Of Human Resource Programs"
+  :sic "9431"
+  :subindustry "Administration of Public Health Programs"}
+ {:sector "Public Administration"
+  :industry "Administration Of Human Resource Programs"
+  :sic "9441"
+  :subindustry "Administration of Social, Human Resource and Income Maintenance Programs"}
+ {:sector "Public Administration"
+  :industry "Administration Of Human Resource Programs"
+  :sic "9451"
+  :subindustry "Administration of Veterans' Affairs, Except Health and Insurance"}
+ {:sector "Public Administration"
+  :industry "Administration Of Environmental Quality And Housing Programs"
+  :sic "9511"
+  :subindustry "Air and Water Resource and Solid Waste Management"}
+ {:sector "Public Administration"
+  :industry "Administration Of Environmental Quality And Housing Programs"
+  :sic "9512"
+  :subindustry "Land, Mineral, Wildlife, and Forest Conservation"}
+ {:sector "Public Administration"
+  :industry "Administration Of Environmental Quality And Housing Programs"
+  :sic "9531"
+  :subindustry "Administration of Housing Programs"}
+ {:sector "Public Administration"
+  :industry "Administration Of Environmental Quality And Housing Programs"
+  :sic "9532"
+  :subindustry "Administration of Urban Planning and Community and Rural Development"}
+ {:sector "Public Administration"
+  :industry "Administration Of Economic Programs"
+  :sic "9611"
+  :subindustry "Administration of General Economic Programs"}
+ {:sector "Public Administration"
+  :industry "Administration Of Economic Programs"
+  :sic "9621"
+  :subindustry "Regulation and Administration of Transportation Programs"}
+ {:sector "Public Administration"
+  :industry "Administration Of Economic Programs"
+  :sic "9631"
+  :subindustry "Regulation and Administration of Communications, Electric, Gas, and Other Utilities"}
+ {:sector "Public Administration"
+  :industry "Administration Of Economic Programs"
+  :sic "9641"
+  :subindustry "Regulation of Agricultural Marketing and Commodities"}
+ {:sector "Public Administration"
+  :industry "Administration Of Economic Programs"
+  :sic "9651"
+  :subindustry "Regulation, Licensing, and Inspection of Miscellaneous Commercial Sectors"}
+ {:sector "Public Administration"
+  :industry "Administration Of Economic Programs"
+  :sic "9661"
+  :subindustry "Space and Research and Technology"}
+ {:sector "Public Administration"
+  :industry "National Security And International Affairs"
+  :sic "9711"
+  :subindustry "National Security"}
+ {:sector "Public Administration"
+  :industry "National Security And International Affairs"
+  :sic "9721"
+  :subindustry "International Affairs"}
+ {:sector "Public Administration"
+  :industry "Nonclassifiable Establishments"
+  :sic "9999"
+  :subindustry "Nonclassifiable Establishments"}
+]
