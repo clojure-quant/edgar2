@@ -1,5 +1,5 @@
 (ns edgar2.web.screen
-  "One page for every screen. /screen and /eodhd-screen both render it."
+  "One page for every screen."
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [edgar2.screen :as screen]

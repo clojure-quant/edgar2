@@ -572,12 +572,6 @@
       (let [amount (Math/abs (double (:val paid)))]
         (when (pos? amount) amount)))))
 
-(defn dividend-coverage
-  "Net income / dividends paid at `end`. Nil when no dividend was paid."
-  [facts unit end net-income]
-  (when-let [paid (annual-dividends-paid facts unit end)]
-    (ratio net-income paid)))
-
 (defn company-stats
   [facts {:keys [revenue-unit] :as row}]
   (let [rev (annual-flows facts universe/revenue-tags revenue-unit)
@@ -610,7 +604,8 @@
         coverage-ni (if margin
                       (:num margin)
                       (:val (fact-at facts net-income-tags revenue-unit coverage-end)))
-        coverage (dividend-coverage facts revenue-unit coverage-end coverage-ni)]
+        paid (annual-dividends-paid facts revenue-unit coverage-end)
+        coverage (when paid (ratio coverage-ni paid))]
     (cond-> (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
       (:sales-growth-yoy growth)
       (assoc :sales-growth-yoy (:sales-growth-yoy growth)
@@ -642,6 +637,7 @@
              :dps-end (:end dps))
       (and dps (:unit dps))
       (assoc :dps-unit (:unit dps))
+      (number? paid) (assoc :dividends-paid paid)
       (number? debt) (assoc :debt debt :debt-end bs-end)
       (number? cash) (assoc :cash cash)
       (number? preferred) (assoc :preferred-stock preferred)
@@ -660,8 +656,9 @@
 (defn with-valuation
   "Add :shares, :price, :marketcap, :price-sales, :price-earnings,
   :enterprise-value, and :ev-ebit.
-  PE is price / USD EPS, else USD market cap / USD Net Income — never mix
-  a dollar price with ARS/JPY/etc. earnings.
+  PE is USD market cap / USD Net Income, else USD price / USD EPS.
+  Dividend yield is USD dividends paid / USD market cap, else USD dividend
+  per share / price. Never mix a dollar price with ARS/JPY/etc. earnings.
   Enterprise value is USD market cap + debt + preferred + noncontrolling
   interest − cash. EV/EBIT divides that by USD EBIT."
   [st price-by-ticker shares]
@@ -675,12 +672,16 @@
         usd-pl? (usd-unit? (:revenue-unit st))
         dps (when (number? (:dps st)) (:dps st))
         usd-dps? (usd-unit? (:dps-unit st))
+        paid (when (number? (:dividends-paid st)) (:dividends-paid st))
         pe (cond
-             (and price (number? eps) usd-eps? (not (zero? (double eps))))
-             (/ (double price) (double eps))
              (and mcap usd-pl? (number? ni) (not (zero? (double ni))))
-             (/ mcap (double ni)))
-        dy (when (and price (pos? (double price)) (number? dps) usd-dps?)
+             (/ mcap (double ni))
+             (and price (number? eps) usd-eps? (not (zero? (double eps))))
+             (/ (double price) (double eps)))
+        dy (cond
+             (and mcap usd-pl? (pos? (double mcap)) (number? paid) (pos? (double paid)))
+             (* 100.0 (/ (double paid) (double mcap)))
+             (and price (pos? (double price)) (number? dps) usd-dps?)
              (* 100.0 (/ (double dps) (double price))))
         ebit (when (number? (:ebit st)) (:ebit st))
         ev (when (and mcap usd-pl?)
@@ -769,6 +770,7 @@
    :revenue-score
    :operating-income-score
    :price-earnings
+   :dividends-paid
    :dividend-yield
    :dividend-coverage
    :enterprise-value
@@ -831,7 +833,8 @@
   return on capital (Net Income / total equity), plus :shares (most recent 10-Q
   when that quarter is at least as recent as the annual report; otherwise
   the annual report), :price, :marketcap, :price-sales,
-  :price-earnings (USD price / USD EPS, else USD market cap / USD Net Income),
+  :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
+  :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
   :ev-ebit, :revenue-score, and :operating-income-score

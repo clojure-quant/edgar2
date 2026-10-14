@@ -303,11 +303,11 @@
 (def columns
   [{:key :ticker :label "Ticker"}
    {:key :name :label "Name"}
-   {:key :close :label "Close" :num? true :decimals 2}
-   {:key :ratio :label "Ratio" :num? true :decimals 4}
-   {:key :base-price :label "Base price" :num? true :decimals 2}
+   {:key :years-history :label "Years" :num? true :decimals 1}
    {:key :octaves :label "Octaves" :num? true}
-   {:key :years-history :label "Years" :num? true :decimals 1}])
+   {:key :base-price :label "Base price" :num? true :decimals 2}
+   {:key :ratio :label "Ratio" :num? true :decimals 4}
+   {:key :close :label "Close" :num? true :decimals 2}])
 
 (defn- column-decimals [columns]
   (into {} (keep (fn [{:keys [key decimals]}]

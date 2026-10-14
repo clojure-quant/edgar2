@@ -48,9 +48,6 @@
    ["/screen" {:name :screen
                :title "Screen"
                :get #'screen-page}]
-   ["/eodhd-screen" {:name :eodhd-screen
-                     :title "EODHD screen"
-                     :get #'screen-page}]
    ["/ingress" {:name :ingress
                 :title "Ingress"
                 :get #'ingress-page}]
