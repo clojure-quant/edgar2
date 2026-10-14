@@ -66,7 +66,7 @@
      label]))
 
 (defn nav
-  "Stats, Screen, and Company. Company adds the ticker field and a second
+  "Stats, Screen, EODHD, Ingress, and Company. Company adds the ticker field and a second
   row of company pages. The ticker lives in tab state, so those links keep it."
   [req]
   (let [here (get-in req [:hyper/route :name])
@@ -78,7 +78,11 @@
       " · "
       (top-link :screen "Screen" (= here :screen) nil)
       " · "
+      (top-link :eodhd-screen "EODHD screen" (= here :eodhd-screen) nil)
+      " · "
       (top-link :ingress "Ingress" (= here :ingress) nil)
+      " · "
+      (top-link :ingress-eodhd "Ingress EODHD" (= here :ingress-eodhd) nil)
       " · "
       (top-link :company-financials "Company" company? q)]
      (when company?
