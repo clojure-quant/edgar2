@@ -1,4 +1,4 @@
-(ns edgar2.eodhd.ltfsr
+(ns edgar2.eodhd.algo.ltfsr
   "Longterm fractal support resistance.
 
   A base price is the bottom of an octave. The band runs from that base
@@ -13,6 +13,35 @@
   that base and keeps the base whose bottom and top intervals are
   thinnest against the average of the intervals between them."
   (:require [tech.v3.dataset :as ds]))
+
+(def search-base
+  "First base in the screen and chart search. Candidates run up to
+  twice this price."
+  10.0)
+
+(def search-step
+  "Space between bases in the screen and chart search."
+  0.1)
+
+(def interval-count
+  "Equal parts of the band in the screen and chart search."
+  20)
+
+(def lowest-n
+  "How many names the lt-fsr screen keeps."
+  250)
+
+(def label
+  "Summary word for one scored series."
+  "score")
+
+(def notes
+  "How a score is chosen. Screen appends these under its load summary."
+  [(format "Bases from %.1f up to but not including %.1f, step %.1f, %d intervals."
+           search-base (* 2.0 search-base) search-step interval-count)
+   "Ratio is the average count of the bottom and top intervals divided by the average count of the intervals between them."
+   (format "The table shows the %d lowest ratios." lowest-n)
+   "Close is the newest close. Base price is the base that won the search."])
 
 (defn position
   "Where `price` sits in the octave of `base-price`.
@@ -183,3 +212,24 @@
                       {:base-price base-price :step-size step-size})))
     ;; thinnest ends, then the smaller edge average, then the lower base
     (first (sort-by (juxt :ratio :edges-avg :base-price) scored))))
+
+(defn find-ltfsr
+  "Fractal base with the thinnest band ends for `bars`.
+
+  The search is `search-base`, `search-step`, and `interval-count`.
+  Returns {:close :ratio :base-price}, or nil when the newest close is
+  not a positive finite number or the ratio is not finite."
+  [bars]
+  (let [bars (ds/->dataset bars)
+        n (ds/row-count bars)]
+    (when (pos? n)
+      (let [raw ((ds/column bars :close) (dec n))]
+        (when (and (number? raw)
+                   (Double/isFinite (double raw))
+                   (pos? (double raw)))
+          (let [{:keys [ratio base-price]}
+                (position-search search-base search-step interval-count bars)]
+            (when (Double/isFinite (double ratio))
+              {:close (double raw)
+               :ratio (double ratio)
+               :base-price (double base-price)})))))))

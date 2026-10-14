@@ -13,11 +13,10 @@
   at a chosen base price. interval-count sets how many equal parts
   the band is split into."
   (:require [clojure.pprint :as pprint]
-            [edgar2.eodhd.ltfsr :as ltfsr]
+            [edgar2.eodhd.algo.ltfsr :as ltfsr]
             [tech.v3.dataset :as ds]
             [tech.v3.datatype :as dtype]
-            [tech.v3.datatype.argops :as argops]
-            [tech.v3.datatype.functional :as dfn])
+            [tech.v3.datatype.argops :as argops])
   (:import [java.time Instant LocalDate ZoneId ZonedDateTime]))
 
 (def high-years 11)
@@ -55,14 +54,31 @@
     (when (pos? (dtype/ecount idxs))
       (long (nth idxs 0)))))
 
-(defn find-breakout
-  "First of the last 100 sessions whose high is above the prior 11-year high.
+(defn- peak-index
+  "Index of the first bar that prints the highest high."
+  [highs]
+  (let [n (dtype/ecount highs)]
+    (loop [i 1
+           best-i 0
+           best (double (highs 0))]
+      (if (>= i n)
+        best-i
+        (let [h (double (highs i))]
+          (if (> h best)
+            (recur (inc i) i h)
+            (recur (inc i) best-i best)))))))
 
-  `bars` is a tech.ml.dataset, or a sequence of maps, sorted oldest-first
-  by :date and carrying :high. The 11-year window ends where those 100
-  sessions start, and the series has to reach back to that date.
+(defn- month-key
+  "YYYY-MM of `dt` in New York, matching the chart's monthly candles."
+  [dt]
+  (let [d (LocalDate/ofInstant (as-instant dt) ny)]
+    (format "%04d-%02d" (.getYear d) (.getMonthValue d))))
 
-  Returns {:days-ago :date :high :close :prior-high}, or nil."
+(defn- locate-breakout
+  "The breakout hit plus the date of the prior high, or nil.
+
+  :date is the session that first cleared the prior high. :prior-date
+  is the session that printed that high."
   [bars]
   (let [bars (ds/->dataset bars)
         n (ds/row-count bars)]
@@ -76,7 +92,9 @@
                                     #(not (.isBefore (as-instant %) cutoff)))]
         (when (and (pos? (ds/row-count prior))
                    (not (.isAfter oldest cutoff)))
-          (let [prior-high (double (dfn/reduce-max (ds/column prior :high)))
+          (let [highs (ds/column prior :high)
+                peak (peak-index highs)
+                prior-high (double (highs peak))
                 i (first-index #(> (double %) prior-high)
                                (ds/column recent :high))]
             (when i
@@ -85,7 +103,36 @@
                :high (col-at recent :high i)
                :close (when-let [close-col (:close recent)]
                         (close-col i))
-               :prior-high prior-high})))))))
+               :prior-high prior-high
+               :prior-date (col-at prior :date peak)
+               :last-close (double (col-at bars :close (dec n)))})))))))
+
+(defn find-breakout
+  "First of the last 100 sessions whose high is above the prior 11-year high.
+
+  `bars` is a tech.ml.dataset, or a sequence of maps, sorted oldest-first
+  by :date and carrying :high. The 11-year window ends where those 100
+  sessions start, and the series has to reach back to that date.
+
+  Returns {:days-ago :date :high :close :prior-high}, or nil."
+  [bars]
+  (when-let [hit (locate-breakout bars)]
+    (select-keys hit [:days-ago :date :high :close :prior-high])))
+
+(defn annotation
+  "Chart summary of the longterm breakout, or nil when there is none.
+
+  :high is the prior 11-year high. :pct is how far the newest close sits
+  above that high. :days is sessions from the breakout to the newest bar.
+  :t is the YYYY-MM of the session that printed the high."
+  [bars]
+  (when-let [hit (locate-breakout bars)]
+    (let [prior (:prior-high hit)]
+      (when (pos? prior)
+        {:high prior
+         :pct (* 100.0 (/ (- (:last-close hit) prior) prior))
+         :days (:days-ago hit)
+         :t (month-key (:prior-date hit))}))))
 
 (defn- interval-table-row
   "One interval as prices inside the base band [base, 2*base]."
