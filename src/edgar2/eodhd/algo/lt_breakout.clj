@@ -32,7 +32,9 @@
    (format "A name needs history back to the start of those %d years." high-years)
    (format "A breakout is the first of those %d sessions whose high is above that level."
            breakout-bars)
-   "Days ago counts sessions from that cross to the newest bar."])
+   "Days ago counts sessions from that cross to the newest bar."
+   "High date is the session that printed the 11-year high."
+   "High ago counts sessions from that high to the newest bar."])
 
 (def ^:private ny (ZoneId/of "America/New_York"))
 
@@ -105,6 +107,10 @@
                         (close-col i))
                :prior-high prior-high
                :prior-date (col-at prior :date peak)
+               ;; sessions after the high in the 11-year window, plus the
+               ;; 100 sessions that window leaves out
+               :high-ago-days (+ (- (dec (ds/row-count prior)) peak)
+                                 breakout-bars)
                :last-close (double (col-at bars :close (dec n)))})))))))
 
 (defn find-breakout
@@ -114,10 +120,12 @@
   by :date and carrying :high. The 11-year window ends where those 100
   sessions start, and the series has to reach back to that date.
 
-  Returns {:days-ago :date :high :close :prior-high}, or nil."
+  Returns {:days-ago :date :high :close :prior-high :prior-date :high-ago-days},
+  or nil. :prior-date is the session that printed the 11-year high.
+  :high-ago-days counts sessions from that high to the newest bar."
   [bars]
   (when-let [hit (locate-breakout bars)]
-    (select-keys hit [:days-ago :date :high :close :prior-high])))
+    (select-keys hit [:days-ago :date :high :close :prior-high :prior-date :high-ago-days])))
 
 (defn annotation
   "Chart summary of the longterm breakout, or nil when there is none.

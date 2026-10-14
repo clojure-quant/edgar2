@@ -208,7 +208,7 @@
          value)))))
 
 (defn- columns [rows]
-  (let [preferred [:ticker :name :days-ago :date :prior-high :close :ratio :base-price]
+  (let [preferred [:ticker :name :days-ago :date :prior-high :prior-date :high-ago-days :close :ratio :base-price :octaves :years-history]
         present (set (mapcat keys rows))]
     (vec (distinct (concat (filter present preferred)
                            (filter present (mapcat keys rows)))))))

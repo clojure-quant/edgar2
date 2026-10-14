@@ -13,7 +13,8 @@
   that base and keeps the base whose bottom and top intervals are
   thinnest against the average of the intervals between them."
   (:require [tech.v3.dataset :as ds])
-  (:import [java.time Instant LocalDate ZoneId ZonedDateTime]))
+  (:import [java.time Instant LocalDate ZoneId ZonedDateTime]
+           [java.time.temporal ChronoUnit]))
 
 (def search-base
   "First base in the screen and chart search. Candidates run up to
@@ -49,6 +50,9 @@
    "Ratio is the average count of the bottom and top intervals divided by the average count of the intervals between them."
    (format "A name needs bars back at least %d years from the newest bar." min-years)
    "A ratio of zero is left out."
+   "The ratio and the octave count use every close in the series."
+   "Octaves is how many distinct octaves of the base price contain a close."
+   "Years is the span from the oldest bar to the newest."
    (format "The table shows the %d lowest ratios." lowest-n)
    "Close is the newest close. Base price is the base that won the search."])
 
@@ -229,35 +233,68 @@
     (instance? LocalDate dt) (.toInstant (.atStartOfDay ^LocalDate dt ny))
     :else nil))
 
-(defn- history?
-  "True when the oldest bar is at least `years` before the newest."
-  [bars years]
+(defn- span
+  "Oldest and newest bar instants, or nil when either date is missing."
+  [bars]
   (let [n (ds/row-count bars)
         dates (ds/column bars :date)
         newest (as-instant (dates (dec n)))
         oldest (as-instant (dates 0))]
-    (and newest oldest
-         (not (.isAfter oldest
-                        (.toInstant (.minusYears (.atZone newest ny) (long years))))))))
+    (when (and newest oldest)
+      {:oldest oldest :newest newest})))
+
+(defn- long-history?
+  "True when the oldest bar is at least `years` before the newest."
+  [{:keys [oldest newest]} years]
+  (not (.isAfter oldest
+                 (.toInstant (.minusYears (.atZone newest ny) (long years))))))
+
+(defn- years-history
+  "Years from the oldest bar to the newest, on a 365.25-day year."
+  [{:keys [oldest newest]}]
+  (let [days (.until (LocalDate/ofInstant oldest ny)
+                     (LocalDate/ofInstant newest ny)
+                     ChronoUnit/DAYS)]
+    (/ (double days) 365.25)))
+
+(defn- octave-count
+  "How many distinct octaves of `base-price` contain a close.
+
+  A close that is not a positive finite number is left out."
+  [base-price closes]
+  (count (reduce (fn [seen price]
+                   (if (and (number? price)
+                            (Double/isFinite (double price))
+                            (pos? (double price)))
+                     (conj seen (:octave (position base-price price)))
+                     seen))
+                 #{}
+                 closes)))
 
 (defn find-ltfsr
   "Fractal base with the thinnest band ends for `bars`.
 
-  The search is `search-base`, `search-step`, and `interval-count`.
-  The series has to reach back `min-years` from the newest bar, and the
-  ratio has to be positive. Returns {:close :ratio :base-price}, or nil."
+  The search is `search-base`, `search-step`, and `interval-count`,
+  and it uses every close in the series. The series has to reach back
+  `min-years` from the newest bar, and the ratio has to be positive.
+  Returns {:close :ratio :base-price :octaves :years-history}, or nil.
+  :octaves is how many distinct octaves of that base contain a close.
+  :years-history is the span from the oldest bar to the newest."
   [bars]
   (let [bars (ds/->dataset bars)
         n (ds/row-count bars)]
-    (when (and (pos? n) (history? bars min-years))
-      (let [raw ((ds/column bars :close) (dec n))]
-        (when (and (number? raw)
-                   (Double/isFinite (double raw))
-                   (pos? (double raw)))
-          (let [{:keys [ratio base-price]}
-                (position-search search-base search-step interval-count bars)
-                ratio (double ratio)]
-            (when (and (Double/isFinite ratio) (pos? ratio))
-              {:close (double raw)
-               :ratio ratio
-               :base-price (double base-price)})))))))
+    (when-let [ends (and (pos? n) (span bars))]
+      (when (long-history? ends min-years)
+        (let [raw ((ds/column bars :close) (dec n))]
+          (when (and (number? raw)
+                     (Double/isFinite (double raw))
+                     (pos? (double raw)))
+            (let [{:keys [ratio base-price]}
+                  (position-search search-base search-step interval-count bars)
+                  ratio (double ratio)]
+              (when (and (Double/isFinite ratio) (pos? ratio))
+                {:close (double raw)
+                 :ratio ratio
+                 :base-price (double base-price)
+                 :octaves (octave-count base-price (close-column bars))
+                 :years-history (years-history ends)}))))))))

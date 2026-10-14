@@ -15,6 +15,8 @@
               {:key :days-ago :label "Days ago" :num? true}
               {:key :date :label "Date"}
               {:key :prior-high :label "11y high" :num? true}
+              {:key :prior-date :label "High date"}
+              {:key :high-ago-days :label "High ago" :num? true}
               {:key :close :label "Close" :num? true}]}
    {:id :ltfsr
     :title "lt-fsr"
@@ -22,7 +24,9 @@
               {:key :name :label "Name"}
               {:key :close :label "Close" :num? true}
               {:key :ratio :label "Ratio" :num? true}
-              {:key :base-price :label "Base price" :num? true}]}])
+              {:key :base-price :label "Base price" :num? true}
+              {:key :octaves :label "Octaves" :num? true}
+              {:key :years-history :label "Years" :num? true}]}])
 
 (defn- cell [v]
   (if (nil? v) "" (str v)))
@@ -57,7 +61,7 @@
                            :notes ltfsr/notes
                            :sort-by :ratio
                            :limit ltfsr/lowest-n
-                           :decimals {:ratio 4}})))
+                           :decimals {:ratio 4 :years-history 1}})))
 
 (defn eodhd-screen-page
   [_req]
