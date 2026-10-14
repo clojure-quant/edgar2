@@ -1,12 +1,13 @@
 (ns edgar2.download.ticker-exchange
   "SEC company_tickers_exchange.json → ticker / CIK / name / exchange."
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
             [edgar.core :as edgar]
-            [edgar2.util.ticker-info :as ticker-info]))
+            [edgar2.download.dataset :as dataset]
+            [edgar2.util.ticker-info :as ticker-info])
+  (:import [java.time LocalDate]))
 
 (def identity-header
   (or (System/getenv "EDGAR_IDENTITY")
@@ -58,17 +59,18 @@
                 (select-exchange-rows (fetch-exchange-rows)))))
 
 (defn save-exchanges!
-  [rows]
-  (.mkdirs (io/file "data"))
-  (let [tmp (str exchanges-path ".tmp")]
-    (spit tmp (with-out-str (pprint/pprint (vec rows))))
-    (.renameTo (io/file tmp) (io/file exchanges-path))))
+  "Write data/ticker-exchange.edn. :download-date defaults to today."
+  ([rows] (save-exchanges! rows (str (LocalDate/now))))
+  ([rows download-date]
+   (dataset/write-dataset! exchanges-path
+                           {:download-date download-date}
+                           rows)))
 
 (defn load-exchanges
   "Rows from data/ticker-exchange.edn, or a fresh SEC download if missing."
   []
   (if (.exists (io/file exchanges-path))
-    (edn/read-string (slurp exchanges-path))
+    (dataset/read-rows exchanges-path)
     (vec (select-exchange-rows (fetch-exchange-rows)))))
 
 (defn download-exchanges

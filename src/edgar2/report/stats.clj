@@ -8,6 +8,7 @@
             [edgar.api :as e]
             [edgar2.derived :as derived]
             [edgar2.filing :as filing]
+            [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds-universe :as fsds]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
@@ -705,7 +706,7 @@
   (when-not (.exists (io/file universe/universe-path))
     (throw (ex-info "Missing universe file; run clj -X:universe-facts first"
                     {:path universe/universe-path})))
-  (edn/read-string (slurp universe/universe-path)))
+  (dataset/read-rows universe/universe-path))
 
 (defn read-cik-json
   [zf cik]
@@ -739,7 +740,7 @@
                     (and cik (seq info)) (update :by-cik assoc cik info)
                     (and ticker (seq info)) (update :by-ticker assoc ticker info))))
               {:by-cik {} :by-ticker {}}
-              (edn/read-string (slurp f))))))
+              (dataset/read-rows f)))))
 
 (defn with-sic
   "Copy SIC names from universe-fsds onto a stats row.

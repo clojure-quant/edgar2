@@ -78,6 +78,8 @@
       " · "
       (top-link :screen "Screen" (= here :screen) nil)
       " · "
+      (top-link :ingress "Ingress" (= here :ingress) nil)
+      " · "
       (top-link :company-financials "Company" company? q)]
      (when company?
        [:div

@@ -4,10 +4,10 @@
   Without MARKETPARQUET_API_KEY this uses the public latest stock_daily file
   (one close per symbol for the newest session). A key unlocks
   GET /api/v1/download/stock_daily/{date}."
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
+            [edgar2.download.dataset :as dataset]
             [jsonista.core :as json])
   (:import [java.net URI]
            [java.net.http HttpClient HttpClient$Redirect HttpRequest HttpResponse$BodyHandlers]
@@ -194,20 +194,25 @@
              :close (double close)})
           (duck-query sql))))
 
-(defn save-prices!
+(defn latest-session-in
+  "Last YYYY-MM-DD for which any ticker has a close."
   [rows]
-  (.mkdirs (io/file "data"))
-  (let [tmp (str prices-path ".tmp")]
-    (spit tmp (with-out-str (pprint/pprint (vec rows))))
-    (.renameTo (io/file tmp) (io/file prices-path))))
+  (->> rows (keep :date) sort last))
+
+(defn save-prices!
+  "Write data/prices.edn. :download-date is the newest session in `rows`."
+  [rows]
+  (let [rows (vec rows)]
+    (dataset/write-dataset! prices-path
+                            {:download-date (latest-session-in rows)}
+                            rows)))
 
 (defn load-prices
   "Rows from data/prices.edn."
   []
-  (if (.exists (io/file prices-path))
-    (edn/read-string (slurp prices-path))
-    (throw (ex-info "Missing prices file; run clj -X:download-prices first"
-                    {:path prices-path}))))
+  (or (dataset/read-rows prices-path)
+      (throw (ex-info "Missing prices file; run clj -X:download-prices first"
+                      {:path prices-path}))))
 
 (defn normalize-date
   [date]

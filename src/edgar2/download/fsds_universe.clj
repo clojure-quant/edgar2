@@ -4,10 +4,12 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds :as dl]
             [edgar2.report.sector :as sector])
   (:import [java.io BufferedReader InputStreamReader]
            [java.nio.charset StandardCharsets]
+           [java.time LocalDate]
            [java.util.zip ZipFile]))
 
 (def filer-info-path "data/universe-fsds.edn")
@@ -37,12 +39,20 @@
    "SML" "Smaller reporting company"
    "5-SML" "Smaller reporting company"})
 
+(defn quarter-label
+  "2026q3 from a zip path, or nil."
+  [path]
+  (second (re-find #"(\d{4}q[1-4])\.zip" (str path))))
+
 (defn save-filer-info!
-  [rows]
-  (.mkdirs (io/file "data"))
-  (let [tmp (str filer-info-path ".tmp")]
-    (spit tmp (with-out-str (pprint/pprint (vec rows))))
-    (.renameTo (io/file tmp) (io/file filer-info-path))))
+  "Write data/universe-fsds.edn with :download-quarter and :download-date."
+  ([rows] (save-filer-info! rows {}))
+  ([rows {:keys [download-quarter download-date]}]
+   (dataset/write-dataset! filer-info-path
+                           (cond-> {}
+                             download-quarter (assoc :download-quarter download-quarter)
+                             download-date (assoc :download-date (str download-date)))
+                           rows)))
 
 (defn fmt-revenue
   [v]
@@ -229,11 +239,14 @@
                           (or (:sic row) "-")
                           (or (:industry row) "-")))
          (flush))
-       (save-filer-info! rows)
+       (let [quarter (some quarter-label zips)]
+         (save-filer-info! rows {:download-quarter quarter
+                                 :download-date (str (LocalDate/now))})
+         (println (format "Wrote %s  (%d filers, %d with a sector, quarter %s)"
+                          filer-info-path
+                          (count rows)
+                          (count (filter :sector rows))
+                          (or quarter "-"))))
        (when (.exists (io/file "data/filer-info.log.edn"))
          (io/delete-file "data/filer-info.log.edn" true))
-       (println (format "Wrote %s  (%d filers, %d with a sector)"
-                        filer-info-path
-                        (count rows)
-                        (count (filter :sector rows))))
        rows))))

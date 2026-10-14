@@ -4,6 +4,7 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar2.download.dataset :as dataset]
             [edgar2.download.facts :as dl]
             [edgar2.util.ticker-info :as ticker-info]
             [jsonista.core :as json])
@@ -214,11 +215,13 @@
           (vec (persistent! acc)))))))
 
 (defn save-universe!
-  [rows]
-  (.mkdirs (io/file "data"))
-  (let [tmp (str universe-path ".tmp")]
-    (spit tmp (with-out-str (pprint/pprint (vec rows))))
-    (.renameTo (io/file tmp) (io/file universe-path))))
+  "Write data/universe-facts.edn. :download-date is the companyfacts zip day."
+  ([rows] (save-universe! rows (dl/companyfacts-date)))
+  ([rows download-date]
+   (dataset/write-dataset! universe-path
+                           (cond-> {}
+                             download-date (assoc :download-date download-date))
+                           rows)))
 
 (defn universe
   "Download companyfacts.zip (with progress), join the primary listed

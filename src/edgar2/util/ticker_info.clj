@@ -1,8 +1,8 @@
 (ns edgar2.util.ticker-info
   "Listed-ticker helpers shared by the exchange file and the facts universe."
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clojure.string :as str]))
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [edgar2.download.dataset :as dataset]))
 
 (def exchange-rows-path "data/ticker-exchange.edn")
 
@@ -74,7 +74,7 @@
   []
   (let [f (io/file exchange-rows-path)]
     (if (.exists f)
-      (edn/read-string (slurp f))
+      (dataset/read-rows f)
       [])))
 
 (def ^:private exchange-rows

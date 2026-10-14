@@ -5,6 +5,7 @@
             [edgar2.web.filing :refer [annual-report-page raw-filing-page]]
             [edgar2.web.filings :refer [filings-page]]
             [edgar2.web.financials :refer [financials-page]]
+            [edgar2.web.ingress :refer [ingress-page]]
             [edgar2.web.overview :refer [overview-page]]
             [edgar2.web.screen :refer [screen-page]]
             [edgar2.web.segment :refer [segment-page]])
@@ -45,6 +46,9 @@
    ["/screen" {:name :screen
                :title "Screen"
                :get #'screen-page}]
+   ["/ingress" {:name :ingress
+                :title "Ingress"
+                :get #'ingress-page}]
    ["/segment" {:name :segment
                 :title "Segment"
                 :get #'segment-page}]
