@@ -1,10 +1,18 @@
 # edgar2
 
-Clojure CLI project that pulls SEC EDGAR annuals via [edgarjure](https://github.com/clojure-finance/edgarjure) and prints revenue, gross profit, and net profit.
+Clojure project that pulls SEC EDGAR data via [edgarjure](https://github.com/clojure-finance/edgarjure) and runs a webserver that visualizes per ticker or screens on a universe.
 
 Requires Clojure 1.12+ and Java 21+. SEC needs a User-Agent; override the default with `EDGAR_IDENTITY` if you want (e.g. `Your Name you@email.com`).
 
-## Examples
+```bash
+clj -X:web
+clj -X:web :port 8080
+```
+
+Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first). `/screen` is the screen tabs, same tables as `clj -X:screen`. `/company/financials` is one ticker, same tables as `clj -X:financials`. The ticker stays with the browser tab across `/company/financials`, `/company/google-finance`, `/company/filings`, `/company/current-annual`, and `/company/description`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
+
+
+## Entrypoints for cli tasks
 
 
 ```bash
@@ -50,52 +58,7 @@ clj -X:stats :limit 25
 
 From `universe-facts.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on assets (Net Income / assets), return on capital (Net Income / total equity), `:shares` (most recent 10-Q when that quarter is at least as recent as the annual report; otherwise the annual report), `:price`, `:marketcap` (price × shares), `:price-sales` (USD market cap / USD revenue), `:price-earnings` (USD price / USD EPS, else USD market cap / USD Net Income), `:dividend-yield` (USD dividend per share / price, %), and `:dividend-coverage` (net income / dividends paid, only when a dividend was paid).
 
-```bash
-clj -X:web
-clj -X:web :port 8080
-```
 
-Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first). `/screen` is the screen tabs, same tables as `clj -X:screen`. `/company/financials` is one ticker, same tables as `clj -X:financials`. The ticker stays with the browser tab across `/company/financials`, `/company/google-finance`, `/company/filings`, `/company/current-annual`, and `/company/description`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
 
 `:ticker` and `:years` work on the download and report aliases. `:financials` takes `:n`: fiscal years when annual, quarters when `:period` is quarterly. `:years` is still accepted there as a synonym for `:n`.
 
-
-20-F is the annual report for a foreign private issuer listed in the U.S. (usually via ADRs). It is the 10-K equivalent for non-U.S. companies: Toyota, Sony, Ecopetrol. They can use IFRS or home-country GAAP, and numbers are often in yen, won, pesos, not dollars. Interim updates are usually 6-K, not 10-Q.
-
-40-F is the annual report for Canadian issuers under the Multijurisdictional Disclosure System (MJDS). The SEC lets them file their Canadian annual package (NI 51-102 AIF / audited statements) wrapped as a 40-F instead of rewriting it as a 10-K or 20-F. Agnico Eagle in your file is a 40-F. Interims are often 6-K as well.
-
-Enterprise value (shown as :ev, in millions of dollars) is:
-
-market cap + interest-bearing debt + preferred stock + noncontrolling interest − cash
-
-Debt is long-term debt including the current portion, plus commercial paper and other short-term borrowings when those are not already counted. EBIT is operating income. When that tag is missing, it is net income + interest + tax. EV/EBIT (:ev-ebit) is that enterprise value divided by EBIT, and only when the financials are in USD.
-
-
-us-gaap:PaymentsForRepurchaseOfCommonStock
-dei:EntityCommonStockSharesOutstanding or us-gaap:CommonStockSharesOutstanding
-ifrs-full:NumberOfSharesOutstanding
-
-
-FSDS 60MB each
-- 1 zip per quarter for all companies
-- xbrl financial statements
-- sub.txt submission summary
-- pre.txt presentation rows. accounting standard / fields
-- tag.txt tag dictionary (all reported fields)
-
-FACTS 1.3 GIG
-- It is the full XBRL history for those companies, rebuilt nightly, not one quarter.
-- Under facts the numbers are grouped by standard taxonomy (us-gaap, ifrs-full, dei), then by tag. A tag such as revenue holds every whole-company observation the SEC kept: period start and end, value, unit (USD, JPY, shares), accession number, form, fiscal year, fiscal period, the date it was filed, and sometimes a calendar frame such as CY2016. Custom tags and segment breakdowns are left out. There is no entityType and no filing list.
-
-SUBMISSIONS 1.5 gig
-- nightly snapshot https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip
-- submissions.zip is the filing index for every EDGAR filer
-- The main file keeps the newest filings, at least one year or 1,000 filings, whichever is more
-
-operating expenses (selling, general and administrative, research and development, and usually depreciation) → operating income
-
-
-
-588 listed companies report a revenue concept and a net-income concept, and report neither us-gaap:OperatingIncomeLoss nor ifrs-full:ProfitLossFromOperatingActivities. CLX is one of them: it has NetIncomeLoss and revenue tags, and no operating-income tag.
-
-Of those 588, 480 have NetIncomeLoss and 108 have only IFRS ProfitLoss
