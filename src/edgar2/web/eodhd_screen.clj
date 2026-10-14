@@ -1,5 +1,6 @@
 (ns edgar2.web.eodhd-screen
   (:require [clojure.string :as str]
+            [edgar2.eodhd.algo.lt-breakout :as lt]
             [edgar2.eodhd.screen :as screen]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
@@ -38,7 +39,8 @@
 
 (defn eodhd-screen-page
   [_req]
-  (let [loaded (try (screen/screen)
+  (let [loaded (try (screen/screen lt/find-breakout
+                                   {:label lt/label :notes lt/notes})
                     (catch Exception e
                       {:error (or (ex-message e) (str e))}))]
     (fn [req]
