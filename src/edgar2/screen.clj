@@ -11,7 +11,8 @@
     clj -X:screen :list true
     clj -X:screen :name cheap-growth :min-mc 1000
     clj -X:screen :name lt-breakout
-    clj -X:screen :name ltfsr"
+    clj -X:screen :name ltfsr
+    clj -X:screen :name ltfsr :reverse true"
   (:refer-clojure :exclude [run!])
   (:require [clojure.pprint :as pprint]
             [edgar2.screen.registry :as registry])
@@ -42,7 +43,8 @@
   "Parameter values for `screen`, with defaults filled in.
 
   A param's :parse returns nil for a value it does not accept, and
-  that param then stays at its default."
+  that param then stays at its default. false is a value, so a boolean
+  option stays false instead of falling back to the default."
   [screen args]
   (into {}
         (map (fn [{:keys [key default parse]}]
@@ -50,8 +52,9 @@
                  [key (if (= raw ::missing)
                         default
                         (if parse
-                          (or (parse raw) default)
-                          (or raw default)))]))
+                          (let [parsed (parse raw)]
+                            (if (some? parsed) parsed default))
+                          (if (some? raw) raw default)))]))
              (:params screen))))
 
 (defn- input-stamp [screen params]

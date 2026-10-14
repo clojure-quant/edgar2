@@ -77,18 +77,24 @@
     [(if (number? ago) ago Long/MAX_VALUE)
      (or (:ticker row) "")]))
 
-(defn- ratio-key [row]
-  (let [r (:ratio row)]
-    [(if (and (number? r) (Double/isFinite (double r)))
-       (double r)
-       Double/POSITIVE_INFINITY)
+(defn- ratio-key
+  "Sort key for :ratio. `descending?` puts the highest ratio first.
+  A missing ratio stays last. Ties break on ticker, ascending."
+  [descending? row]
+  (let [r (:ratio row)
+        ratio (when (and (number? r) (Double/isFinite (double r)))
+                (double r))]
+    [(cond
+       (nil? ratio) Double/POSITIVE_INFINITY
+       descending? (- ratio)
+       :else ratio)
      (or (:ticker row) "")]))
 
-(defn- sort-key-fn [sort-by]
+(defn- sort-key-fn [sort-by descending?]
   (case sort-by
     nil days-ago-key
     :days-ago days-ago-key
-    :ratio ratio-key
+    :ratio (fn [row] (ratio-key descending? row))
     (throw (ex-info "Unknown screen sort" {:sort-by sort-by}))))
 
 (defn- plural [word n]
@@ -147,12 +153,24 @@
         (reset! result-cache* {})
         value))))
 
-(defn- compute [algo {:keys [label notes limit decimals] sort-key :sort-by} loaded]
+(defn- screen-opts
+  "Canonical options map. This map is the result-cache key, so two
+  reports that differ in any option, including :reverse, do not share
+  a cached table."
+  [{:keys [label notes sort-by limit decimals reverse] :or {label "hit"}}]
+  {:label label
+   :notes (vec (or notes []))
+   :sort-by sort-by
+   :limit limit
+   :decimals (or decimals {})
+   :reverse (true? reverse)})
+
+(defn- compute [algo {:keys [label notes limit decimals] sort-key :sort-by reverse? :reverse} loaded]
   (let [{:keys [equities with-bars secs-load]} loaded
         t-calc (System/nanoTime)
         hits (parallel! (map #(calc-task algo %) with-bars) (cpu-parallel))
         secs-calculate (secs-since t-calc)
-        scored (->> hits (remove nil?) (sort-by (sort-key-fn sort-key)))
+        scored (->> hits (remove nil?) (sort-by (sort-key-fn sort-key reverse?)))
         shown (if limit (take (long limit) scored) scored)
         rows (mapv #(present-row % decimals) shown)]
     {:rows rows
@@ -180,30 +198,26 @@
   :label     word for one hit in the summary (default \"hit\")
   :notes     strings appended after the load summary
   :sort-by   :days-ago (default) or :ratio. Ties break on ticker.
+  :reverse   true sorts :ratio descending (highest first). false keeps
+             the lowest first.
   :limit     keep only this many rows after sorting
   :decimals  map of column key to decimal places (default 2)
 
   The bar load is shared across algos until the equity list or the bar
-  catalog changes. Each algo's rows are cached on their own."
+  catalog changes. Each algo's rows are cached on the stamp and the
+  whole options map."
   ([algo] (screen algo {}))
-  ([algo {:keys [label notes sort-by limit decimals] :or {label "hit"}}]
-   (let [notes (vec (or notes []))
-         decimals (or decimals {})
+  ([algo opts]
+   (let [opts (screen-opts opts)
          loaded (load-with-bars)
-         cache-key [(:stamp loaded) algo label notes sort-by limit decimals]]
+         cache-key [(:stamp loaded) algo opts]]
      (if-let [cached (get @result-cache* cache-key)]
        cached
        (let [value (if (empty? (:equities loaded))
                      {:rows []
                       :lines (into ["No equity list yet. Run Bar download on Ingress EODHD."]
-                                   notes)}
-                     (compute algo
-                              {:label label
-                               :notes notes
-                               :sort-by sort-by
-                               :limit limit
-                               :decimals decimals}
-                              loaded))]
+                                   (:notes opts))}
+                     (compute algo opts loaded))]
          (swap! result-cache* assoc cache-key value)
          value)))))
 
@@ -211,22 +225,20 @@
   "Run `algo` on the series for `items` and return {:rows :lines}.
 
   `items` are {:ticker :name :equity} from the eodhd universe. Bars come
-  from the shared load cache. This does not use the result cache; the
-  screen runner stores the rows."
-  [items algo {:keys [label notes sort-by limit decimals] :or {label "hit"}}]
-  (let [notes (vec (or notes []))
+  from the shared load cache. This does not use the result cache. The
+  screen runner stores the rows, and its cache key is the screen id,
+  the resolved parameters (including :reverse), and the input stamp.
+  Recalculate always runs `algo` again."
+  [items algo opts]
+  (let [opts (screen-opts opts)
         loaded (load-with-bars)]
     (if (empty? (:equities loaded))
       {:rows []
        :lines (into ["No equity list yet. Run Bar download on Ingress EODHD."]
-                    notes)}
+                    (:notes opts))}
       (let [codes (set (keep :ticker items))]
         (compute algo
-                 {:label label
-                  :notes notes
-                  :sort-by sort-by
-                  :limit limit
-                  :decimals (or decimals {})}
+                 opts
                  (assoc loaded
                         :equities (filterv (comp codes :code) (:equities loaded))
                         :with-bars (filterv (comp codes :code :equity) (:with-bars loaded))))))))
@@ -273,11 +285,11 @@
 
   `:label` names a hit in the summary. `:notes` is a vector of strings
   or a symbol resolving to one. `:sort-by` is :days-ago or :ratio.
-  `:limit` keeps that many rows. `:decimals` is a map of column key to
-  decimal places.
+  `:reverse` true sorts :ratio descending. `:limit` keeps that many
+  rows. `:decimals` is a map of column key to decimal places.
 
   Usage: clj -X:eodhd-screen"
-  [{:keys [algo label notes sort-by limit decimals]}]
+  [{:keys [algo label notes sort-by limit decimals reverse]}]
   (when-not algo
     (throw (ex-info "Pass :algo, a function or a namespaced symbol" {})))
   (print-screen (screen (resolve-fn algo)
@@ -285,5 +297,6 @@
                          :notes (resolve-notes notes)
                          :sort-by sort-by
                          :limit limit
-                         :decimals decimals}))
+                         :decimals decimals
+                         :reverse reverse}))
   nil)

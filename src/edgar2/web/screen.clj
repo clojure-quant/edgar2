@@ -52,8 +52,9 @@
      [:select {:data-on:change
                (h/action
                 (reset! err* nil)
-                (when-let [v (parse $value)]
-                  (swap! params* assoc (:key param) v)))}
+                (let [v (parse $value)]
+                  (when (some? v)
+                    (swap! params* assoc (:key param) v))))}
       (for [choice (:choices param)]
         [:option (cond-> {:key (str choice) :value (str choice)}
                    (= choice selected) (assoc :selected true))

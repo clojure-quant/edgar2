@@ -54,7 +54,8 @@
    "The ratio and the octave count use every close in the series."
    "Octaves is how many distinct octaves of the base price contain a close."
    "Years is the span from the oldest bar to the newest."
-   (format "The table shows the %d lowest ratios." lowest-n)
+   (format "The table shows the %d lowest ratios. Reverse true shows the %d highest, sorted descending."
+           lowest-n lowest-n)
    "Close is the newest close. Base price is the base that won the search."])
 
 (defn position
@@ -314,15 +315,40 @@
                    (when decimals [key decimals]))
                  columns)))
 
+(defn- parse-bool
+  "true or false, or nil. Accepts a boolean or the strings \"true\" and \"false\"."
+  [x]
+  (cond
+    (true? x) true
+    (false? x) false
+    (string? x) (case (.toLowerCase (.trim ^String x))
+                  "true" true
+                  "false" false
+                  nil)
+    :else nil))
+
+(def reverse-opt
+  "When true, the table keeps the highest ratios, sorted descending."
+  {:key :reverse
+   :label "Reverse"
+   :choices [false true]
+   :default false
+   :parse parse-bool})
+
 (defn calculate
-  "Score each series in `items`. Bars are loaded here."
-  [items _params]
+  "Score each series in `items`. Bars are loaded here.
+
+  `:reverse` true sorts by ratio descending and keeps the highest
+  ratios. False keeps the lowest."
+  [items params]
   (if (empty? items)
     {:rows [] :lines []}
-    (let [score @(requiring-resolve 'edgar2.eodhd.screen/score)]
+    (let [reverse? (true? (:reverse params))
+          score @(requiring-resolve 'edgar2.eodhd.screen/score)]
       (score items find-ltfsr
              {:label label
               :sort-by :ratio
+              :reverse reverse?
               :limit lowest-n
               :decimals (column-decimals columns)}))))
 
@@ -330,6 +356,7 @@
   {:id :ltfsr
    :title "lt-fsr"
    :description notes
+   :params [reverse-opt]
    :columns columns
    :universe uni/eodhd
    :calculate calculate
