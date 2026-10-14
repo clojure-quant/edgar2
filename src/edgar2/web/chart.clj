@@ -4,11 +4,16 @@
   Prices are the split-adjusted daily bars, rolled up to one candle per
   month so thirty years fit on the screen. Split markers come from the
   EODHD split files. Pixi draws both in a web component; the page passes
-  the candles and the splits in as attributes."
+  the candles and the splits in as attributes.
+
+  The annotation list can draw longterm fractal support and resistance:
+  the optimum base from the full series, and every octave of that base
+  that falls inside the price range on screen."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [hyper.core :as h]
             [edgar2.eodhd.ingress :as ingress]
+            [edgar2.eodhd.ltfsr :as ltfsr]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]
             [quanta.bar.db.nippy :as nippy]
@@ -20,6 +25,13 @@
 
 (def chart-years 30)
 
+(def ltfsr-intervals
+  "Equal parts of the octave band used to place the fractal base."
+  20)
+
+(def ltfsr-search-base 10.0)
+(def ltfsr-step 0.1)
+
 (defn- session-date
   [inst]
   (LocalDate/ofInstant inst ny))
@@ -28,6 +40,18 @@
   "Four decimal places, as a double JSON can encode."
   [x]
   (* 0.0001 (Math/round (* 10000.0 (double x)))))
+
+(defn- ltfsr-annotation
+  "Optimum fractal base for the whole split-adjusted series.
+
+  The search is the same one used from the REPL: bases from 10 up to 20
+  in steps of 0.1, scored on 20 intervals. The chart then draws the
+  octaves of that base that sit inside the visible price range."
+  [ds]
+  (when (pos? (tc/row-count ds))
+    (let [hit (ltfsr/position-search ltfsr-search-base ltfsr-step ltfsr-intervals ds)]
+      {:base (px (:base-price hit))
+       :ratio (px (:ratio hit))})))
 
 (defn- window-cutoff
   "Session date `chart-years` before the last bar in `ds`."
@@ -95,11 +119,26 @@
           months)))
 
 (h/defc price-chart
-  "Pixi canvas. Attributes are the data; mount owns the Application."
+  "Pixi canvas. Attributes are the data; mount owns the Application.
+
+  The annotation select is empty or ltfsr. ltfsr draws octave price
+  levels from :ltfsr and shows that base and its ratio beside the canvas."
   {:require [["https://cdn.jsdelivr.net/npm/pixi.js@8.14.3/dist/pixi.min.mjs" :as pixi]]}
-  [{:keys [ticker bars splits]}]
+  [{:keys [ticker bars splits ltfsr]}]
+  (event ::annotation [e]
+    (set! (.-annotation ctx) (.. e -target -value))
+    (when (.-redraw ctx)
+      ((.-redraw ctx))))
   (render
-    [:div.price-chart-host])
+    [:div.price-chart-layout
+     [:div.price-chart-main
+      [:div.price-chart-host]]
+     [:aside.price-chart-side
+      [:label.chart-annotation-label "Annotation"
+       [:select.chart-annotation-select {:on {:change ::annotation}}
+        [:option {:value ""} "empty"]
+        [:option {:value "ltfsr"} "ltfsr"]]]
+      [:div.chart-annotation-table]]])
   (mount [root]
     (let [host (.querySelector root ".price-chart-host")
           app (pixi/Application.)]
@@ -107,6 +146,7 @@
       (set! (.-ticker ctx) (or ticker ""))
       (set! (.-bars ctx) bars)
       (set! (.-splits ctx) splits)
+      (set! (.-ltfsr ctx) ltfsr)
       (letfn [(label! [s size fill]
                 (pixi/Text. {:text (str s)
                              :style {:fill fill
@@ -117,6 +157,31 @@
                   (>= p 100) (str (js/Math.round p))
                   (>= p 10) (.toFixed p 1)
                   :else (.toFixed p 2)))
+              (cell [tag text class-name]
+                (let [node (.createElement js/document tag)]
+                  (set! (.-textContent node) text)
+                  (when class-name
+                    (set! (.-className node) class-name))
+                  node))
+              (annotation-table! [annotation ann]
+                (let [box (.querySelector root ".chart-annotation-table")]
+                  (when box
+                    (set! (.-textContent box) "")
+                    (when (and (= annotation "ltfsr") ann)
+                      (let [table (.createElement js/document "table")
+                            thead (.createElement js/document "thead")
+                            tbody (.createElement js/document "tbody")
+                            head (.createElement js/document "tr")
+                            row (.createElement js/document "tr")]
+                        (.appendChild head (cell "th" "base-price" "num"))
+                        (.appendChild head (cell "th" "ratio" "num"))
+                        (.appendChild thead head)
+                        (.appendChild row (cell "td" (.toFixed (.-base ann) 2) "num"))
+                        (.appendChild row (cell "td" (.toFixed (.-ratio ann) 4) "num"))
+                        (.appendChild tbody row)
+                        (.appendChild table thead)
+                        (.appendChild table tbody)
+                        (.appendChild box table))))))
               (ticks [y-min y-max]
                 (loop [pow (js/Math.floor (js/Math.log10 y-min))
                        acc []]
@@ -135,11 +200,51 @@
                                (if (and (>= v5 y-min) (<= v5 y-max))
                                  (conj acc v5)
                                  acc)))))))
+              (octave-levels [base y-min y-max]
+                ;; Walk /2 and *2 from the optimum base. Keep a level only
+                ;; when its price sits inside the chart.
+                (let [down (loop [p base
+                                  acc []
+                                  guard 0]
+                             (if (or (< p y-min) (>= guard 64))
+                               acc
+                               (recur (/ p 2.0)
+                                      (if (<= p y-max) (conj acc p) acc)
+                                      (inc guard))))]
+                  (loop [p (* 2.0 base)
+                         acc down
+                         guard 0]
+                    (if (or (> p y-max) (>= guard 64))
+                      acc
+                      (recur (* 2.0 p)
+                             (if (>= p y-min) (conj acc p) acc)
+                             (inc guard))))))
+              (draw-levels! [stage y-of pad-l plot-w y-min y-max]
+                (let [ann (.-ltfsr ctx)
+                      base (when ann (.-base ann))]
+                  (when (and base (> base 0))
+                    (let [bands (pixi/Graphics.)
+                          marks (pixi/Graphics.)]
+                      (doseq [p (octave-levels base y-min y-max)]
+                        (let [y (y-of p)
+                              y-top (y-of (* p 1.05))
+                              y-bot (y-of (* p 0.95))
+                              top (js/Math.min y-top y-bot)
+                              bh (js/Math.max 1 (js/Math.abs (- y-bot y-top)))]
+                          (.rect bands pad-l top plot-w bh)
+                          (.fill bands {:color 0x5b8def :alpha 0.2})
+                          (.moveTo marks pad-l y)
+                          (.lineTo marks (+ pad-l plot-w) y)
+                          (.stroke marks {:width 1.25 :color 0xd6e4ff})))
+                      (.addChild stage bands)
+                      (.addChild stage marks)))))
               (draw! []
-                (let [stage (.-stage app)
+                (let [annotation (or (.-annotation ctx) "")
+                      stage (.-stage app)
                       screen (.-screen app)
                       w (.-width screen)
                       h (.-height screen)
+                      _ (annotation-table! annotation (.-ltfsr ctx))
                       bars (or (.-bars ctx) [])
                       n (or (.-length bars) 0)
                       pad-l 58
@@ -243,6 +348,8 @@
                             (.fill candles {:color color})
                             (recur (inc i)))))
                       (.addChild stage candles)
+                      (when (= annotation "ltfsr")
+                        (draw-levels! stage y-of pad-l plot-w y-min y-max))
                       (let [splits (or (.-splits ctx) [])
                             nsplit (or (.-length splits) 0)]
                         (loop [s 0]
@@ -291,6 +398,7 @@
     (set! (.-ticker ctx) (or ticker ""))
     (set! (.-bars ctx) bars)
     (set! (.-splits ctx) splits)
+    (set! (.-ltfsr ctx) ltfsr)
     (when (.-ready ctx)
       ((.-redraw ctx))))
   (unmount [_root]
@@ -306,7 +414,8 @@
     (let [cutoff (window-cutoff ds)]
       {:ticker ticker
        :bars (monthly-bars ds cutoff)
-       :splits (split-markers ticker cutoff)})))
+       :splits (split-markers ticker cutoff)
+       :ltfsr (ltfsr-annotation ds)})))
 
 (defn chart-page
   [req]
@@ -325,6 +434,7 @@
                             (price-chart {:class "price-chart"
                                           :ticker ticker
                                           :bars (:bars data)
-                                          :splits (:splits data)})]
+                                          :splits (:splits data)
+                                          :ltfsr (:ltfsr data)})]
                     [:p "Enter a ticker."])]))
      :unmount (fn [{:keys [stop]}] (stop))}))
