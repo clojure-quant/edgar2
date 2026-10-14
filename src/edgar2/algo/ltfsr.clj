@@ -1,4 +1,4 @@
-(ns edgar2.eodhd.algo.ltfsr
+(ns edgar2.algo.ltfsr
   "Longterm fractal support resistance.
 
   A base price is the bottom of an octave. The band runs from that base
@@ -12,7 +12,8 @@
   to 20.0. The search slides the base from the given base up to twice
   that base and keeps the base whose bottom and top intervals are
   thinnest against the average of the intervals between them."
-  (:require [tech.v3.dataset :as ds])
+  (:require [edgar2.screen.universe :as uni]
+            [tech.v3.dataset :as ds])
   (:import [java.time Instant LocalDate ZoneId ZonedDateTime]
            [java.time.temporal ChronoUnit]))
 
@@ -298,3 +299,38 @@
                  :base-price (double base-price)
                  :octaves (octave-count base-price (close-column bars))
                  :years-history (years-history ends)}))))))))
+
+(def columns
+  [{:key :ticker :label "Ticker"}
+   {:key :name :label "Name"}
+   {:key :close :label "Close" :num? true :decimals 2}
+   {:key :ratio :label "Ratio" :num? true :decimals 4}
+   {:key :base-price :label "Base price" :num? true :decimals 2}
+   {:key :octaves :label "Octaves" :num? true}
+   {:key :years-history :label "Years" :num? true :decimals 1}])
+
+(defn- column-decimals [columns]
+  (into {} (keep (fn [{:keys [key decimals]}]
+                   (when decimals [key decimals]))
+                 columns)))
+
+(defn calculate
+  "Score each series in `items`. Bars are loaded here."
+  [items _params]
+  (if (empty? items)
+    {:rows [] :lines []}
+    (let [score @(requiring-resolve 'edgar2.eodhd.screen/score)]
+      (score items find-ltfsr
+             {:label label
+              :sort-by :ratio
+              :limit lowest-n
+              :decimals (column-decimals columns)}))))
+
+(def screen
+  {:id :ltfsr
+   :title "lt-fsr"
+   :description notes
+   :columns columns
+   :universe uni/eodhd
+   :calculate calculate
+   :stamp uni/eodhd-stamp})

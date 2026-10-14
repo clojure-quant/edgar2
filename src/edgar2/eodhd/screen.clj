@@ -207,6 +207,30 @@
          (swap! result-cache* assoc cache-key value)
          value)))))
 
+(defn score
+  "Run `algo` on the series for `items` and return {:rows :lines}.
+
+  `items` are {:ticker :name :equity} from the eodhd universe. Bars come
+  from the shared load cache. This does not use the result cache; the
+  screen runner stores the rows."
+  [items algo {:keys [label notes sort-by limit decimals] :or {label "hit"}}]
+  (let [notes (vec (or notes []))
+        loaded (load-with-bars)]
+    (if (empty? (:equities loaded))
+      {:rows []
+       :lines (into ["No equity list yet. Run Bar download on Ingress EODHD."]
+                    notes)}
+      (let [codes (set (keep :ticker items))]
+        (compute algo
+                 {:label label
+                  :notes notes
+                  :sort-by sort-by
+                  :limit limit
+                  :decimals (or decimals {})}
+                 (assoc loaded
+                        :equities (filterv (comp codes :code) (:equities loaded))
+                        :with-bars (filterv (comp codes :code :equity) (:with-bars loaded))))))))
+
 (defn- columns [rows]
   (let [preferred [:ticker :name :days-ago :date :prior-high :prior-date :high-ago-days :close :ratio :base-price :octaves :years-history]
         present (set (mapcat keys rows))]

@@ -1,4 +1,4 @@
-(ns edgar2.eodhd.algo.lt-breakout
+(ns edgar2.algo.lt-breakout
   "Longterm up breakout on one bar series.
 
   A split-adjusted high in the last 100 sessions above the prior 11-year
@@ -13,7 +13,8 @@
   at a chosen base price. interval-count sets how many equal parts
   the band is split into."
   (:require [clojure.pprint :as pprint]
-            [edgar2.eodhd.algo.ltfsr :as ltfsr]
+            [edgar2.algo.ltfsr :as ltfsr]
+            [edgar2.screen.universe :as uni]
             [tech.v3.dataset :as ds]
             [tech.v3.datatype :as dtype]
             [tech.v3.datatype.argops :as argops])
@@ -178,3 +179,38 @@
                         (mapv (fn [i c] (interval-table-row base n i c))
                               (range n)
                               counts))))
+
+(def columns
+  [{:key :ticker :label "Ticker"}
+   {:key :name :label "Name"}
+   {:key :days-ago :label "Days ago" :num? true}
+   {:key :date :label "Date"}
+   {:key :prior-high :label "11y high" :num? true :decimals 2}
+   {:key :prior-date :label "High date"}
+   {:key :high-ago-days :label "High ago" :num? true}
+   {:key :close :label "Close" :num? true :decimals 2}])
+
+(defn- column-decimals [columns]
+  (into {} (keep (fn [{:keys [key decimals]}]
+                   (when decimals [key decimals]))
+                 columns)))
+
+(defn calculate
+  "Score each series in `items`. Bars are loaded here."
+  [items _params]
+  (if (empty? items)
+    {:rows [] :lines []}
+    (let [score @(requiring-resolve 'edgar2.eodhd.screen/score)]
+      (score items find-breakout
+             {:label label
+              :sort-by :days-ago
+              :decimals (column-decimals columns)}))))
+
+(def screen
+  {:id :lt-breakout
+   :title "Longterm up breakout"
+   :description notes
+   :columns columns
+   :universe uni/eodhd
+   :calculate calculate
+   :stamp uni/eodhd-stamp})
