@@ -1,6 +1,7 @@
 (ns edgar2.web.server
   (:require [clojure.string :as str]
             [hyper.core :as h]
+            [edgar2.web.chart :refer [chart-page]]
             [edgar2.web.company :refer [current-annual-page description-page google-page]]
             [edgar2.web.filing :refer [annual-report-page raw-filing-page]]
             [edgar2.web.filings :refer [filings-page]]
@@ -81,6 +82,9 @@
    ["/company/description" {:name :company-description
                             :title "Description"
                             :get #'description-page}]
+   ["/company/chart" {:name :company-chart
+                      :title "Chart"
+                      :get #'chart-page}]
    ["/financials" {:get #'legacy-financials}]
    ["/financials/:ticker" {:get #'legacy-financials}]
    ["/financials/:ticker/:n" {:get #'legacy-financials}]
@@ -106,6 +110,7 @@
         stop (h/start! (h/create-handler #'routes
                                          :head [[:link {:rel "stylesheet"
                                                         :href "/css/edgar2.css"}]]
+                                         :squint-core-url "https://cdn.jsdelivr.net/npm/squint-cljs@0.14.203/src/squint/core.js"
                                          :static-resources "public")
                        {:port port})]
     (.addShutdownHook (Runtime/getRuntime) (Thread. (fn [] (stop))))

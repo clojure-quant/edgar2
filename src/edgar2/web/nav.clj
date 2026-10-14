@@ -10,7 +10,8 @@
     :company-google
     :company-filings
     :company-annual
-    :company-description})
+    :company-description
+    :company-chart})
 
 (def subnav
   "Second row, shown only on company pages. The value is the route names
@@ -20,7 +21,8 @@
    ["google-finance" :company-google #{:company-google}]
    ["filings" :company-filings #{:company-filings}]
    ["current-annual" :company-annual #{:company-annual}]
-   ["description" :company-description #{:company-description}]])
+   ["description" :company-description #{:company-description}]
+   ["chart" :company-chart #{:company-chart}]])
 
 (defn- top-link
   [route-name label active? query]
