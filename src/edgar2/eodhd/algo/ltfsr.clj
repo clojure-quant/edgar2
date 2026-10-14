@@ -12,7 +12,8 @@
   to 20.0. The search slides the base from the given base up to twice
   that base and keeps the base whose bottom and top intervals are
   thinnest against the average of the intervals between them."
-  (:require [tech.v3.dataset :as ds]))
+  (:require [tech.v3.dataset :as ds])
+  (:import [java.time Instant LocalDate ZoneId ZonedDateTime]))
 
 (def search-base
   "First base in the screen and chart search. Candidates run up to
@@ -31,6 +32,12 @@
   "How many names the lt-fsr screen keeps."
   250)
 
+(def min-years
+  "A series has to reach back this many years from the newest bar."
+  7)
+
+(def ^:private ny (ZoneId/of "America/New_York"))
+
 (def label
   "Summary word for one scored series."
   "score")
@@ -40,6 +47,8 @@
   [(format "Bases from %.1f up to but not including %.1f, step %.1f, %d intervals."
            search-base (* 2.0 search-base) search-step interval-count)
    "Ratio is the average count of the bottom and top intervals divided by the average count of the intervals between them."
+   (format "A name needs bars back at least %d years from the newest bar." min-years)
+   "A ratio of zero is left out."
    (format "The table shows the %d lowest ratios." lowest-n)
    "Close is the newest close. Base price is the base that won the search."])
 
@@ -213,23 +222,42 @@
     ;; thinnest ends, then the smaller edge average, then the lower base
     (first (sort-by (juxt :ratio :edges-avg :base-price) scored))))
 
+(defn- as-instant [dt]
+  (cond
+    (instance? Instant dt) dt
+    (instance? ZonedDateTime dt) (.toInstant ^ZonedDateTime dt)
+    (instance? LocalDate dt) (.toInstant (.atStartOfDay ^LocalDate dt ny))
+    :else nil))
+
+(defn- history?
+  "True when the oldest bar is at least `years` before the newest."
+  [bars years]
+  (let [n (ds/row-count bars)
+        dates (ds/column bars :date)
+        newest (as-instant (dates (dec n)))
+        oldest (as-instant (dates 0))]
+    (and newest oldest
+         (not (.isAfter oldest
+                        (.toInstant (.minusYears (.atZone newest ny) (long years))))))))
+
 (defn find-ltfsr
   "Fractal base with the thinnest band ends for `bars`.
 
   The search is `search-base`, `search-step`, and `interval-count`.
-  Returns {:close :ratio :base-price}, or nil when the newest close is
-  not a positive finite number or the ratio is not finite."
+  The series has to reach back `min-years` from the newest bar, and the
+  ratio has to be positive. Returns {:close :ratio :base-price}, or nil."
   [bars]
   (let [bars (ds/->dataset bars)
         n (ds/row-count bars)]
-    (when (pos? n)
+    (when (and (pos? n) (history? bars min-years))
       (let [raw ((ds/column bars :close) (dec n))]
         (when (and (number? raw)
                    (Double/isFinite (double raw))
                    (pos? (double raw)))
           (let [{:keys [ratio base-price]}
-                (position-search search-base search-step interval-count bars)]
-            (when (Double/isFinite (double ratio))
+                (position-search search-base search-step interval-count bars)
+                ratio (double ratio)]
+            (when (and (Double/isFinite ratio) (pos? ratio))
               {:close (double raw)
-               :ratio (double ratio)
+               :ratio ratio
                :base-price (double base-price)})))))))
