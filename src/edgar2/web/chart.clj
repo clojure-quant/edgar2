@@ -9,9 +9,11 @@
   The annotation list can draw longterm fractal support and resistance:
   the optimum base from the full series, and every octave of that base
   that falls inside the price range on screen."
-  (:require [clojure.java.io :as io]
+  (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.string :as str]
             [hyper.core :as h]
+            [hyper.effects :as effects]
             [edgar2.eodhd.ingress :as ingress]
             [edgar2.algo.lt-breakout :as lt-breakout]
             [edgar2.algo.ltfsr :as ltfsr]
@@ -20,7 +22,8 @@
             [quanta.bar.db.nippy :as nippy]
             [tablecloth.api :as tc]
             [tech.v3.dataset :as ds])
-  (:import [java.time LocalDate ZoneId]))
+  (:import [java.net URLEncoder]
+           [java.time LocalDate ZoneId]))
 
 (def ^:private ny (ZoneId/of "America/New_York"))
 
@@ -135,7 +138,8 @@
         [:option {:value ""} "empty"]
         [:option {:value "ltfsr"} "ltfsr"]
         [:option {:value "lt-breakout"} "lt-breakout"]]]
-      [:div.chart-annotation-table]]])
+      [:div.chart-annotation-table]
+      [:slot {:name "nearby"}]]])
   (mount [root]
     (let [host (.querySelector root ".price-chart-host")
           app (pixi/Application.)]
@@ -442,6 +446,55 @@
       (.destroy (.-app ctx))
       (set! (.-app ctx) nil))))
 
+(def nearby-path
+  "Peer lists written by clj -X:nearness."
+  "data/nearby.edn")
+
+(defonce ^:private nearby-cache* (atom nil))
+
+(defn nearby-for
+  "Peers for `ticker` from data/nearby.edn. Empty when the file or the
+  ticker is missing. The map is reread when the file changes."
+  [ticker]
+  (let [file (io/file nearby-path)]
+    (if-not (.exists file)
+      []
+      (let [stamp (.lastModified file)
+            cached @nearby-cache*]
+        (when (or (nil? cached) (not= stamp (:stamp cached)))
+          (reset! nearby-cache*
+                  {:stamp stamp
+                   :by-ticker (edn/read-string (slurp file))}))
+        (vec (get (:by-ticker @nearby-cache*) ticker []))))))
+
+(defn- chart-ticker-link
+  "Link that opens the chart for `ticker` and stores it on this tab."
+  [ticker]
+  (let [ticker (ticker/normalize ticker)]
+    {:href (str "/company/chart?ticker=" (URLEncoder/encode ticker "UTF-8"))
+     :data-on:click__prevent
+     (h/action
+       (reset! (ticker/ticker*) ticker)
+       (effects/navigate! :company-chart {} {:ticker ticker}))}))
+
+(defn- nearby-table
+  "Sidebar table of ticker and correlation. Each ticker opens that chart."
+  [rows]
+  [:div.chart-nearby {:slot "nearby"}
+   [:div.chart-nearby-title "Correlation"]
+   (if (seq rows)
+     [:table
+      [:thead
+       [:tr
+        [:th "ticker"]
+        [:th.num "correlation"]]]
+      [:tbody
+       (for [{:keys [ticker correlation]} rows]
+         [:tr {:key ticker}
+          [:td [:a (chart-ticker-link ticker) ticker]]
+          [:td.num (format "%.4f" (double correlation))]])]]
+     [:p.chart-nearby-empty "No correlations."])])
+
 (defn chart-payload
   [ticker]
   (let [ds (ingress/adjusted-bars ticker)]
@@ -452,7 +505,8 @@
        :bars (monthly-bars ds cutoff)
        :splits (split-markers ticker cutoff)
        :ltfsr (ltfsr-annotation ds)
-       :breakout (lt-breakout/annotation ds)})))
+       :breakout (lt-breakout/annotation ds)
+       :nearby (nearby-for ticker)})))
 
 (defn chart-page
   [req]
@@ -473,6 +527,7 @@
                                           :bars (:bars data)
                                           :splits (:splits data)
                                           :ltfsr (:ltfsr data)
-                                          :breakout (:breakout data)})]
+                                          :breakout (:breakout data)}
+                              (nearby-table (:nearby data)))]
                     [:p "Enter a ticker."])]))
      :unmount (fn [{:keys [stop]}] (stop))}))

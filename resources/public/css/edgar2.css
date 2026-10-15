@@ -310,9 +310,14 @@ price-chart.price-chart {
 }
 
 .price-chart-side {
-  width: 18rem;
+  width: 16rem;
   flex: none;
+  min-height: 0;
+  overflow: auto;
   color: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .chart-annotation-label {
@@ -320,7 +325,7 @@ price-chart.price-chart {
   flex-direction: column;
   gap: 0.35rem;
   font-size: 0.9rem;
-  margin-bottom: 0.75rem;
+  flex: none;
 }
 
 .chart-annotation-select {
@@ -328,6 +333,22 @@ price-chart.price-chart {
   padding: 0.25rem 0.4rem;
 }
 
-.chart-annotation-table table {
+.chart-annotation-table table,
+.chart-nearby table {
   width: 100%;
+}
+
+.chart-nearby-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.chart-nearby-empty {
+  margin: 0;
+  color: #555;
+}
+
+.chart-nearby a {
+  color: #084a8a;
 }
