@@ -32,6 +32,10 @@
   :screen {:exec-fn edgar2.screen/run}
   :eodhd-screen {:exec-fn edgar2.screen/run
                  :exec-args {:name :lt-breakout}}
+  ;; quanta-eodhd brings quanta-calendar 0.6.29, which has no aligned-ds-map.
+  :nearness {:extra-deps {io.github.clojure-quant/quanta-calendar {:mvn/version "0.6.33"}
+                          org.clojars.haifengl/smile {:mvn/version "4.2.0"}}
+             :exec-fn edgar2.screen.nearness/run}
   :web {:extra-paths ["resources"]
         :extra-deps {ai.dyal/hyper {:mvn/version "0.2.2"}
                      org.duckdb/duckdb_jdbc {:mvn/version "1.3.1.0"}}
