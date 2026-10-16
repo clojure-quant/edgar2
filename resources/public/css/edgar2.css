@@ -305,8 +305,42 @@ price-chart.price-chart {
 }
 
 .price-chart-host {
+  position: relative;
   width: 100%;
   height: 100%;
+}
+
+.chart-pointer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.chart-pointer-v,
+.chart-pointer-h {
+  position: absolute;
+  background: rgba(214, 228, 255, 0.55);
+}
+
+.chart-pointer-v {
+  width: 1px;
+}
+
+.chart-pointer-h {
+  height: 1px;
+}
+
+.chart-pointer-readout {
+  position: absolute;
+  padding: 0.15rem 0.4rem;
+  background: rgba(15, 20, 25, 0.92);
+  color: #d7e0ea;
+  border: 1px solid #3a4a5c;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 .price-chart-side {
@@ -353,25 +387,54 @@ price-chart.price-chart {
   color: #084a8a;
 }
 
-nearby-lines.nearby-lines {
-  display: block;
-  width: 100%;
+.nearby-layout,
+.pairs-layout {
+  display: flex;
   height: calc(100vh - 9rem);
   min-height: 520px;
-}
-
-.nearby-layout {
-  display: flex;
-  height: 100%;
   gap: 0.75rem;
 }
 
-.nearby-side {
+nearby-table.nearby-side {
+  display: block;
   width: 20rem;
   flex: none;
   min-height: 0;
   overflow: auto;
   color: #1a1a1a;
+}
+
+.pairs-side {
+  width: min(54rem, 58%);
+  flex: none;
+  min-height: 0;
+  overflow: auto;
+}
+
+.pairs-side tr {
+  cursor: pointer;
+}
+
+tr.pairs-selected td {
+  background: #e7f1fb;
+}
+
+.pairs-main,
+.nearby-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+pair-chart.pair-chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pair-chart-host {
+  width: 100%;
+  height: 100%;
 }
 
 .nearby-title {
@@ -392,17 +455,6 @@ nearby-lines.nearby-lines {
   margin-right: 0.35rem;
   border: 1px solid #bbb;
   vertical-align: -2px;
-}
-
-.nearby-main {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-}
-
-.nearby-host {
-  width: 100%;
-  height: 100%;
 }
 
 .nearby-table table {

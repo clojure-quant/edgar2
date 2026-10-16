@@ -121,7 +121,9 @@
 
   The annotation select is empty, ltfsr, or lt-breakout. ltfsr draws
   octave price levels. lt-breakout draws the prior high from the
-  session that printed it through the newest bar."
+  session that printed it through the newest bar. While the pointer
+  is inside the plot, a crosshair shows that month and the price at
+  that height."
   {:require [["https://cdn.jsdelivr.net/npm/pixi.js@8.14.3/dist/pixi.min.mjs" :as pixi]]}
   [{:keys [ticker bars splits ltfsr breakout]}]
   (event ::annotation [e]
@@ -131,7 +133,11 @@
   (render
     [:div.price-chart-layout
      [:div.price-chart-main
-      [:div.price-chart-host]]
+      [:div.price-chart-host
+       [:div.chart-pointer {:hidden true}
+        [:div.chart-pointer-v]
+        [:div.chart-pointer-h]
+        [:div.chart-pointer-readout]]]]
      [:aside.price-chart-side
       [:label.chart-annotation-label "Annotation"
        [:select.chart-annotation-select {:on {:change ::annotation}}
@@ -159,6 +165,65 @@
                   (>= p 100) (str (js/Math.round p))
                   (>= p 10) (.toFixed p 1)
                   :else (.toFixed p 2)))
+              (fmt-px [p]
+                (if (>= p 1) (.toFixed p 2) (.toFixed p 4)))
+              (hide-pointer! []
+                (set! (.-lastPointer ctx) nil)
+                (let [box (.querySelector root ".chart-pointer")]
+                  (when box
+                    (set! (.-hidden box) true))))
+              (show-pointer! [e]
+                (let [box (.querySelector root ".chart-pointer")
+                      plot (.-plot ctx)
+                      canvas (.-canvas app)]
+                  (if (or (not box) (not plot) (not canvas) (<= (.-n plot) 0))
+                    (when box (set! (.-hidden box) true))
+                    (let [rect (.getBoundingClientRect canvas)
+                          x (- (.-clientX e) (.-left rect))
+                          y (- (.-clientY e) (.-top rect))
+                          pad-l (.-padL plot)
+                          pad-t (.-padT plot)
+                          plot-w (.-plotW plot)
+                          plot-h (.-plotH plot)
+                          n (.-n plot)]
+                      (if (or (< x pad-l)
+                              (> x (+ pad-l plot-w))
+                              (< y pad-t)
+                              (> y (+ pad-t plot-h)))
+                        (do (set! (.-lastPointer ctx) nil)
+                            (set! (.-hidden box) true))
+                        (let [slot (/ plot-w n)
+                              raw (js/Math.round (- (/ (- x pad-l) slot) 0.5))
+                              idx (js/Math.max 0 (js/Math.min (dec n) raw))
+                              bar (aget (.-bars ctx) idx)
+                              log-min (js/Math.log (.-yMin plot))
+                              log-max (js/Math.log (.-yMax plot))
+                              t (- 1 (/ (- y pad-t) plot-h))
+                              price (js/Math.exp (+ log-min (* t (- log-max log-min))))
+                              readout (.querySelector box ".chart-pointer-readout")
+                              vline (.querySelector box ".chart-pointer-v")
+                              hline (.querySelector box ".chart-pointer-h")]
+                          (set! (.-lastPointer ctx) e)
+                          (set! (.-textContent readout)
+                                (str (.-t bar) "  " (fmt-px price)))
+                          (set! (.-hidden box) false)
+                          (set! (.. vline -style -left) (str x "px"))
+                          (set! (.. vline -style -top) (str pad-t "px"))
+                          (set! (.. vline -style -height) (str plot-h "px"))
+                          (set! (.. hline -style -top) (str y "px"))
+                          (set! (.. hline -style -left) (str pad-l "px"))
+                          (set! (.. hline -style -width) (str plot-w "px"))
+                          (let [rw (.-offsetWidth readout)
+                                rh (.-offsetHeight readout)
+                                host-w (.-clientWidth host)
+                                lx (if (> (+ x 12 rw) (- host-w 4))
+                                     (js/Math.max 4 (- x rw 12))
+                                     (+ x 12))
+                                ly (if (< (- y rh 8) 4)
+                                     (+ y 12)
+                                     (- y rh 8))]
+                            (set! (.. readout -style -left) (str lx "px"))
+                            (set! (.. readout -style -top) (str ly "px")))))))))
               (cell [tag text class-name]
                 (let [node (.createElement js/document tag)]
                   (set! (.-textContent node) text)
@@ -289,6 +354,7 @@
                       pad-t 32
                       pad-b 28]
                   (.removeChildren stage)
+                  (set! (.-plot ctx) nil)
                   (if (zero? n)
                     (let [g (pixi/Graphics.)
                           title (label! (str (.-ticker ctx) "  ·  30 years") 18 0xd7e0ea)]
@@ -297,7 +363,8 @@
                       (.addChild stage g)
                       (set! (.-x title) 28)
                       (set! (.-y title) 14)
-                      (.addChild stage title))
+                      (.addChild stage title)
+                      (hide-pointer!))
                     (let [first (aget bars 0)
                           lastb (aget bars (dec n))
                           range (loop [i 0
@@ -421,8 +488,22 @@
                                         (set! (.-x text) (+ x 8))))
                                   (set! (.-y text) (+ pad-t 2))
                                   (.addChild stage text)))
-                              (recur (inc s))))))))))]
-        (set! (.-redraw ctx) draw!))
+                              (recur (inc s)))))
+                      (set! (.-plot ctx)
+                            {:padL pad-l
+                             :padT pad-t
+                             :plotW plot-w
+                             :plotH plot-h
+                             :n n
+                             :yMin y-min
+                             :yMax y-max})
+                      (when (.-lastPointer ctx)
+                        (show-pointer! (.-lastPointer ctx))))))))]
+        (set! (.-redraw ctx) draw!)
+        (set! (.-onPointer ctx) show-pointer!)
+        (set! (.-onLeave ctx) hide-pointer!)
+        (.addEventListener host "pointermove" show-pointer!)
+        (.addEventListener host "pointerleave" hide-pointer!))
       (-> (.init app {:background 0x0f1419
                       :antialias true
                       :resizeTo host
@@ -441,7 +522,13 @@
     (set! (.-breakout ctx) breakout)
     (when (.-ready ctx)
       ((.-redraw ctx))))
-  (unmount [_root]
+  (unmount [root]
+    (let [host (.querySelector root ".price-chart-host")]
+      (when host
+        (when (.-onPointer ctx)
+          (.removeEventListener host "pointermove" (.-onPointer ctx)))
+        (when (.-onLeave ctx)
+          (.removeEventListener host "pointerleave" (.-onLeave ctx)))))
     (when (.-app ctx)
       (.destroy (.-app ctx))
       (set! (.-app ctx) nil))))

@@ -10,6 +10,7 @@
             [edgar2.web.ingress :refer [ingress-page]]
             [edgar2.web.ingress-eodhd :refer [ingress-eodhd-page]]
             [edgar2.web.overview :refer [overview-page]]
+            [edgar2.web.pairs :refer [pairs-page]]
             [edgar2.web.screen :refer [screen-page]]
             [edgar2.web.segment :refer [segment-page]])
   (:import [java.net URLEncoder]))
@@ -49,6 +50,15 @@
    ["/screen" {:name :screen
                :title "Screen"
                :get #'screen-page}]
+   ["/pairs" {:name :pairs
+              :title "Pairs"
+              :get #'pairs-page}]
+   ["/pairs/:a/:b" {:name :pairs-ab
+                    :title "Pairs"
+                    :get #'pairs-page}]
+   ["/pairs/:a/:b/:years" {:name :pairs-ab-years
+                           :title "Pairs"
+                           :get #'pairs-page}]
    ["/ingress" {:name :ingress
                 :title "Ingress"
                 :get #'ingress-page}]

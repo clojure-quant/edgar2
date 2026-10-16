@@ -91,6 +91,8 @@
       " · "
       (top-link :screen "Screen" (= here :screen) nil)
       " · "
+      (top-link :pairs "Pairs" (contains? #{:pairs :pairs-ab :pairs-ab-years} here) nil)
+      " · "
       (top-link :ingress "Ingress" (= here :ingress) nil)
       " · "
       (top-link :ingress-eodhd "Ingress EODHD" (= here :ingress-eodhd) nil)

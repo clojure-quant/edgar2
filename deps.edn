@@ -36,6 +36,7 @@
   :nearness {:extra-deps {io.github.clojure-quant/quanta-calendar {:mvn/version "0.6.33"}
                           org.clojars.haifengl/smile {:mvn/version "4.2.0"}}
              :exec-fn edgar2.screen.nearness/run}
+  :similar-behavior {:exec-fn edgar2.study.similar-behavior/run}
   :web {:extra-paths ["resources"]
         :extra-deps {ai.dyal/hyper {:mvn/version "0.2.2"}
                      org.duckdb/duckdb_jdbc {:mvn/version "1.3.1.0"}}
