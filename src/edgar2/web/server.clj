@@ -85,6 +85,9 @@
    ["/company/chart-nearby" {:name :company-chart-nearby
                              :title "Chart nearby"
                              :get #'chart-nearby-page}]
+   ["/company/chart-nearby/:years" {:name :company-chart-nearby-years
+                                    :title "Chart nearby"
+                                    :get #'chart-nearby-page}]
    ["/financials" {:get #'legacy-financials}]
    ["/financials/:ticker" {:get #'legacy-financials}]
    ["/financials/:ticker/:n" {:get #'legacy-financials}]

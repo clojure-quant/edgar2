@@ -12,7 +12,8 @@
     :company-annual
     :company-description
     :company-chart
-    :company-chart-nearby})
+    :company-chart-nearby
+    :company-chart-nearby-years})
 
 (def subnav
   "Second row, shown only on company pages. The value is the route names
@@ -24,7 +25,8 @@
    ["current-annual" :company-annual #{:company-annual}]
    ["description" :company-description #{:company-description}]
    ["chart" :company-chart #{:company-chart}]
-   ["chart-nearby" :company-chart-nearby #{:company-chart-nearby}]])
+   ["chart-nearby" :company-chart-nearby
+    #{:company-chart-nearby :company-chart-nearby-years}]])
 
 (defn- top-link
   [route-name label active? query]
@@ -58,11 +60,18 @@
   (let [here (get-in req [:hyper/route :name])
         q (ticker/query)
         active? (contains? active-names here)
-        ;; Stay on the current financials count and period when that item
-        ;; is already showing.
-        link (if (and (= route-name :company-financials)
-                      (#{:company-financials-n :company-financials-period} here))
+        ;; Stay on the current financials count, or the nearby year window,
+        ;; when that item is already showing.
+        link (cond
+               (and (= route-name :company-financials)
+                    (#{:company-financials-n :company-financials-period} here))
                (h/navigate here (get-in req [:hyper/route :path-params]) q)
+
+               (and (= route-name :company-chart-nearby)
+                    (= here :company-chart-nearby-years))
+               (h/navigate here (get-in req [:hyper/route :path-params]) q)
+
+               :else
                (h/navigate route-name {} q))]
     [:a (cond-> link
           active? (assoc :class "active")

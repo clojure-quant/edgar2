@@ -5,11 +5,12 @@
   and a show checkbox. A peer starts checked when its correlation is
   above show-correlation.
 
-  The right column is two linear panes over the last chart-years of
-  daily closes. The top pane is each shown close indexed to 100 on that
+  The right column is two linear panes over the selected number of
+  years of daily closes. Five years is the default. The top pane is
+  each shown close indexed to 100 on that
   series' first day in the window. The selected ticker is black; each
-  peer has its own color. The lower pane is the selected close divided
-  by the peer close, indexed to 1 on that ratio's first day, in the
+  peer has its own color. The lower pane is the peer close divided
+  by the selected close, indexed to 1 on that ratio's first day, in the
   same color."
   (:require [hyper.core :as h]
             [hyper.effects :as effects]
@@ -22,7 +23,21 @@
   (:import [java.time LocalDate ZoneId]
            [java.util.concurrent Callable Executors]))
 
-(def chart-years 5)
+(def year-choices
+  "Windows the nearby chart can show. Five years is the default."
+  [5 10 15 20 25 30])
+
+(defn- parse-years
+  [s]
+  (let [n (try
+            (Long/parseLong (str s))
+            (catch Exception _
+              nil))]
+    (if (some #(= n %) year-choices) n 5)))
+
+(defn- years-param
+  [req]
+  (parse-years (get-in req [:hyper/route :path-params :years])))
 
 (def show-correlation
   "Peers with a higher correlation start with show checked."
@@ -57,11 +72,11 @@
        (> (double correlation) (double show-correlation))))
 
 (defn- window-start
-  "Session date chart-years before the last bar in `ds`."
-  ^LocalDate [ds]
+  "Session date `years` before the last bar in `ds`."
+  ^LocalDate [ds years]
   (let [n (tc/row-count ds)
         last-day (session-date (nth (:date ds) (dec n)))]
-    (.minusYears last-day (long chart-years))))
+    (.minusYears last-day (long years))))
 
 (defn- closes-by-day
   "Map of YYYY-MM-DD to positive close, for sessions on or after `cutoff`."
@@ -99,11 +114,11 @@
               values)))))
 
 (defn- close-ratio
-  "Selected close divided by the peer close. Nil where either close is missing."
+  "Peer close divided by the selected close. Nil where either close is missing."
   [primary other]
   (mapv (fn [a b]
           (when (and (positive? a) (positive? b))
-            (/ (double a) (double b))))
+            (/ (double b) (double a))))
         primary other))
 
 (defn- parallel-map
@@ -136,11 +151,12 @@
       nil)))
 
 (defn chart-nearby-payload
-  [ticker]
-  (let [ds (ingress/adjusted-bars ticker)]
+  [ticker years]
+  (let [years (parse-years years)
+        ds (ingress/adjusted-bars ticker)]
     (when (or (nil? ds) (zero? (tc/row-count ds)))
       (throw (ex-info (str "No prices for " ticker) {:ticker ticker})))
-    (let [cutoff (window-start ds)
+    (let [cutoff (window-start ds years)
           primary-map (closes-by-day ds cutoff)]
       (when (empty? primary-map)
         (throw (ex-info (str "No prices for " ticker) {:ticker ticker})))
@@ -173,7 +189,7 @@
   redraws both panes without a server round-trip. The selected ticker
   is always the black line on the top pane."
   {:require [["https://cdn.jsdelivr.net/npm/pixi.js@8.14.3/dist/pixi.min.mjs" :as pixi]]}
-  [{:keys [ticker dates primary peers]}]
+  [{:keys [ticker dates primary peers years]}]
   (render
     [:div.nearby-layout
      [:aside.nearby-side
@@ -187,6 +203,7 @@
           app (pixi/Application.)]
       (set! (.-app ctx) app)
       (set! (.-ticker ctx) (or ticker ""))
+      (set! (.-years ctx) (or years 5))
       (set! (.-dates ctx) (or dates (js/Array.)))
       (set! (.-primary ctx) (or primary (js/Array.)))
       (set! (.-peers ctx) (or peers (js/Array.)))
@@ -264,8 +281,8 @@
                           (set! (.-className link) "nearby-ticker")
                           (set! (.-textContent link) sym)
                           (set! (.-href link)
-                                (str "/company/chart-nearby?ticker="
-                                     (js/encodeURIComponent sym)))
+                                (str "/company/chart-nearby/" (or (.-years ctx) 5)
+                                     "?ticker=" (js/encodeURIComponent sym)))
                           (.addEventListener link "click"
                                              (fn [ev]
                                                (.preventDefault ev)
@@ -358,18 +375,19 @@
                                    acc)
                                  (inc guard))))))))
               (year-indexes [dates n]
-                (loop [i 0
-                       last-i -1000
-                       acc []]
-                  (if (>= i n)
-                    acc
-                    (let [year (.slice (aget dates i) 0 4)
-                          prev (when (pos? i) (.slice (aget dates (dec i)) 0 4))
-                          boundary (or (zero? i) (not= year prev))
-                          ok (and boundary (> (- i last-i) 30))]
-                      (recur (inc i)
-                             (if ok i last-i)
-                             (if ok (conj acc i) acc))))))
+                (let [min-gap (js/Math.max 40 (js/Math.round (/ n 14)))]
+                  (loop [i 0
+                         last-i -1000
+                         acc []]
+                    (if (>= i n)
+                      acc
+                      (let [year (.slice (aget dates i) 0 4)
+                            prev (when (pos? i) (.slice (aget dates (dec i)) 0 4))
+                            boundary (or (zero? i) (not= year prev))
+                            ok (and boundary (> (- i last-i) min-gap))]
+                        (recur (inc i)
+                               (if ok i last-i)
+                               (if ok (conj acc i) acc)))))))
               (stroke-series! [stage values y-of x-of color width]
                 (when values
                   (let [g (pixi/Graphics.)
@@ -443,8 +461,8 @@
                                              first-d " – " last-d
                                              "  ·  daily  ·  indexed to 100")
                                         13 0x1a1a1a)
-                          ratio-title (label! (str (.-ticker ctx)
-                                                   " / associated  ·  indexed to 1")
+                          ratio-title (label! (str "associated / " (.-ticker ctx)
+                                                   "  ·  indexed to 1")
                                               13 0x1a1a1a)
                           shown (js/Array.)
                           _ (dotimes [i (.-length peers)]
@@ -526,6 +544,7 @@
         (init-show!)
         (fill-table!)
         (set! (.-loaded ctx) (or ticker ""))
+        (set! (.-loadedYears ctx) (or years 5))
         (set! (.-initShow ctx) init-show!)
         (set! (.-fillTable ctx) fill-table!)
         (set! (.-redraw ctx) draw!))
@@ -541,14 +560,17 @@
                    (.on (.-renderer app) "resize" (.-redraw ctx)))))))
   (update [root]
     (set! (.-ticker ctx) (or ticker ""))
+    (set! (.-years ctx) (or years 5))
     (set! (.-dates ctx) (or dates (js/Array.)))
     (set! (.-primary ctx) (or primary (js/Array.)))
     (set! (.-peers ctx) (or peers (js/Array.)))
-    (when (and (not= (.-loaded ctx) (or ticker ""))
-               (.-initShow ctx))
+    (when (and (.-initShow ctx)
+               (or (not= (.-loaded ctx) (or ticker ""))
+                   (not= (.-loadedYears ctx) (or years 5))))
       ((.-initShow ctx))
       ((.-fillTable ctx))
-      (set! (.-loaded ctx) (or ticker "")))
+      (set! (.-loaded ctx) (or ticker ""))
+      (set! (.-loadedYears ctx) (or years 5)))
     (when (.-ready ctx)
       ((.-redraw ctx))))
   (unmount [_root]
@@ -556,29 +578,66 @@
       (.destroy (.-app ctx))
       (set! (.-app ctx) nil))))
 
+(defn- open-nearby!
+  "Open the nearby chart for `ticker` over `years`. Five years uses the
+  bare route. Any other choice is in the path so the page remounts."
+  [ticker years]
+  (let [years (parse-years years)
+        q (when ticker {:ticker ticker})]
+    (if (= years 5)
+      (effects/navigate! :company-chart-nearby {} q)
+      (effects/navigate! :company-chart-nearby-years
+                         {:years (str years)}
+                         q))))
+
+(defn- go-years!
+  [years]
+  (open-nearby! (ticker/current) years))
+
+(defn- years-form
+  [years]
+  [:form.ticker-form
+   {:data-on:submit__prevent
+    (h/action
+      (go-years! (:years $form-data)))}
+   [:label "Years "
+    [:select {:name "years"
+              :data-on:change
+              (h/action
+                (go-years! (:years $form-data)))}
+     (for [choice year-choices]
+       [:option (cond-> {:key choice :value (str choice)}
+                  (= choice years) (assoc :selected true))
+        (str choice " year")])]]
+   [:button {:type "submit"} "Show"]])
+
 (defn chart-nearby-page
   [req]
-  (h/view
-    {:mount (fn []
-              (ticker/seed! req)
-              (ticker/begin chart-nearby-payload))
-     :render (fn [{:keys [result*]} req]
-               (let [{:keys [status ticker message data]} @result*]
-                 [:div.page
-                  (nav req)
-                  (case status
-                    :loading [:p (str "Loading nearby chart for " ticker "…")]
-                    :error [:p.error message]
-                    :ready (nearby-lines {:class "nearby-lines"
-                                          :ticker (:ticker data)
-                                          :dates (:dates data)
-                                          :primary (:primary data)
-                                          :peers (:peers data)
-                                          :data-on:open-ticker
-                                          (h/action
-                                            (let [next (ticker/normalize (:ticker $detail))]
-                                              (when next
-                                                (reset! (ticker/ticker*) next)
-                                                (effects/navigate! :company-chart-nearby {} {:ticker next}))))})
-                    [:p "Enter a ticker."])]))
-     :unmount (fn [{:keys [stop]}] (stop))}))
+  (let [years (years-param req)]
+    (h/view
+      {:mount (fn []
+                (ticker/seed! req)
+                (ticker/begin (fn [t] (chart-nearby-payload t years))))
+       :render (fn [{:keys [result*]} req]
+                 (let [{:keys [status ticker message data]} @result*]
+                   [:div.page
+                    (nav req)
+                    (years-form years)
+                    (case status
+                      :loading [:p (str "Loading nearby chart for " ticker
+                                        " (" years " year)…")]
+                      :error [:p.error message]
+                      :ready (nearby-lines {:class "nearby-lines"
+                                            :ticker (:ticker data)
+                                            :years years
+                                            :dates (:dates data)
+                                            :primary (:primary data)
+                                            :peers (:peers data)
+                                            :data-on:open-ticker
+                                            (h/action
+                                              (let [next (ticker/normalize (:ticker $detail))]
+                                                (when next
+                                                  (reset! (ticker/ticker*) next)
+                                                  (open-nearby! next years))))})
+                      [:p "Enter a ticker."])]))
+       :unmount (fn [{:keys [stop]}] (stop))})))
