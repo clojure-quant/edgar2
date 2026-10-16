@@ -11,7 +11,8 @@
     :company-filings
     :company-annual
     :company-description
-    :company-chart})
+    :company-chart
+    :company-chart-nearby})
 
 (def subnav
   "Second row, shown only on company pages. The value is the route names
@@ -22,7 +23,8 @@
    ["filings" :company-filings #{:company-filings}]
    ["current-annual" :company-annual #{:company-annual}]
    ["description" :company-description #{:company-description}]
-   ["chart" :company-chart #{:company-chart}]])
+   ["chart" :company-chart #{:company-chart}]
+   ["chart-nearby" :company-chart-nearby #{:company-chart-nearby}]])
 
 (defn- top-link
   [route-name label active? query]

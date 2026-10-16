@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [edgar2.web.chart :refer [chart-page]]
+            [edgar2.web.chart-nearby :refer [chart-nearby-page]]
             [edgar2.web.company :refer [current-annual-page description-page google-page]]
             [edgar2.web.filing :refer [annual-report-page raw-filing-page]]
             [edgar2.web.filings :refer [filings-page]]
@@ -81,6 +82,9 @@
    ["/company/chart" {:name :company-chart
                       :title "Chart"
                       :get #'chart-page}]
+   ["/company/chart-nearby" {:name :company-chart-nearby
+                             :title "Chart nearby"
+                             :get #'chart-nearby-page}]
    ["/financials" {:get #'legacy-financials}]
    ["/financials/:ticker" {:get #'legacy-financials}]
    ["/financials/:ticker/:n" {:get #'legacy-financials}]
