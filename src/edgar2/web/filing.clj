@@ -25,12 +25,75 @@
       (str/ends-with? name ".css") "text/css; charset=utf-8"
       :else "application/octet-stream")))
 
+(defn- html-file?
+  [file]
+  (let [name (str/lower-case (.getName file))]
+    (or (str/ends-with? name ".htm")
+        (str/ends-with? name ".html"))))
+
+(def ^:private ix-ns
+  "http://www.xbrl.org/2013/inlineXBRL")
+
+(def ^:private ix-highlight-snippet
+  "Injected into every HTML filing. Marks ix facts that have both name and id."
+  (str
+   "<style id=\"edgar2-ix-hl\">"
+   ".edgar2-ix{outline:1px solid red;cursor:help}"
+   ".edgar2-ix-tip{position:fixed;z-index:2147483647;background:#111;color:#fff;"
+   "padding:4px 8px;font:12px/1.3 sans-serif;pointer-events:none;"
+   "max-width:48em;display:none;box-shadow:0 1px 4px rgba(0,0,0,.35);"
+   "white-space:nowrap}"
+   "</style>"
+   "<script>(function(){"
+   "var IXNS=" (pr-str ix-ns) ";"
+   "function isIx(el){"
+   "var t=(el.tagName||'').toLowerCase();"
+   "return t.indexOf('ix:')===0||el.namespaceURI===IXNS;}"
+   "function mark(){"
+   "var els=document.getElementsByTagName('*');"
+   "for(var i=0;i<els.length;i++){"
+   "var el=els[i];"
+   "if(!isIx(el))continue;"
+   "if(!el.getAttribute('name')||!el.getAttribute('id'))continue;"
+   "el.classList.add('edgar2-ix');}"
+   "var tip=document.createElement('div');"
+   "tip.className='edgar2-ix-tip';"
+   "(document.body||document.documentElement).appendChild(tip);"
+   "document.addEventListener('mouseover',function(e){"
+   "var el=e.target;"
+   "if(!el||!el.classList||!el.classList.contains('edgar2-ix'))return;"
+   "tip.textContent=el.getAttribute('name')||'';"
+   "tip.style.display='block';});"
+   "document.addEventListener('mousemove',function(e){"
+   "if(tip.style.display!=='block')return;"
+   "tip.style.left=(e.clientX+12)+'px';"
+   "tip.style.top=(e.clientY+12)+'px';});"
+   "document.addEventListener('mouseout',function(e){"
+   "var el=e.target;"
+   "if(!el||!el.classList||!el.classList.contains('edgar2-ix'))return;"
+   "tip.style.display='none';});}"
+   "if(document.readyState==='loading')"
+   "document.addEventListener('DOMContentLoaded',mark);"
+   "else mark();"
+   "})();</script>"))
+
+(defn- inject-ix-highlight
+  "Insert highlight CSS/JS just before </head>, or at the top if missing."
+  [html]
+  (if-let [idx (or (str/index-of html "</head>")
+                    (str/index-of html "</HEAD>"))]
+    (str (subs html 0 idx) ix-highlight-snippet (subs html idx))
+    (str ix-highlight-snippet html)))
+
 (defn- file-response
   [file]
-  {:status 200
-   :headers {"Content-Type" (content-type file)}
-   :body file})
-
+  (if (html-file? file)
+    {:status 200
+     :headers {"Content-Type" "text/html; charset=utf-8"}
+     :body (inject-ix-highlight (slurp file :encoding "UTF-8"))}
+    {:status 200
+     :headers {"Content-Type" (content-type file)}
+     :body file}))
 (defn- text-response
   [status body]
   {:status status
