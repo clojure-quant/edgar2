@@ -180,9 +180,10 @@
 (def dividends-paid-label "Dividends Paid")
 
 (def dividends-paid-concepts
-  "Total cash dividends. US-GAAP total, then common-only, then IFRS financing."
+  "Total cash dividends. US-GAAP total, then ordinary, then common-only, then IFRS financing."
   [[dividends-paid-label
     "PaymentsOfDividends"
+    "PaymentsOfOrdinaryDividends"
     "PaymentsOfDividendsCommonStock"
     "DividendsPaidClassifiedAsFinancingActivities"
     "DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities"

@@ -44,8 +44,9 @@
    [:ifrs-full :DividendsPaidOrdinaryShares]])
 
 (def dividends-paid-tags
-  "Total cash dividends. US-GAAP total, then common-only, then IFRS financing."
+  "Total cash dividends. US-GAAP total, then ordinary, then common-only, then IFRS financing."
   [[:us-gaap :PaymentsOfDividends]
+   [:us-gaap :PaymentsOfOrdinaryDividends]
    [:us-gaap :PaymentsOfDividendsCommonStock]
    [:ifrs-full :DividendsPaidClassifiedAsFinancingActivities]
    [:ifrs-full :DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities]
