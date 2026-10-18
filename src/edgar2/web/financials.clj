@@ -45,7 +45,7 @@
 
 (def result-fields
   "Subtotals drawn with a light green row."
-  #{"Gross Profit" "Operating Income" "Net Income"})
+  #{"Gross Profit" "Operating Income" "Net Income" "Dividends Paid"})
 
 (def asset-fields
   "Cash and equivalents through total assets."
@@ -178,7 +178,7 @@
               ;; Two rules between the last addend and its total.
               rule? (= (get sum-line field) next-field)
               below? (= (get sum-line prev-field) field)
-              class (if (= field "year-end")
+              class (if (#{"year-end" "filing-date"} field)
                       "fin-year-end"
                       (row-class field rule? below?))]
           (cond-> [[:tr (cond-> {:key i}

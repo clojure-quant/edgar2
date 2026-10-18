@@ -471,9 +471,25 @@
         (vec (concat (take (inc idx) rows) [row] (drop (inc idx) rows)))
         (vec (concat rows [row]))))))
 
+(defn filing-dates-by-end
+  "Map of report period-end → :filingDate from company filings.
+  When several filings share an end (e.g. an amendment), keeps the earliest date."
+  [cik forms]
+  (->> forms
+       (mapcat (fn [form] (e/filings cik :form form)))
+       (filter #(and (:reportDate %) (:filingDate %)))
+       (group-by #(str (:reportDate %)))
+       (into {}
+             (map (fn [[end xs]]
+                    [end (->> xs
+                              (map #(str (:filingDate %)))
+                              sort
+                              first)])))))
+
 (defn statement-rows
-  "P&L, a blank line, then the balance sheet. `col-labels` names each period in `ends`."
-  [by-pl* by-bs dividends ends col-labels]
+  "P&L, a blank line, then the balance sheet. `col-labels` names each period in `ends`.
+  `filing-dates` maps period-end string → :filingDate."
+  [by-pl* by-bs dividends ends col-labels filing-dates]
   (let [by-pl (derived/with-derived-lines by-pl* ends)
         items (cond-> (vec (keys by-pl*))
                 (seq (by-pl derived/operating-expenses))
@@ -485,6 +501,10 @@
         columns (into [:field] col-labels)
         year-end (into {:field "year-end"}
                        (map (fn [end label] [label (str end)]) ends col-labels))
+        filing-date (into {:field "filing-date"}
+                          (map (fn [end label]
+                                 [label (get filing-dates (str end))])
+                               ends col-labels))
         pl-items (concat (filter (set items) pl-column-order)
                          (sort (remove (set pl-column-order) items)))
         bs-items (filter (fn [item]
@@ -498,7 +518,7 @@
         pl-rows (insert-after (map #(field-row % by-pl ends col-labels) pl-items)
                               "Shares Diluted"
                               div-row)
-        rows (vec (concat [year-end]
+        rows (vec (concat [year-end filing-date]
                           pl-rows
                           [blank]
                           (map #(field-row % by-bs ends col-labels) bs-items)))]
@@ -764,7 +784,11 @@
                             (get by-bs "Total Assets")
                             n)
           labels (column-labels ends period (fye-month fye))
-          table (statement-rows by-pl* by-bs (:dividends source) ends labels)]
+          ;; Quarterly columns include Q4 from the annual report.
+          filing-forms (if quarterly? ["10-Q" form] [form])
+          filing-dates (filing-dates-by-end cik filing-forms)
+          table (statement-rows by-pl* by-bs (:dividends source) ends labels
+                                filing-dates)]
       (merge {:ticker ticker
               :name (:name meta)
               :cik cik
