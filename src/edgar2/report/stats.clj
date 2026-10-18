@@ -52,6 +52,13 @@
    [:ifrs-full :DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities]
    [:ifrs-full :DividendsPaid]])
 
+(def stock-repurchase-tags
+  "Cash paid to repurchase common equity. US-GAAP common, then broader equity,
+  then IFRS financing."
+  [[:us-gaap :PaymentsForRepurchaseOfCommonStock]
+   [:us-gaap :PaymentsForRepurchaseOfEquity]
+   [:ifrs-full :PaymentsToAcquireOrRedeemEntitysShares]])
+
 (def asset-tags
   [[:us-gaap :Assets]
    [:ifrs-full :Assets]])
@@ -573,6 +580,18 @@
       (let [amount (Math/abs (double (:val paid)))]
         (when (pos? amount) amount)))))
 
+(defn annual-stock-repurchase
+  "Cash paid to repurchase equity at period-end `end`, as a positive amount
+  in `unit`. Nil when that fact is missing, zero, or in another currency.
+  A negative cash-flow sign is treated as the amount paid."
+  [facts unit end]
+  (when-let [paid (fact-at facts stock-repurchase-tags unit end)]
+    (when (and (number? (:val paid))
+               (or (str/blank? (str unit))
+                   (= (str unit) (str (:unit paid)))))
+      (let [amount (Math/abs (double (:val paid)))]
+        (when (pos? amount) amount)))))
+
 (defn company-stats
   [facts {:keys [revenue-unit] :as row}]
   (let [rev (annual-flows facts universe/revenue-tags revenue-unit)
@@ -606,6 +625,7 @@
                       (:num margin)
                       (:val (fact-at facts net-income-tags revenue-unit coverage-end)))
         paid (annual-dividends-paid facts revenue-unit coverage-end)
+        repurchase (annual-stock-repurchase facts revenue-unit coverage-end)
         coverage (when paid (ratio coverage-ni paid))]
     (cond-> (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
       (:sales-growth-yoy growth)
@@ -639,6 +659,7 @@
       (and dps (:unit dps))
       (assoc :dps-unit (:unit dps))
       (number? paid) (assoc :dividends-paid paid)
+      (number? repurchase) (assoc :stock-repurchase repurchase)
       (number? debt) (assoc :debt debt :debt-end bs-end)
       (number? cash) (assoc :cash cash)
       (number? preferred) (assoc :preferred-stock preferred)
@@ -659,7 +680,8 @@
   :enterprise-value, and :ev-ebit.
   PE is USD market cap / USD Net Income, else USD price / USD EPS.
   Dividend yield is USD dividends paid / USD market cap, else USD dividend
-  per share / price. Never mix a dollar price with ARS/JPY/etc. earnings.
+  per share / price. Buyback yield is USD stock repurchase / USD market cap.
+  Never mix a dollar price with ARS/JPY/etc. earnings.
   Enterprise value is USD market cap + debt + preferred + noncontrolling
   interest − cash. EV/EBIT divides that by USD EBIT."
   [st price-by-ticker shares]
@@ -674,6 +696,7 @@
         dps (when (number? (:dps st)) (:dps st))
         usd-dps? (usd-unit? (:dps-unit st))
         paid (when (number? (:dividends-paid st)) (:dividends-paid st))
+        repurchase (when (number? (:stock-repurchase st)) (:stock-repurchase st))
         pe (cond
              (and mcap usd-pl? (number? ni) (not (zero? (double ni))))
              (/ mcap (double ni))
@@ -684,6 +707,9 @@
              (* 100.0 (/ (double paid) (double mcap)))
              (and price (pos? (double price)) (number? dps) usd-dps?)
              (* 100.0 (/ (double dps) (double price))))
+        by (when (and mcap usd-pl? (pos? (double mcap))
+                      (number? repurchase) (pos? (double repurchase)))
+             (* 100.0 (/ (double repurchase) (double mcap))))
         ebit (when (number? (:ebit st)) (:ebit st))
         ev (when (and mcap usd-pl?)
              (+ (double mcap)
@@ -699,6 +725,7 @@
       (assoc :price-sales (/ mcap (double rev)))
       pe (assoc :price-earnings pe)
       dy (assoc :dividend-yield dy)
+      by (assoc :buyback-yield by)
       ev (assoc :enterprise-value ev)
       (and ev (number? ebit) (not (zero? (double ebit))))
       (assoc :ev-ebit (/ ev (double ebit))))))
@@ -774,6 +801,8 @@
    :dividends-paid
    :dividend-yield
    :dividend-coverage
+   :stock-repurchase
+   :buyback-yield
    :enterprise-value
    :ev-ebit
    :ebit
@@ -837,6 +866,7 @@
   :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
   :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),
+  :buyback-yield (USD stock repurchase / USD market cap),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
   :ev-ebit, :revenue-score, and :operating-income-score
   (0–100 share of annual years that did not fall versus the prior year).
@@ -907,7 +937,7 @@
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  rev-score=%d  oi-score=%d  sic=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
@@ -921,6 +951,7 @@
                               (count (filter :enterprise-value out))
                               (count (filter :ev-ebit out))
                               (count (filter :dividend-coverage out))
+                              (count (filter :buyback-yield out))
                               (count (filter :revenue-score out))
                               (count (filter :operating-income-score out))
                               (count (filter :sic out))))

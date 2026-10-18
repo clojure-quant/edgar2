@@ -10,6 +10,7 @@
    {:key :pe :label "PE" :num? true :decimals 1}
    {:key :ev-ebit :label "EV/EBIT" :num? true :decimals 1}
    {:key :dividend-yield :label "Dividend yield" :num? true :decimals 1}
+   {:key :buyback-yield :label "Buyback yield" :num? true :decimals 1}
    {:key :dividend-coverage :label "Dividend coverage" :num? true :decimals 1}])
 
 (defn- yield-screen [rows]
@@ -34,6 +35,7 @@
     [(format "  top 10%% dividend-yield (n=%d, >= %.1f%%, positive only)"
              (:n screen) (double (:cut screen)))
      "  sorted by dividend-yield descending"
+     "  buyback-yield = stock repurchase / market cap"
      "  dividend-coverage = net income / dividends paid"
      "  market-cap in $ millions"
      (format "  %d names" (count (:rows screen)))]))

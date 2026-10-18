@@ -45,7 +45,8 @@
 
 (def result-fields
   "Subtotals drawn with a light green row."
-  #{"Gross Profit" "Operating Income" "Net Income" "Dividends Paid"})
+  #{"Gross Profit" "Operating Income" "Net Income"
+    "Dividends Paid" "Stock Repurchase"})
 
 (def asset-fields
   "Cash and equivalents through total assets."
@@ -121,6 +122,7 @@
              {:key :pe :source :price-earnings :digits 1}
              {:key :price-sales :digits 2}
              {:key :dividend-yield :digits 1}
+             {:key :buyback-yield :digits 1}
              {:key :dividend-coverage :digits 1}]}])
 
 (defn- ratio-label

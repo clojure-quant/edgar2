@@ -72,5 +72,7 @@
     (number? (:dividend-yield r))
     (assoc :dyld (format "%.1f" (double (:dividend-yield r)))
            :dividend-yield (stats/round1 (:dividend-yield r)))
+    (number? (:buyback-yield r))
+    (assoc :buyback-yield (stats/round1 (:buyback-yield r)))
     (number? (:dividend-coverage r))
     (assoc :dividend-coverage (stats/round1 (:dividend-coverage r)))))

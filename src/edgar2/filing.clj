@@ -189,6 +189,20 @@
     "DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities"
     "DividendsPaid"]])
 
+(def stock-repurchase-label "Stock Repurchase")
+
+(def stock-repurchase-concepts
+  "Cash paid to buy back common equity. US-GAAP common, then broader equity,
+  then IFRS financing (PaymentsToAcquireOrRedeemEntitysShares)."
+  [[stock-repurchase-label
+    "PaymentsForRepurchaseOfCommonStock"
+    "PaymentsForRepurchaseOfEquity"
+    "PaymentsToAcquireOrRedeemEntitysShares"]])
+
+(def cashflow-extra-concepts
+  "Dividends and stock repurchase lines pulled with the cash-flow statement."
+  (into dividends-paid-concepts stock-repurchase-concepts))
+
 (defn annual-cashflow-rows
   "Full-year cash-flow fact rows (quarterly repeats removed)."
   [cik _fiscal-year-end form concepts]
@@ -423,7 +437,8 @@
    "EPS Diluted"
    "Shares Basic"
    "Shares Diluted"
-   "Dividends Paid"])
+   "Dividends Paid"
+   "Stock Repurchase"])
 
 (def bs-column-order
   "Main balance-sheet lines only."
@@ -489,7 +504,7 @@
 (defn statement-rows
   "P&L, a blank line, then the balance sheet. `col-labels` names each period in `ends`.
   `filing-dates` maps period-end string → :filingDate."
-  [by-pl* by-bs dividends ends col-labels filing-dates]
+  [by-pl* by-bs dividends repurchases ends col-labels filing-dates]
   (let [by-pl (derived/with-derived-lines by-pl* ends)
         items (cond-> (vec (keys by-pl*))
                 (seq (by-pl derived/operating-expenses))
@@ -515,9 +530,14 @@
                   (field-row dividends-paid-label
                              {dividends-paid-label dividends}
                              ends col-labels))
-        pl-rows (insert-after (map #(field-row % by-pl ends col-labels) pl-items)
-                              "Shares Diluted"
-                              div-row)
+        repurchase-row (when (some #(get repurchases %) ends)
+                         (field-row stock-repurchase-label
+                                    {stock-repurchase-label repurchases}
+                                    ends col-labels))
+        cash-anchor (if div-row dividends-paid-label "Shares Diluted")
+        pl-rows (-> (mapv #(field-row % by-pl ends col-labels) pl-items)
+                    (insert-after "Shares Diluted" div-row)
+                    (insert-after cash-anchor repurchase-row))
         rows (vec (concat [year-end filing-date]
                           pl-rows
                           [blank]
@@ -561,14 +581,15 @@
                    (annual-balance-rows cik fiscal-year-end form))
         cash (ds/mapseq-reader
               (e/cashflow cik :form "10-Q" :view :standardized
-                          :concepts dividends-paid-concepts))
-        annual-cash (annual-cashflow-rows cik fiscal-year-end form dividends-paid-concepts)
+                          :concepts cashflow-extra-concepts))
+        annual-cash (annual-cashflow-rows cik fiscal-year-end form cashflow-extra-concepts)
         items (vec (distinct (map :line-item (concat income annual))))]
     {:income-values (into {} (for [item items]
                                [item (quarterly-values income annual item)]))
      :balance-values (into {} (for [item (distinct (map :line-item bs))]
                                 [item (annual-line-values bs item)]))
-     :dividends (quarterly-values cash annual-cash dividends-paid-label)}))
+     :dividends (quarterly-values cash annual-cash dividends-paid-label)
+     :repurchases (quarterly-values cash annual-cash stock-repurchase-label)}))
 
 (defn- ix-attr
   [attrs k]
@@ -770,13 +791,14 @@
                    (quarterly-statements cik fye form)
                    (let [annual (annual-statement-rows cik fye form)
                          bs (annual-balance-rows cik fye form)
-                         cash (annual-cashflow-rows cik fye form dividends-paid-concepts)
+                         cash (annual-cashflow-rows cik fye form cashflow-extra-concepts)
                          items (vec (distinct (map :line-item annual)))]
                      {:income-values (into {} (for [item items]
                                                 [item (annual-line-values annual item)]))
                       :balance-values (into {} (for [item (distinct (map :line-item bs))]
                                                  [item (annual-line-values bs item)]))
-                      :dividends (annual-line-values cash dividends-paid-label)}))
+                      :dividends (annual-line-values cash dividends-paid-label)
+                      :repurchases (annual-line-values cash stock-repurchase-label)}))
           by-pl* (cond-> (:income-values source)
                    (not quarterly?) (with-class-shares cik form))
           by-bs (:balance-values source)
@@ -787,8 +809,8 @@
           ;; Quarterly columns include Q4 from the annual report.
           filing-forms (if quarterly? ["10-Q" form] [form])
           filing-dates (filing-dates-by-end cik filing-forms)
-          table (statement-rows by-pl* by-bs (:dividends source) ends labels
-                                filing-dates)]
+          table (statement-rows by-pl* by-bs (:dividends source) (:repurchases source)
+                                ends labels filing-dates)]
       (merge {:ticker ticker
               :name (:name meta)
               :cik cik
