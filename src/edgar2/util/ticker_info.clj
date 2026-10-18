@@ -43,20 +43,13 @@
   [row]
   (not (str/includes? (str (:ticker row)) "-")))
 
-(defn ticker-rank
-  "Lower rank is closer to common stock (no hyphen, shorter symbol)."
-  [ticker]
-  [(if (str/includes? (str ticker) "-") 1 0)
-   (count (str ticker))
-   (str ticker)])
-
 (defn filter-primary-filers
-  "Keep the main ticker for each CIK (drop units, warrants, preferred)."
+  "Keep the main ticker for each CIK: first row in SEC listing order."
   [filers]
   (->> filers
        (group-by :cik)
        vals
-       (map (fn [rows] (first (sort-by (comp ticker-rank :ticker) rows))))
+       (map first)
        (sort-by :ticker)))
 
 (defn etf-name?
@@ -100,21 +93,22 @@
   (when-let [t (some-> ticker str str/trim not-empty str/upper-case)]
     (get @cik-by-ticker t)))
 
-(defn- ranked-rows
+(defn- listed-rows
+  "Exchange rows for `cik` in SEC file order (primary first)."
   [cik]
-  (->> (get @rows-by-cik cik)
-       (filter #(not (str/blank? (str (:ticker %)))))
-       (sort-by (comp ticker-rank :ticker))))
+  (->> (get @rows-by-cik (pad-cik cik))
+       (filterv #(not (str/blank? (str (:ticker %)))))))
 
 (defn tickers-for-cik
-  "Every listed ticker for `cik`, primary first. Empty when the CIK is absent."
+  "Every listed ticker for `cik`, primary first (SEC order). Empty when absent."
   [cik]
-  (vec (distinct (map :ticker (ranked-rows cik)))))
+  (vec (distinct (map :ticker (listed-rows cik)))))
 
 (defn primary-ticker-for-cik
   "Primary listed ticker and exchange for `cik`, or nil.
-  The primary is the same choice `filter-primary-filers` makes."
+  Primary is the first symbol for that CIK in company_tickers_exchange.json
+  (same choice `filter-primary-filers` makes)."
   [cik]
-  (when-let [row (first (ranked-rows cik))]
+  (when-let [row (first (listed-rows cik))]
     {:ticker (:ticker row)
      :exchange (:exchange row)}))

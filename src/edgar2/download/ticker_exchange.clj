@@ -27,7 +27,10 @@
    :exchange exchange})
 
 (defn fetch-exchange-rows
-  "SEC company_tickers_exchange.json → seq of {:ticker :cik :name :category :exchange}."
+  "SEC company_tickers_exchange.json → seq of {:ticker :cik :name :category :exchange}.
+
+  Row order matches the SEC file (not alphabetical). For a given CIK the
+  first listed symbol is the primary ticker used by ticker-info."
   []
   (let [payload (edgar/edgar-get exchange-url)
         fields (mapv keyword (:fields payload))]
@@ -39,7 +42,6 @@
                      :cik (ticker-info/pad-cik (:cik m))
                      :name (:name m)
                      :exchange (:exchange m)}))))
-         (sort-by :ticker)
          vec)))
 
 (defn listed-exchange?
