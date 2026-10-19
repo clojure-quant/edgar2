@@ -33,8 +33,9 @@
    [:ifrs-full :RevenueFromContractsWithCustomers]])
 
 (defn pad-cik
+  "10-digit CIK, or nil when blank / non-numeric."
   [cik]
-  (format "%010d" (Long/parseLong (str cik))))
+  (ticker-info/pad-cik cik))
 
 (defn unit-name
   "Keep USD/shares as USD/shares; jsonista turns that key into a namespaced keyword."

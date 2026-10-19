@@ -7,8 +7,11 @@
 (def exchange-rows-path "data/ticker-exchange.edn")
 
 (defn pad-cik
+  "10-digit CIK string, or nil when `cik` is blank / non-numeric."
   [cik]
-  (format "%010d" (Long/parseLong (str cik))))
+  (let [s (str/trim (str cik))]
+    (when (re-matches #"\d+" s)
+      (format "%010d" (Long/parseLong s)))))
 
 (def ^:private category-words
   "Fund, Trust, and Preferred. The rightmost match in the name wins, so
@@ -96,8 +99,10 @@
 (defn- listed-rows
   "Exchange rows for `cik` in SEC file order (primary first)."
   [cik]
-  (->> (get @rows-by-cik (pad-cik cik))
-       (filterv #(not (str/blank? (str (:ticker %)))))))
+  (if-let [padded (pad-cik cik)]
+    (->> (get @rows-by-cik padded)
+         (filterv #(not (str/blank? (str (:ticker %))))))
+    []))
 
 (defn tickers-for-cik
   "Every listed ticker for `cik`, primary first (SEC order). Empty when absent."
