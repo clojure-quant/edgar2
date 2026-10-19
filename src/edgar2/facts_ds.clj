@@ -1,7 +1,5 @@
 (ns edgar2.facts-ds
   (:require [clojure.string :as str]
-            [edgar.api :as e]
-            [tablecloth.api :as tc]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]
            [java.time.temporal ChronoUnit]))
@@ -95,17 +93,25 @@
        :frame (calendar-duration-frame end-d)})))
 
 (defn annual-periods
-  "Reduce an `e/facts` dataset to one annual period row per yearly filing.
+  "Reduce an `e/facts` dataset to one annual period row per fiscal year-end.
 
-  Keeps 10-K / 20-F / 40-F (and amendments) via `annual-forms`.
-  Keeps only ~12-month duration windows (`annual-duration?`, 300–400 days),
-  then for each filing (`:filed` + `:form`) keeps the latest `:end` — the
-  filing's own year, not comparative prior years also present in the report.
+  Uses ~12-month duration windows (`annual-duration?`, 300–400 days) on any
+  form (10-K / 20-F / 40-F, and foreign 6-K annuals). Groups by `:end` so
+  comparative years restated later still produce a row; the latest `:filed`
+  observation supplies `:accn` / `:start` / …
 
   Returns a dataset of `:accn :filed :form :fy :fp :start :end :frame`."
   [facts]
-  (ds/->dataset (filing-periods facts annual-forms annual-duration?)
-                {:dataset-name "annual-filing-periods"}))
+  (let [rows (->> (ds/rows facts {:nil-missing? true})
+                  (filter annual-duration?)
+                  (map #(select-keys % period-cols)))
+        best (->> rows
+                  (group-by #(str (:end %)))
+                  vals
+                  (map (fn [rs] (last (sort-by #(str (:filed %)) rs))))
+                  (sort-by #(str (:end %)))
+                  vec)]
+    (ds/->dataset best {:dataset-name "annual-filing-periods"})))
 
 (defn quarterly-periods
   "Reduce an `e/facts` dataset to one quarterly period row per filing.
@@ -136,17 +142,35 @@
   [row]
   (str/blank? (str (:start row))))
 
+(defn- annual-stock-fact?
+  "Instant facts for annual periods: FY / 10-K / 20-F / 40-F only.
+  Later 10-Qs often restate year-end balances with rounded values."
+  [fact]
+  (or (= "FY" (str (:fp fact)))
+      (annual-forms (str (:form fact)))))
+
 (defn- matching-period
-  "Period for one fact. Duration facts need the same `:accn`, `:end`, and
-  `:start`. Instant facts (blank `:start`) prefer the same `:accn`+`:end`,
-  else the sole period on that accession (DEI share counts often use a
-  cover-page date, not the fiscal period-end)."
-  [fact periods-by-accn-end periods-by-accn]
-  (if (blank-start? fact)
-    (or (first (get periods-by-accn-end [(str (:accn fact)) (str (:end fact))]))
-        (first (get periods-by-accn (str (:accn fact)))))
-    (some #(when (= (str (:start fact)) (str (:start %))) %)
-          (get periods-by-accn-end [(str (:accn fact)) (str (:end fact))]))))
+  "Period for one fact.
+
+  Duration: same `:accn`+`:start`+`:end`, else the period with the same
+  `:start`+`:end` (comparative year restated on a later 10-K).
+  Instant (blank `:start`): annual filings only; `:accn`+`:end`, else same
+  `:end`, else (cover-page DEI) the filing's period when `:end` matches none."
+  [fact periods-by-accn-end periods-by-end periods-by-accn]
+  (let [accn (str (:accn fact))
+        end (str (:end fact))
+        start (str (:start fact))]
+    (if (blank-start? fact)
+      (when (annual-stock-fact? fact)
+        (or (first (get periods-by-accn-end [accn end]))
+            (first (get periods-by-end end))
+            (when-not (contains? periods-by-end end)
+              (first (get periods-by-accn accn)))))
+      (or (some #(when (= start (str (:start %))) %)
+                (get periods-by-accn-end [accn end]))
+          (when (annual-duration? fact)
+            (some #(when (= start (str (:start %))) %)
+                  (get periods-by-end end)))))))
 
 (defn select-data
   "Facts for `fields` restricted to annual (`:y`) or quarterly (`:q`) periods.
@@ -166,17 +190,20 @@
                   (throw (ex-info "q-or-y must be :q or :y" {:q-or-y q-or-y})))
         period-rows (ds/rows periods {:nil-missing? true})
         by-accn-end (group-by (juxt #(str (:accn %)) #(str (:end %))) period-rows)
+        by-end (group-by #(str (:end %)) period-rows)
         by-accn (group-by #(str (:accn %)) period-rows)
         wanted (set (map field-pair fields))
-        out-cols (into period-cols [:taxonomy :concept :label :unit :val])
+        out-cols (into period-cols [:taxonomy :concept :label :unit :val :filed])
         rows (->> (ds/rows dss {:nil-missing? true})
                   (keep (fn [fact]
                           (when (contains? wanted
                                            [(str (:taxonomy fact))
                                             (str (:concept fact))])
-                            (when-let [period (matching-period fact by-accn-end by-accn)]
+                            (when-let [period (matching-period fact by-accn-end by-end by-accn)]
                               (-> fact
                                   (merge (select-keys period period-cols))
+                                  ;; keep the fact's own :filed for restatement preference
+                                  (assoc :filed (:filed fact))
                                   (select-keys out-cols))))))
                   (sort-by (juxt #(str (:end %))
                                  #(str (:taxonomy %))
@@ -184,10 +211,91 @@
                                  #(str (:unit %)))))]
     (ds/->dataset rows {:dataset-name (str "select-data-" (name q-or-y))})))
 
+(defn- unit-str
+  "Normalize a companyfacts unit key to a plain string (USD, USD/shares)."
+  [u]
+  (cond
+    (string? u) u
+    (and (keyword? u) (namespace u)) (str (namespace u) "/" (name u))
+    (keyword? u) (name u)
+    (nil? u) ""
+    :else (str u)))
+
+(defn- unit-ok?
+  "Keep reporting-currency matches, share / per-share units, and blank units.
+  When `unit` is blank, every row is kept. Only `:revenue-unit` is needed
+  downstream as the report currency."
+  [row unit]
+  (let [u (unit-str (:unit row))
+        want (unit-str unit)]
+    (or (str/blank? want)
+        (= u want)
+        (= u "shares")
+        (str/includes? u "/")
+        (str/blank? u))))
+
+(defn- field-rank
+  [fields]
+  (into {} (map-indexed (fn [i pair] [(field-pair pair) i]) fields)))
+
+(defn- better-fact?
+  "Prefer a reporting-currency match, then a later `:filed`, then earlier
+  `fields` order."
+  [a b unit ranks]
+  (let [unit-score (fn [r]
+                     (cond
+                       (str/blank? (unit-str unit)) 0
+                       (= (unit-str (:unit r)) (unit-str unit)) 0
+                       :else 1))
+        ra (unit-score a)
+        rb (unit-score b)
+        filed (compare (str (:filed a)) (str (:filed b)))]
+    (cond
+      (not= ra rb) (< ra rb)
+      (not= 0 filed) (pos? filed)
+      :else (< (get ranks [(str (:taxonomy a)) (str (:concept a))] 9999)
+               (get ranks [(str (:taxonomy b)) (str (:concept b))] 9999)))))
+
+(defn- pivot-keeping-periods
+  "Wide table: period columns plus one column per concept name.
+  One value per [end, concept]; unit/`fields` order break ties."
+  [long-ds fields unit]
+  (let [ranks (field-rank fields)
+        rows (ds/rows long-ds {:nil-missing? true})
+        chosen (reduce (fn [acc r]
+                         (let [k [(str (:end r)) (str (:concept r))]
+                               cur (get acc k)]
+                           (if (or (nil? cur) (better-fact? r cur unit ranks))
+                             (assoc acc k r)
+                             acc)))
+                       {}
+                       rows)
+        wide (->> chosen
+                  vals
+                  (group-by #(str (:end %)))
+                  (map (fn [[_ facts]]
+                         (let [period (select-keys (first facts) period-cols)
+                               vals (into {}
+                                          (map (fn [f] [(str (:concept f)) (:val f)])
+                                               facts))]
+                           (merge period vals))))
+                  (sort-by #(str (:end %)) #(compare %2 %1))
+                  vec)]
+    (ds/->dataset wide {:dataset-name "report-table"})))
+
 (defn report-table
-  "Wide report for `fields` over annual (`:y`) or quarterly (`:q`) periods:
-  `select-data` → `e/pivot` → newest `:end` first."
-  [dss q-or-y fields]
-  (-> (select-data dss q-or-y fields)
-      e/pivot
-      (tc/order-by :end :desc)))
+  "Wide report for `fields` over annual (`:y`) or quarterly (`:q`) periods.
+
+  `select-data`, then pivot to one row per period (newest `:end` first) with
+  period columns (`:accn :filed :form :fy :fp :start :end :frame`) kept and
+  one column per concept. Optional `unit` prefers matching monetary units
+  (share / per-share units are always eligible)."
+  ([dss q-or-y fields]
+   (report-table dss q-or-y fields nil))
+  ([dss q-or-y fields unit]
+   (let [long-ds (select-data dss q-or-y fields)
+         rows (filter #(unit-ok? % unit) (ds/rows long-ds {:nil-missing? true}))
+         filtered (if (seq rows)
+                    (ds/->dataset rows)
+                    long-ds)]
+     (pivot-keeping-periods filtered fields unit))))

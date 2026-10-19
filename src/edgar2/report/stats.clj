@@ -16,7 +16,9 @@
             [edgar2.download.price :as price]
             [edgar2.download.facts-universe :as universe]
             [edgar2.facts-ds :as facts-ds]
-            [jsonista.core :as json])
+            [edgar.xbrl :as xbrl]
+            [jsonista.core :as json]
+            [tech.v3.dataset :as ds])
   (:import [java.util.zip ZipFile]))
 
 (def stats-path "data/stats.edn")
@@ -98,6 +100,21 @@
    [:ifrs-full :CashAndCashEquivalents]
    [:us-gaap :Cash]])
 
+(def preferred-tags
+  [[:us-gaap :PreferredStockValue]])
+
+(def debt-tags
+  [[:us-gaap :LongTermDebtNoncurrent]
+   [:ifrs-full :LongtermBorrowings]
+   [:us-gaap :LongTermDebtCurrent]
+   [:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]
+   [:ifrs-full :ShorttermBorrowings]
+   [:us-gaap :LongTermDebt]
+   [:ifrs-full :Borrowings]
+   [:us-gaap :CommercialPaper]
+   [:us-gaap :ShortTermBorrowings]
+   [:us-gaap :OtherShortTermBorrowings]])
+
 (def sales-growth-window
   "Number of trailing YoY revenue changes averaged into :sales-growth-yoy."
   7)
@@ -106,60 +123,28 @@
   "Number of trailing annual profit margins averaged into :avg-profit-margin."
   10)
 
-(defn observations
-  [facts tag-pairs]
-  (mapcat (fn [[tax tag]] (universe/concept-observations facts tax tag))
-          tag-pairs))
-
-(defn prefer-unit
-  [obs unit]
-  (if (str/blank? (str unit))
-    obs
-    (let [matched (filter #(= unit (:unit %)) obs)]
-      (if (seq matched) matched obs))))
-
-(defn latest-by-end
-  [obs]
-  (->> obs
-       (filter #(and (number? (:val %)) (not (str/blank? (str (:end %))))))
-       (group-by #(str (:end %)))
-       vals
-       (map (fn [rs] (last (sort-by #(str (:filed %)) rs))))
-       (sort-by #(str (:end %)))
-       vec))
-
-(defn annual-flows
-  "Duration facts covering ~12 months, one value per period-end."
-  [facts tag-pairs unit]
-  (latest-by-end
-   (filter facts-ds/annual-duration?
-           (prefer-unit (observations facts tag-pairs) unit))))
-
-(defn first-annual-flows
-  "Annual series from the first tag pair that has data (do not mix tags)."
-  [facts tag-pairs unit]
-  (or (some (fn [pair]
-              (let [s (annual-flows facts [pair] unit)]
-                (when (seq s) s)))
-            tag-pairs)
-      []))
-
-(defn annual-stocks
-  "Instant facts from annual filings (FY / 10-K / 20-F / 40-F)."
-  [facts tag-pairs unit]
-  (latest-by-end
-   (filter #(or (= "FY" (:fp %))
-                (facts-ds/annual-forms (str (:form %))))
-           (prefer-unit (observations facts tag-pairs) unit))))
-
-(defn first-annual-stocks
-  "Annual instant series from the first tag pair that has data (do not mix tags)."
-  [facts tag-pairs unit]
-  (or (some (fn [pair]
-              (let [s (annual-stocks facts [pair] unit)]
-                (when (seq s) s)))
-            tag-pairs)
-      []))
+(def stats-fields
+  "All concept pairs pulled into the annual report-table."
+  (vec (distinct
+        (concat universe/revenue-tags
+                [[:ifrs-full :RevenueFromSaleOfGoods]]
+                net-income-tags
+                eps-tags
+                dps-cash-tags
+                dps-other-tags
+                dividends-paid-tags
+                stock-repurchase-tags
+                asset-tags
+                total-equity-tags
+                parent-equity-tags
+                nci-tags
+                ebit-tags
+                interest-expense-tags
+                income-tax-tags
+                cash-tag-pairs
+                preferred-tags
+                debt-tags
+                (mapcat second derived/statement-lines)))))
 
 (defn yoy-pct
   [prev cur]
@@ -212,15 +197,65 @@
                 row))
             base))))
 
-(defn total-equity
+(defn table-rows
+  [table]
+  (vec (ds/rows table {:nil-missing? true})))
+
+(defn- as-number
+  "Keep integral doubles as longs so stats match JSON integer facts."
+  [v]
+  (when (number? v)
+    (if (and (float? v)
+             (== (double v) (Math/rint (double v)))
+             (<= (Math/abs (double v)) (double Long/MAX_VALUE)))
+      (long v)
+      v)))
+
+(defn concept-val
+  [row concept]
+  (as-number (get row (name concept))))
+
+(defn first-concept-val
+  [row tag-pairs]
+  (some (fn [[_ c]] (concept-val row c)) tag-pairs))
+
+(defn series-for
+  "Oldest-first {:end :val} series for the first tag pair with any values.
+  Does not mix tags across years (same as old first-annual-flows)."
+  [rows tag-pairs]
+  (let [col (some (fn [[_ c]]
+                    (let [n (name c)]
+                      (when (some #(number? (get % n)) rows) n)))
+                  tag-pairs)]
+    (when col
+      (->> rows
+           reverse
+           (keep (fn [r]
+                   (let [v (get r col)]
+                     (when (number? v)
+                       {:end (str (:end r)) :val v}))))
+           vec))))
+
+(defn series-mixed
+  "Oldest-first {:end :val} series: per period, first tag-pair with a value.
+  Same idea as old annual-flows / annual-stocks over several tags."
+  [rows tag-pairs]
+  (->> rows
+       reverse
+       (keep (fn [r]
+               (when-let [v (first-concept-val r tag-pairs)]
+                 {:end (str (:end r)) :val v})))
+       vec))
+
+(defn total-equity-series
   "Total equity. Prefer a tag that already includes noncontrolling interest.
   Otherwise parent equity, plus noncontrolling interest on years that tag it."
-  [facts unit]
-  (let [inclusive (first-annual-stocks facts total-equity-tags unit)]
+  [rows]
+  (let [inclusive (series-for rows total-equity-tags)]
     (if (seq inclusive)
       inclusive
-      (plus-at-end (first-annual-stocks facts parent-equity-tags unit)
-                   (first-annual-stocks facts nci-tags unit)))))
+      (plus-at-end (or (series-for rows parent-equity-tags) [])
+                   (or (series-for rows nci-tags) [])))))
 
 (defn aligned-ends
   "Period-ends present in both series, oldest first."
@@ -282,16 +317,16 @@
   [a b]
   (->> [a b] (remove str/blank?) sort last))
 
-(defn annual-revenue
+(defn annual-revenue-series
   "Annual revenue for sales growth and the revenue score.
 
   One IFRS series, not a mix: `ifrs-full` Revenue, or
   RevenueFromSaleOfGoods when that series' latest period-end is later.
   When both end on the same date, Revenue is the total and wins.
   With neither tag, US-GAAP revenue tags are used."
-  [facts unit]
-  (let [total (annual-flows facts [[:ifrs-full :Revenue]] unit)
-        goods (annual-flows facts [[:ifrs-full :RevenueFromSaleOfGoods]] unit)
+  [rows]
+  (let [total (series-for rows [[:ifrs-full :Revenue]])
+        goods (series-for rows [[:ifrs-full :RevenueFromSaleOfGoods]])
         total-end (some-> (latest-obs total) :end str)
         goods-end (some-> (latest-obs goods) :end str)
         end (later-end total-end goods-end)
@@ -300,23 +335,12 @@
                  (= end goods-end) goods)]
     (if (seq chosen)
       chosen
-      (annual-flows facts universe/revenue-tags unit))))
+      (series-mixed rows universe/revenue-tags))))
 
-(defn fact-at
-  "First annual fact among `tag-pairs` whose period-end is `end`."
-  [facts tag-pairs unit end]
+(defn- row-at-end
+  [rows end]
   (when-not (str/blank? (str end))
-    (some (fn [[tax tag]]
-            (some (fn [series]
-                    (when-let [row (some #(when (= (str end) (str (:end %))) %) series)]
-                      (when (number? (:val row))
-                        (assoc row
-                               :taxonomy tax
-                               :tag tag
-                               :end (str end)))))
-                  [(annual-flows facts [[tax tag]] unit)
-                   (annual-stocks facts [[tax tag]] unit)]))
-          tag-pairs)))
+    (some #(when (= (str end) (str (:end %))) %) rows)))
 
 (defn- whole-dollar?
   "True when v is a positive whole number. A split ($.98 …) tag lands here as 98."
@@ -374,41 +398,21 @@
       (when (seq acc)
         (reduce + acc)))))
 
-(defn best-annual-flows
-  "Annual series from the tag whose latest period-end is most recent."
-  [facts tag-pairs unit]
-  (let [series (keep (fn [pair]
-                        (let [s (annual-flows facts [pair] unit)]
-                          (when (seq s) s)))
-                      tag-pairs)]
-    (when (seq series)
-      (apply max-key #(str (:end (last %))) series))))
-
-(defn stock-at
-  [facts tag-pairs unit end]
-  (value-at (annual-stocks facts tag-pairs unit) end))
-
-(defn balance-sheet-end
-  [assets]
-  (some-> (latest-obs assets) :end str))
-
 (defn interest-bearing-debt
-  "Interest-bearing debt at annual balance-sheet `end`.
+  "Interest-bearing debt from one wide report-table row.
 
   Term debt is the noncurrent portion plus the current portion when both
   are tagged, otherwise the long-term debt total (US-GAAP LongTermDebt or
   IFRS Borrowings). Commercial paper and other short-term borrowings are
   added unless they repeat that current portion."
-  [facts unit end]
-  (when end
-    (let [at (fn [pairs] (stock-at facts pairs unit end))
-          non (or (at [[:us-gaap :LongTermDebtNoncurrent]])
-                  (at [[:ifrs-full :LongtermBorrowings]]))
-          cur (or (at [[:us-gaap :LongTermDebtCurrent]])
-                  (at [[:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]])
-                  (at [[:ifrs-full :ShorttermBorrowings]]))
-          ltd (or (at [[:us-gaap :LongTermDebt]])
-                  (at [[:ifrs-full :Borrowings]]))
+  [row]
+  (when row
+    (let [at (fn [c] (concept-val row c))
+          non (or (at :LongTermDebtNoncurrent) (at :LongtermBorrowings))
+          cur (or (at :LongTermDebtCurrent)
+                  (at :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings)
+                  (at :ShorttermBorrowings))
+          ltd (or (at :LongTermDebt) (at :Borrowings))
           term (cond
                  (and (number? non) (number? cur)) (+ (double non) (double cur))
                  (and (number? non) (number? ltd)
@@ -422,16 +426,11 @@
                     cur)
           extras (sum-unique
                   (remove #(approx= % already)
-                          [(at [[:us-gaap :CommercialPaper]])
-                           (at [[:us-gaap :ShortTermBorrowings]])
-                           (at [[:us-gaap :OtherShortTermBorrowings]])]))]
+                          [(at :CommercialPaper)
+                           (at :ShortTermBorrowings)
+                           (at :OtherShortTermBorrowings)]))]
       (when (or term extras)
         (+ (double (or term 0)) (double (or extras 0)))))))
-
-(defn cash-at
-  [facts unit end]
-  (when end
-    (some #(stock-at facts [%] unit end) cash-tag-pairs)))
 
 (defn first-present
   "Period-end → value. Earlier maps win when an end is in more than one."
@@ -439,14 +438,13 @@
   (reduce (fn [acc m] (merge m acc)) {} maps))
 
 (defn statement-by-item
-  "Annual {line {end value}} for the lines edgar2.derived fills.
-  Per period, the first concept in the line's chain that has an annual fact."
-  [facts unit]
+  "Annual {line {end value}} for the lines edgar2.derived fills."
+  [rows]
   (into {}
         (keep (fn [[label tags]]
                 (let [by-end (first-present
                               (keep (fn [pair]
-                                      (let [series (annual-flows facts [pair] unit)]
+                                      (when-let [series (series-for rows [pair])]
                                         (when (seq series)
                                           (into {} (map (juxt #(str (:end %)) :val) series)))))
                                     tags))]
@@ -460,8 +458,8 @@
   = gross profit − operating expenses.
 
   `:derived-oi` is only the operating-income periods this call filled."
-  [facts unit]
-  (let [by-item (statement-by-item facts unit)
+  [rows]
+  (let [by-item (statement-by-item rows)
         ends (->> (vals by-item) (mapcat keys) distinct sort vec)
         filled (derived/with-derived-lines by-item ends)
         before (get by-item derived/operating-income)]
@@ -480,36 +478,29 @@
     (->> (concat reported
                  (keep (fn [[end v]]
                          (when (and (number? v) (not (have (str end))))
-                           {:end (str end) :val (double v)}))
+                           {:end (str end) :val v}))
                        extra))
          (sort-by #(str (:end %)))
          vec)))
 
 (defn annual-ebit
   "Operating income at the last report `end`. Otherwise derived operating
-  income at that date (gross profit − derived operating expenses).
-  Otherwise net income + interest + tax at that same date."
-  [facts unit end derived-oi]
-  (or (when-let [reported (fact-at facts ebit-tags unit end)]
-        {:ebit (:val reported) :ebit-end (:end reported)})
-      (when-let [v (get derived-oi (str end))]
-        (when (number? v)
-          {:ebit (double v) :ebit-end (str end)}))
-      (let [ni (fact-at facts net-income-tags unit end)
-            interest (fact-at facts interest-expense-tags unit end)
-            tax (fact-at facts income-tax-tags unit end)]
-        (when (and ni (or interest tax))
-          {:ebit (+ (double (:val ni))
-                    (double (or (:val interest) 0))
-                    (double (or (:val tax) 0)))
-           :ebit-end (str end)}))))
-
-(defn flow-or-stock
-  [facts pair unit]
-  (let [flows (annual-flows facts [pair] unit)]
-    (if (seq flows)
-      flows
-      (annual-stocks facts [pair] unit))))
+  income at that date. Otherwise net income + interest + tax."
+  [rows end derived-oi]
+  (let [row (row-at-end rows end)]
+    (or (when-let [v (first-concept-val row ebit-tags)]
+          {:ebit v :ebit-end (str end)})
+        (when-let [v (get derived-oi (str end))]
+          (when (number? v)
+            {:ebit (double v) :ebit-end (str end)}))
+        (let [ni (first-concept-val row net-income-tags)
+              interest (first-concept-val row interest-expense-tags)
+              tax (first-concept-val row income-tax-tags)]
+          (when (and ni (or interest tax))
+            {:ebit (+ (double ni)
+                      (double (or interest 0))
+                      (double (or tax 0)))
+             :ebit-end (str end)})))))
 
 (defn basic-if-diluted-older
   "Basic series when its latest period-end is after diluted's."
@@ -521,92 +512,86 @@
       (seq diluted) diluted
       (seq basic) basic)))
 
-(defn annual-eps
-  "Latest annual EPS. Basic wins when diluted's period-end is older."
-  [facts]
+(defn annual-eps-series
+  "Latest annual EPS series. Basic wins when diluted's period-end is older."
+  [rows]
   (or (basic-if-diluted-older
-       (flow-or-stock facts [:us-gaap :EarningsPerShareDiluted] nil)
-       (flow-or-stock facts [:us-gaap :EarningsPerShareBasic] nil))
+       (series-for rows [[:us-gaap :EarningsPerShareDiluted]])
+       (series-for rows [[:us-gaap :EarningsPerShareBasic]]))
       (basic-if-diluted-older
-       (flow-or-stock facts [:ifrs-full :DilutedEarningsLossPerShare] nil)
-       (flow-or-stock facts [:ifrs-full :BasicEarningsLossPerShare] nil))
-      (seq (flow-or-stock facts [:ifrs-full :BasicAndDilutedEarningsLossPerShare] nil))
+       (series-for rows [[:ifrs-full :DilutedEarningsLossPerShare]])
+       (series-for rows [[:ifrs-full :BasicEarningsLossPerShare]]))
+      (series-for rows [[:ifrs-full :BasicAndDilutedEarningsLossPerShare]])
       []))
 
 (defn annual-dps
-  "Per-share dividend at the last report `end`. Cash paid wins. No fact
-  on that date is 0.
+  "Per-share dividend at period-end `end`. Cash paid wins. Missing → 0.
 
   A filing that shows ($.98 per share) with only 98 inside the tag is
   read as 0.98."
-  [facts end revenue-unit cik]
-  (absorb-currency-decimal
-   cik
-   (or (fact-at facts dps-cash-tags nil end)
-       (fact-at facts dps-other-tags nil end)
-       (when end
-         {:val 0.0
-          :end (str end)
-          :unit (when (usd-unit? revenue-unit) "USD/shares")}))))
+  [rows end cik]
+  (let [row (row-at-end rows end)
+        pair (or (some (fn [p] (when (number? (concept-val row (second p))) p))
+                       dps-cash-tags)
+                 (some (fn [p] (when (number? (concept-val row (second p))) p))
+                       dps-other-tags))
+        fact (if pair
+               {:val (concept-val row (second pair))
+                :end (str end)
+                :accn (:accn row)
+                :taxonomy (first pair)
+                :tag (second pair)}
+               {:val 0.0 :end (str end)})]
+    (absorb-currency-decimal cik fact)))
 
-(defn annual-dividends-paid
-  "Cash dividends paid at period-end `end`, as a positive amount in `unit`.
-  Nil when that fact is missing, zero, or in another currency.
-  A negative cash-flow sign is treated as the amount paid."
-  [facts unit end]
-  (when-let [paid (fact-at facts dividends-paid-tags unit end)]
-    (when (and (number? (:val paid))
-               (or (str/blank? (str unit))
-                   (= (str unit) (str (:unit paid)))))
-      (let [amount (Math/abs (double (:val paid)))]
-        (when (pos? amount) amount)))))
-
-(defn annual-stock-repurchase
-  "Cash paid to repurchase equity at period-end `end`, as a positive amount
-  in `unit`. Nil when that fact is missing, zero, or in another currency.
-  A negative cash-flow sign is treated as the amount paid."
-  [facts unit end]
-  (when-let [paid (fact-at facts stock-repurchase-tags unit end)]
-    (when (and (number? (:val paid))
-               (or (str/blank? (str unit))
-                   (= (str unit) (str (:unit paid)))))
-      (let [amount (Math/abs (double (:val paid)))]
-        (when (pos? amount) amount)))))
+(defn abs-paid
+  [row tag-pairs]
+  (when-let [v (first-concept-val row tag-pairs)]
+    (let [amount (Math/abs (double v))]
+      (when (pos? amount) amount))))
 
 (defn company-stats
-  [facts {:keys [revenue-unit] :as row}]
-  (let [rev (annual-flows facts universe/revenue-tags revenue-unit)
-        ni (first-annual-flows facts net-income-tags revenue-unit)
-        assets (annual-stocks facts asset-tags revenue-unit)
-        bs-end (balance-sheet-end assets)
+  "Fundamentals from an `e/facts`-shaped dataset via `report-table`.
+
+  Reporting currency is `:revenue-unit` on `row` (from revenue). First table
+  row is the current year; trailing rows feed growth and average margins."
+  [dss {:keys [revenue-unit] :as row}]
+  (let [table (facts-ds/report-table dss :y stats-fields revenue-unit)
+        rows (table-rows table)
+        current (first rows)
+        rev (series-mixed rows universe/revenue-tags)
+        ni (or (series-for rows net-income-tags) [])
+        assets (series-mixed rows asset-tags)
+        bs-end (some-> (latest-obs assets) :end str)
         last-end (later-end (some-> (latest-obs rev) :end str) bs-end)
-        eps (latest-obs (annual-eps facts))
-        dps (annual-dps facts last-end revenue-unit (:cik row))
-        income (with-derived-income facts revenue-unit)
-        oi (series-plus (annual-flows facts ebit-tags revenue-unit)
+        eps (latest-obs (annual-eps-series rows))
+        dps (annual-dps rows last-end (:cik row))
+        income (with-derived-income rows)
+        oi (series-plus (series-mixed rows ebit-tags)
                         (:derived-oi income))
-        revenue (annual-revenue facts revenue-unit)
+        revenue (annual-revenue-series rows)
         growth (avg-sales-growth revenue sales-growth-window)
         margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score revenue)
         oi-score (direction-score oi)
-        equity (total-equity facts revenue-unit)
+        equity (total-equity-series rows)
         margin (latest-aligned ni rev)
         roa (latest-aligned ni assets)
         roc (latest-aligned ni equity)
-        debt (interest-bearing-debt facts revenue-unit bs-end)
-        cash (cash-at facts revenue-unit bs-end)
-        preferred (stock-at facts [[:us-gaap :PreferredStockValue]] revenue-unit bs-end)
-        nci (or (stock-at facts [[:us-gaap :MinorityInterest]] revenue-unit bs-end)
-                (stock-at facts [[:ifrs-full :NoncontrollingInterests]] revenue-unit bs-end))
-        ebit (annual-ebit facts revenue-unit last-end
-                             (:derived-oi income))
+        bs-row (or (row-at-end rows bs-end) current)
+        debt (interest-bearing-debt bs-row)
+        cash (first-concept-val bs-row cash-tag-pairs)
+        preferred (first-concept-val bs-row preferred-tags)
+        nci (or (concept-val bs-row :MinorityInterest)
+                (concept-val bs-row :NoncontrollingInterests))
+        ebit (annual-ebit rows last-end (:derived-oi income))
         coverage-end (or (:end margin) last-end)
+        coverage-row (or (row-at-end rows coverage-end) current)
         coverage-ni (if margin
                       (:num margin)
-                      (:val (fact-at facts net-income-tags revenue-unit coverage-end)))
-        paid (annual-dividends-paid facts revenue-unit coverage-end)
-        repurchase (annual-stock-repurchase facts revenue-unit coverage-end)
+                      (first-concept-val coverage-row net-income-tags))
+        paid (abs-paid coverage-row dividends-paid-tags)
+        repurchase (abs-paid coverage-row stock-repurchase-tags)
         coverage (when paid (ratio coverage-ni paid))]
     (cond-> (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
       (:sales-growth-yoy growth)
@@ -632,13 +617,10 @@
              :roc-end (:end roc))
       (and eps (number? (:val eps)))
       (assoc :eps (:val eps)
-             :eps-unit (:unit eps)
              :eps-end (:end eps))
       (and dps (number? (:val dps)))
       (assoc :dps (:val dps)
              :dps-end (:end dps))
-      (and dps (:unit dps))
-      (assoc :dps-unit (:unit dps))
       (number? paid) (assoc :dividends-paid paid)
       (number? repurchase) (assoc :stock-repurchase repurchase)
       (number? debt) (assoc :debt debt :debt-end bs-end)
@@ -702,21 +684,20 @@
         rev (when (number? (:revenue st)) (:revenue st))
         ni (when (number? (:net-profit st)) (:net-profit st))
         eps (when (number? (:eps st)) (:eps st))
-        usd-eps? (usd-unit? (:eps-unit st))
         dps (when (number? (:dps st)) (:dps st))
-        usd-dps? (usd-unit? (:dps-unit st))
+        report-usd? (usd-unit? (:revenue-unit st))
         paid (when (number? (:dividends-paid st)) (:dividends-paid st))
         repurchase (when (number? (:stock-repurchase st)) (:stock-repurchase st))
         pe (cond
              (and vmcap (number? ni) (not (zero? (double ni))))
              (/ (double vmcap) (double ni))
-             (and (not need-adj?) price (number? eps) usd-eps?
+             (and (not need-adj?) report-usd? price (number? eps)
                   (not (zero? (double eps))))
              (/ (double price) (double eps)))
         dy (cond
              (and vmcap (pos? (double vmcap)) (number? paid) (pos? (double paid)))
              (* 100.0 (/ (double paid) (double vmcap)))
-             (and (not need-adj?) price (pos? (double price)) (number? dps) usd-dps?)
+             (and (not need-adj?) report-usd? price (pos? (double price)) (number? dps))
              (* 100.0 (/ (double dps) (double price))))
         by (when (and vmcap (pos? (double vmcap))
                       (number? repurchase) (pos? (double repurchase)))
@@ -947,21 +928,27 @@
                            (catch Exception ex
                              (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
                              nil))
+                 dss (when data
+                       (try (xbrl/facts->dataset data)
+                            (catch Exception ex
+                              (println (format "  facts-ds %s (%s)" (:cik row) (.getMessage ex)))
+                              nil)))
                  shares (or (when data
                               (universe/shares-outstanding (:facts data)))
                             (:shares-outstanding row))
                  st (with-sic
                       (try
-                        (let [base (if data
-                                     (company-stats (:facts data) row)
-                                     (select-keys row [:ticker :exchange :cik :entityName]))
+                        (let [base (if dss
+                                     (company-stats dss row)
+                                     (select-keys row [:ticker :exchange :cik :entityName
+                                                       :revenue-unit]))
                               ratio (adr/get-ratio (:ticker base))]
                           (-> base
                               (cond-> ratio (assoc :adr-ratio ratio))
                               (with-valuation prices shares)))
                         (catch Exception ex
                           (println (format "  stats-fail %s (%s)" (:ticker row) (.getMessage ex)))
-                          (select-keys row [:ticker :exchange :cik :entityName])))
+                          (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])))
                       sic-index)
                  i' (inc i)]
              (when (or (zero? (mod i' 250)) (= i' total))
