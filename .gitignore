@@ -7,3 +7,6 @@
 /data-old
 /target
 edgar/
+__pycache__/
+*.py[cod]
+*$py.class

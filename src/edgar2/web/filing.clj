@@ -16,7 +16,8 @@
       (or (str/ends-with? name ".xml")
           (str/ends-with? name ".xsd")) "application/xml; charset=utf-8"
       (str/ends-with? name ".pdf") "application/pdf"
-      (str/ends-with? name ".txt") "text/plain; charset=utf-8"
+      (or (str/ends-with? name ".txt")
+          (str/ends-with? name ".paper")) "text/plain; charset=utf-8"
       (or (str/ends-with? name ".jpg")
           (str/ends-with? name ".jpeg")) "image/jpeg"
       (str/ends-with? name ".gif") "image/gif"
@@ -30,6 +31,14 @@
   (let [name (str/lower-case (.getName file))]
     (or (str/ends-with? name ".htm")
         (str/ends-with? name ".html"))))
+
+(defn- pdf-file?
+  [file]
+  (str/ends-with? (str/lower-case (.getName file)) ".pdf"))
+
+(defn- paper-filename?
+  [name]
+  (str/ends-with? (str/lower-case (str name)) ".paper"))
 
 (def ^:private ix-ns
   "http://www.xbrl.org/2013/inlineXBRL")
@@ -89,10 +98,19 @@
 
 (defn- file-response
   [file]
-  (if (html-file? file)
+  (cond
+    (html-file? file)
     {:status 200
      :headers {"Content-Type" "text/html; charset=utf-8"}
      :body (inject-ix-highlight (slurp file :encoding "UTF-8"))}
+
+    (pdf-file? file)
+    {:status 200
+     :headers {"Content-Type" "application/pdf"
+               "Content-Disposition" (str "inline; filename=\"" (.getName file) "\"")}
+     :body file}
+
+    :else
     {:status 200
      :headers {"Content-Type" (content-type file)}
      :body file}))
@@ -216,16 +234,83 @@
       (spit path (ec/edgar-get url :raw? true))))
   path)
 
-(defn- try-doc
-  "Cached path of one named document, or nil when SEC has none at this CIK."
-  [f doc-name]
-  (when-let [path (cache-file f doc-name)]
+(defn- absolute-sec-url
+  "Turn an Archives-relative href into an absolute https://www.sec.gov URL."
+  [href]
+  (cond
+    (str/blank? href) nil
+    (str/starts-with? href "https://") href
+    (str/starts-with? href "http://") href
+    (str/starts-with? href "/") (str "https://www.sec.gov" href)
+    :else nil))
+
+(defn- scanned-pdf-url
+  "URL of the scanned paper PDF from the filing index, if listed.
+  Newer paper filings link to /Archives/edgar/vprr/... rather than the
+  accession directory, so the index href must be used — not filing-doc-url."
+  [f]
+  (try
+    (let [html (ec/edgar-get (ef/filing-index-url f) :raw? true)
+          href (or (second (re-find #"(?is)Scanned paper document</td>\s*<td[^>]*>\s*<a href=\"([^\"]+)\""
+                                    html))
+                   (second (re-find #"(?i)href=\"([^\"]+\.pdf)\"[^>]*>\s*scanned\.pdf"
+                                    html)))]
+      (absolute-sec-url href))
+    (catch clojure.lang.ExceptionInfo e
+      (if (http-404? e) nil (throw e)))))
+
+(defn- download-url-bytes!
+  [url path]
+  (.mkdirs (.getParentFile path))
+  (let [bytes (ec/edgar-get-bytes url)]
+    (with-open [out (java.io.FileOutputStream. path)]
+      (.write out ^bytes bytes)))
+  path)
+
+(defn- try-scanned-pdf
+  "Cached scanned.pdf for a paper filing, or nil when the index has none."
+  [f]
+  (when-let [path (cache-file f "scanned.pdf")]
     (cond
       (.isFile path) path
-      :else (try
-              (download-doc! f doc-name path)
-              (catch clojure.lang.ExceptionInfo e
-                (if (http-404? e) nil (throw e)))))))
+      :else (when-let [url (scanned-pdf-url f)]
+              (try
+                (download-url-bytes! url path)
+                (catch clojure.lang.ExceptionInfo e
+                  (if (or (http-404? e)
+                          (= 403 (:status (ex-data e))))
+                    nil
+                    (throw e))))))))
+
+(defn- try-doc
+  "Cached path of one named document, or nil when SEC has none at this CIK.
+  Requests for .paper stubs prefer a scanned PDF when the index lists one."
+  [f doc-name]
+  (if (paper-filename? doc-name)
+    (or (try-scanned-pdf f)
+        (when-let [path (cache-file f doc-name)]
+          (cond
+            (.isFile path) path
+            :else (try
+                    (download-doc! f doc-name path)
+                    (catch clojure.lang.ExceptionInfo e
+                      (if (http-404? e) nil (throw e)))))))
+    (when-let [path (cache-file f doc-name)]
+      (cond
+        (.isFile path) path
+        (= "scanned.pdf" (str/lower-case (str doc-name)))
+        (try-scanned-pdf f)
+        :else (try
+                (download-doc! f doc-name path)
+                (catch clojure.lang.ExceptionInfo e
+                  (if (http-404? e) nil (throw e))))))))
+
+(defn- prefer-viewable
+  "For paper stubs, prefer the scanned PDF when EDGAR has one."
+  [f path]
+  (if (and path (paper-filename? (.getName path)))
+    (or (try-scanned-pdf f) path)
+    path))
 
 (defn raw-filing-file
   "Path of the primary document for an accession number.
@@ -233,15 +318,16 @@
 
   `cik` is the issuer. The accession prefix is the submitter, which for
   agent-filed registration statements is a filing agent. Those documents
-  are stored under the issuer CIK, so that path is tried first."
+  are stored under the issuer CIK, so that path is tried first.
+  Paper filings resolve to scanned.pdf when that scan is on the index."
   [cik accession]
   (filing/ensure-identity!)
   (let [f (e/filing-by-accession accession)
         issuer (padded-cik cik)
         issuer-filing (if issuer (assoc f :cik issuer) f)]
-    (or (try-primary issuer-filing)
+    (or (some->> (try-primary issuer-filing) (prefer-viewable issuer-filing))
         (when-not (same-cik? (:cik issuer-filing) (:cik f))
-          (try-primary f)))))
+          (some->> (try-primary f) (prefer-viewable f))))))
 
 (defn filing-doc-file
   "Path of one document in a filing, such as an image beside the HTML.
@@ -264,10 +350,15 @@
    :headers {"Location" url}
    :body ""})
 
+(defn- filing-url
+  [cik accession filename]
+  (str "/filing/" (or (padded-cik cik) cik) "/" accession "/" filename))
+
 (defn raw-filing-page
   "Hyper handler. Returns one filing document as a raw response.
   A request with no filename redirects to the primary document so relative
-  image links in the HTML resolve next to it."
+  image links in the HTML resolve next to it.
+  Paper stubs redirect to scanned.pdf when EDGAR lists a scan."
   [req]
   (let [cik (get-in req [:hyper/route :path-params :cik])
         accession (some-> (get-in req [:hyper/route :path-params :accession])
@@ -277,13 +368,14 @@
       (cond
         (and accession doc)
         (if-let [file (filing-doc-file cik accession doc)]
-          (file-response file)
+          (if (not= (str/lower-case doc) (str/lower-case (.getName file)))
+            (redirect (filing-url cik accession (.getName file)))
+            (file-response file))
           (text-response 404 (str "No document " doc " in " accession)))
 
         accession
         (if-let [file (raw-filing-file cik accession)]
-          (redirect (str "/filing/" (or (padded-cik cik) cik)
-                         "/" accession "/" (.getName file)))
+          (redirect (filing-url cik accession (.getName file)))
           (text-response 404 (str "No filing for " accession)))
 
         :else
