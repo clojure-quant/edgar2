@@ -1,0 +1,214 @@
+(ns edgar2.adr
+  "ADR listings from 20-F/40-F cover-page Security12bTitle."
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [edgar.api :as e]
+            [edgar2.download.dataset :as dataset]
+            [edgar2.download.fsds :as dl]
+            [edgar2.download.fsds-universe :as fsds]
+            [edgar2.util.ticker-info :as ticker-info])
+  (:import [java.time LocalDate]))
+
+(def adr-path "data/adr.edn")
+
+(def foreign-annual-forms
+  #{"20-F" "20-F/A" "40-F" "40-F/A"})
+
+(def ^:private word->n
+  {"one" 1 "two" 2 "three" 3 "four" 4 "five" 5
+   "six" 6 "seven" 7 "eight" 8 "nine" 9 "ten" 10
+   "eleven" 11 "twelve" 12 "thirteen" 13 "fourteen" 14
+   "fifteen" 15 "sixteen" 16 "seventeen" 17 "eighteen" 18
+   "nineteen" 19 "twenty" 20
+   "one-half" 0.5 "one-third" (/ 1.0 3) "one-fourth" 0.25
+   "one-fifth" 0.2 "one-sixth" (/ 1.0 6) "one-eighth" 0.125
+   "one-tenth" 0.1})
+
+(defn- amendment?
+  [form]
+  (str/includes? (str form) "/A"))
+
+(defn- better-sub?
+  "True when candidate `a` should replace current `b`."
+  [a b]
+  (let [cmp (compare (str (:filed a)) (str (:filed b)))]
+    (cond
+      (pos? cmp) true
+      (neg? cmp) false
+      :else
+      (and (not (amendment? (:form a)))
+           (amendment? (:form b))))))
+
+(defn collect-foreign-annual-subs
+  "Latest 20-F/40-F per CIK across FSDS SUB tables. Returns {cik sub}."
+  [zip-paths]
+  (reduce
+   (fn [by-cik zip-path]
+     (println (format "  parse SUB %s" (.getName (io/file zip-path))))
+     (flush)
+     (fsds/reduce-zip-tsv
+      zip-path "sub.txt"
+      (fn [acc row]
+        (let [form (str (:form row))]
+          (if (or (not (foreign-annual-forms form))
+                  (str/blank? (str (:cik row)))
+                  (str/blank? (str (:adsh row))))
+            acc
+            (let [cik (fsds/pad-cik (:cik row))
+                  sub {:cik cik
+                       :name (str/trim (str (:name row)))
+                       :adsh (:adsh row)
+                       :form form
+                       :filed (str (:filed row))}]
+              (if (or (nil? (get acc cik))
+                      (better-sub? sub (get acc cik)))
+                (assoc acc cik sub)
+                acc)))))
+      by-cik))
+   {}
+   zip-paths))
+
+(defn- primary-html
+  "Primary filing document, cached under data/ix-html."
+  [cik adsh]
+  (let [f (io/file "data/ix-html" (str adsh ".htm"))]
+    (or (when (.exists f) (slurp f))
+        (when-let [html (e/html {:cik (ticker-info/pad-cik cik)
+                                 :accessionNumber (str adsh)})]
+          (.mkdirs (.getParentFile f))
+          (spit f html)
+          html))))
+
+(defn- strip-tags
+  [s]
+  (-> (or s "")
+      (str/replace #"<[^>]+>" " ")
+      (str/replace #"&nbsp;|&#160;" " ")
+      (str/replace #"&#\d+;|&[a-zA-Z]+;" " ")
+      (str/replace #"\s+" " ")
+      str/trim))
+
+(defn security12b-titles
+  "All dei:Security12bTitle string values from inline XBRL HTML."
+  [html]
+  (when html
+    (let [m (re-matcher
+             #"(?is)<ix:nonNumeric\b[^>]*\bname=\"dei:Security12bTitle\"[^>]*>(.*?)</ix:nonNumeric>"
+             html)]
+      (->> (loop [acc []]
+             (if (.find m)
+               (recur (conj acc (strip-tags (.group m 1))))
+               acc))
+           (remove str/blank?)
+           distinct
+           vec))))
+
+(defn adr-title?
+  "True for American/Global Depositary Share/Receipt titles (not bank preferred DSs)."
+  [title]
+  (boolean
+   (re-find #"(?i)american\s+depositary|global\s+depositary|\bADSs?\b|\bADRs?\b"
+            (str title))))
+
+(defn- normalize-ratio
+  [n]
+  (when (number? n)
+    (let [d (double n)]
+      (if (< (Math/abs (- d (Math/rint d))) 1e-9)
+        (long (Math/rint d))
+        d))))
+
+(def ^:private word-ratio-re
+  (let [words (->> (keys word->n)
+                   (sort-by (comp - count))
+                   (map #(java.util.regex.Pattern/quote %))
+                   (str/join "|"))]
+    {:represent (re-pattern
+                 (str "(?i)represent(?:s|ing)\\s+(?:a\\s+)?(" words ")\\b"))
+     :each (re-pattern
+            (str "(?i)each\\s+(?:of\\s+which\\s+)?represents?\\s+(?:a\\s+)?("
+                 words ")\\b"))}))
+
+(defn parse-ratio
+  "Ordinary shares per one ADR/ADS from a Security12bTitle, or nil."
+  [title]
+  (let [t (-> (str title)
+              str/lower-case
+              (str/replace #"\s+" " ")
+              (str/replace #"shareswith" "shares with"))]
+    (normalize-ratio
+     (or
+      (when-let [[_ a b] (re-find #"represent(?:s|ing)\s+(\d+)\s*/\s*(\d+)" t)]
+        (/ (Double/parseDouble a) (Double/parseDouble b)))
+      (when-let [[_ w] (re-find (:represent word-ratio-re) t)]
+        (word->n w))
+      (when-let [[_ n] (re-find #"represent(?:s|ing)\s+(?:a\s+)?(\d+(?:\.\d+)?)\b" t)]
+        (Double/parseDouble n))
+      (when-let [[_ a b] (re-find #"each\s+(?:of\s+which\s+)?represents?\s+(\d+)\s*/\s*(\d+)" t)]
+        (/ (Double/parseDouble a) (Double/parseDouble b)))
+      (when-let [[_ w] (re-find (:each word-ratio-re) t)]
+        (word->n w))
+      (when-let [[_ n] (re-find #"each\s+(?:of\s+which\s+)?represents?\s+(?:a\s+)?(\d+(?:\.\d+)?)\b" t)]
+        (Double/parseDouble n))))))
+
+(defn- filing-date
+  [filed]
+  (fsds/yyyymmdd->iso filed))
+
+(defn- adr-row
+  [sub titles]
+  (when-let [title (some #(when (adr-title? %) %) titles)]
+    (when-let [{:keys [ticker]} (ticker-info/primary-ticker-for-cik (:cik sub))]
+      (let [ratio (parse-ratio title)]
+        (cond-> {:ticker (str ticker)
+                 :cik (:cik sub)
+                 :filing-date (filing-date (:filed sub))
+                 :title title
+                 :form (:form sub)}
+          ratio (assoc :ratio ratio))))))
+(defn run
+  "Scan latest 20-F/40-F cover pages for ADRs. Writes data/adr.edn.
+
+  Usage: clj -X:adr
+         clj -X:adr :limit 20"
+  ([] (run {}))
+  ([{:keys [limit]}]
+   (e/init! dl/identity-header)
+   (e/enable-disk-cache! :dir "data/edgar-cache")
+   (println (format "adr  → %s" adr-path))
+   (println "Ensuring recent FSDS quarters…")
+   (let [zips (dl/ensure-quarters!)]
+     (when (empty? zips)
+       (throw (ex-info "No FSDS quarter zips available" {:dir dl/fsds-dir})))
+     (println (format "Using %d quarter zip(s)" (count zips)))
+     (let [by-cik (collect-foreign-annual-subs zips)
+           subs (vec (cond->> (sort-by (juxt :name :cik) (vals by-cik))
+                       limit (take (long limit))))
+           n (count subs)
+           _ (println (format "Scanning %d foreign annual filings for Security12bTitle…" n))
+           rows (->> subs
+                     (map-indexed
+                      (fn [i sub]
+                        (when (zero? (mod (inc i) 50))
+                          (println (format "  %d/%d" (inc i) n))
+                          (flush))
+                        (try
+                          (let [html (primary-html (:cik sub) (:adsh sub))
+                                titles (security12b-titles html)]
+                            (adr-row sub titles))
+                          (catch Throwable ex
+                            (println (format "  skip %s %s (%s)"
+                                             (:cik sub) (:adsh sub)
+                                             (.getMessage ex)))
+                            nil))))
+                     (remove nil?)
+                     (sort-by :ticker)
+                     vec)]
+       (dataset/write-dataset! adr-path
+                               {:download-date (str (LocalDate/now))}
+                               rows)
+       (println (format "Wrote %s  (%d ADRs; %d with :ratio)"
+                        adr-path
+                        (count rows)
+                        (count (filter :ratio rows))))
+       rows))))

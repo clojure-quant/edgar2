@@ -1,9 +1,10 @@
 (ns edgar2.report.ingress
-  "Refresh prices, listings, the two universes, and stats when they are stale."
+  "Refresh prices, listings, the two universes, FX, and stats when they are stale."
   (:require [clojure.java.io :as io]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.facts-universe :as facts-universe]
             [edgar2.download.fsds-universe :as fsds]
+            [edgar2.download.fx :as fx]
             [edgar2.download.price :as price]
             [edgar2.download.ticker-exchange :as exchanges]
             [edgar2.report.stats :as stats])
@@ -18,6 +19,7 @@
 (def listing-max-days 14)
 (def fsds-max-days 14)
 (def facts-max-days 3)
+(def fx-max-days 20)
 
 (defn- parse-date
   [s]
@@ -87,30 +89,40 @@
                       :as-of-label "companyfacts published"
                       :run #(facts-universe/universe {:force true})}
                      (file-status facts-universe/universe-path facts-max-days))
+        fx-item (merge {:id :fx
+                        :label "FX rates"
+                        :path fx/fx-path
+                        :max-days fx-max-days
+                        :as-of-label "downloaded"
+                        :run #(fx/download-fx {})}
+                       (file-status fx/fx-path fx-max-days))
+        ;; Stats only depend on company datasets, not FX.
         inputs [prices listings fsds-item facts]
         stats-file? (.exists (io/file stats/stats-path))
         stats-due? (or (some :due? inputs) (not stats-file?))]
-    (conj (vec inputs)
-          {:id :stats
-           :label "Stats"
-           :path stats/stats-path
-           :due? stats-due?
-           :date nil
-           :summary (cond
-                      (not stats-file?) "no file"
-                      stats-due? "runs because a dataset will refresh"
-                      :else "current")
-           :run #(stats/stats {})})))
+    (into []
+          (concat inputs
+                  [fx-item]
+                  [{:id :stats
+                    :label "Stats"
+                    :path stats/stats-path
+                    :due? stats-due?
+                    :date nil
+                    :summary (cond
+                               (not stats-file?) "no file"
+                               stats-due? "runs because a dataset will refresh"
+                               :else "current")
+                    :run #(stats/stats {})}]))))
 
 (defn run
-  "Download each stale dataset, then rebuild stats if any dataset ran
-  or stats are missing.
+  "Download each stale dataset, then rebuild stats if any company dataset
+  ran or stats are missing.
 
   No file and no :download-date both count as stale.
   Prices use the newest session (3 days). Ticker exchange and the FSDS
   universe use the day they were written (14 days). Company facts use the
   companyfacts.zip publication day (3 days) and are downloaded again before
-  universe-facts is rebuilt.
+  universe-facts is rebuilt. FX rates refresh every 20 days.
 
   Usage: clj -X:ingress"
   ([] (run {}))
