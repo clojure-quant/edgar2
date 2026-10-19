@@ -12,6 +12,7 @@
             [edgar2.download.fsds-universe :as fsds]
             [edgar2.adr :as adr]
             [edgar2.download.facts :as dl]
+            [edgar2.download.fx :as fx]
             [edgar2.download.price :as price]
             [edgar2.download.facts-universe :as universe]
             [jsonista.core :as json])
@@ -676,54 +677,87 @@
                [(str/upper-case (str ticker)) (double close)])
              (price/load-prices))))
 
+(defn market-cap-adjusted
+  "USD `:marketcap` into the reporting currency, divided by ordinary-shares-per-ADR.
+
+  `marketcap` is ADR (or share) price × shares outstanding. When `:adr-ratio`
+  is ordinary shares per one ADR, divide so the cap matches whole-company
+  financials. Non-USD units use the latest `from-usd` rate. Nil when market
+  cap is missing or FX is unknown for a foreign unit."
+  ([row]
+   (market-cap-adjusted (:marketcap row) (:revenue-unit row) (:adr-ratio row)))
+  ([marketcap revenue-unit adr-ratio]
+   (when (number? marketcap)
+     (let [usd? (usd-unit? revenue-unit)
+           rate (if usd? 1.0 (fx/from-usd revenue-unit))
+           ratio (let [r (when (number? adr-ratio) (double adr-ratio))]
+                   (if (and r (pos? r)) r 1.0))]
+       (when rate
+         (/ (* (double marketcap) (double rate)) ratio))))))
+
+(defn needs-mcap-adjust?
+  "True when valuation must use `:market-cap-adjusted` (foreign report or
+  ADR ratio other than 1)."
+  [revenue-unit adr-ratio]
+  (or (not (usd-unit? revenue-unit))
+      (and (number? adr-ratio)
+           (not= 1.0 (double adr-ratio)))))
+
 (defn with-valuation
-  "Add :shares, :price, :marketcap, :price-sales, :price-earnings,
-  :enterprise-value, and :ev-ebit.
-  PE is USD market cap / USD Net Income, else USD price / USD EPS.
-  Dividend yield is USD dividends paid / USD market cap, else USD dividend
-  per share / price. Buyback yield is USD stock repurchase / USD market cap.
-  Never mix a dollar price with ARS/JPY/etc. earnings.
-  Enterprise value is USD market cap + debt + preferred + noncontrolling
-  interest − cash. EV/EBIT divides that by USD EBIT."
+  "Add :shares, :price, :marketcap, :market-cap-adjusted, :price-sales,
+  :price-earnings, :enterprise-value, and :ev-ebit.
+
+  When the report is not USD or `:adr-ratio` is not 1, price-sales, PE,
+  dividend-yield, buyback-yield, EV, and EV/EBIT use `:market-cap-adjusted`
+  (reporting-currency cap after ADR) against same-currency fundamentals.
+  Otherwise PE is market cap / Net Income, else USD price / USD EPS;
+  dividend yield is dividends paid / market cap, else USD DPS / price."
   [st price-by-ticker shares]
   (let [price (get price-by-ticker (str/upper-case (str (:ticker st))))
         mcap (when (and price (number? shares))
                (* (double price) (double shares)))
+        ratio (:adr-ratio st)
+        mcap-adj (market-cap-adjusted mcap (:revenue-unit st) ratio)
+        need-adj? (needs-mcap-adjust? (:revenue-unit st) ratio)
+        vmcap (if need-adj? mcap-adj mcap)
         rev (when (number? (:revenue st)) (:revenue st))
         ni (when (number? (:net-profit st)) (:net-profit st))
         eps (when (number? (:eps st)) (:eps st))
         usd-eps? (usd-unit? (:eps-unit st))
-        usd-pl? (usd-unit? (:revenue-unit st))
         dps (when (number? (:dps st)) (:dps st))
         usd-dps? (usd-unit? (:dps-unit st))
         paid (when (number? (:dividends-paid st)) (:dividends-paid st))
         repurchase (when (number? (:stock-repurchase st)) (:stock-repurchase st))
         pe (cond
-             (and mcap usd-pl? (number? ni) (not (zero? (double ni))))
-             (/ mcap (double ni))
-             (and price (number? eps) usd-eps? (not (zero? (double eps))))
+             (and vmcap (number? ni) (not (zero? (double ni))))
+             (/ (double vmcap) (double ni))
+             (and (not need-adj?) price (number? eps) usd-eps?
+                  (not (zero? (double eps))))
              (/ (double price) (double eps)))
         dy (cond
-             (and mcap usd-pl? (pos? (double mcap)) (number? paid) (pos? (double paid)))
-             (* 100.0 (/ (double paid) (double mcap)))
-             (and price (pos? (double price)) (number? dps) usd-dps?)
+             (and vmcap (pos? (double vmcap)) (number? paid) (pos? (double paid)))
+             (* 100.0 (/ (double paid) (double vmcap)))
+             (and (not need-adj?) price (pos? (double price)) (number? dps) usd-dps?)
              (* 100.0 (/ (double dps) (double price))))
-        by (when (and mcap usd-pl? (pos? (double mcap))
+        by (when (and vmcap (pos? (double vmcap))
                       (number? repurchase) (pos? (double repurchase)))
-             (* 100.0 (/ (double repurchase) (double mcap))))
+             (* 100.0 (/ (double repurchase) (double vmcap))))
         ebit (when (number? (:ebit st)) (:ebit st))
-        ev (when (and mcap usd-pl?)
-             (+ (double mcap)
+        ev (when vmcap
+             (+ (double vmcap)
                 (double (or (:debt st) 0))
                 (double (or (:preferred-stock st) 0))
                 (double (or (:noncontrolling-interest st) 0))
                 (- (double (or (:cash st) 0)))))]
-    (cond-> st
+    (cond-> (dissoc st :price-sales :price-earnings :dividend-yield
+                    :buyback-yield :enterprise-value :ev-ebit
+                    :market-cap-adjusted)
       (number? shares) (assoc :shares shares)
       price (assoc :price price)
       mcap (assoc :marketcap mcap)
-      (and mcap usd-pl? rev (not (zero? (double rev))))
-      (assoc :price-sales (/ mcap (double rev)))
+      mcap-adj (assoc :market-cap-adjusted mcap-adj)
+      (and vmcap rev (not (zero? (double rev))))
+      (assoc :price-sales (/ (double vmcap) (double rev)))
       pe (assoc :price-earnings pe)
       dy (assoc :dividend-yield dy)
       by (assoc :buyback-yield by)
@@ -787,7 +821,7 @@
 
 (def stats-field-order
   [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
-   :shares :adr-ratio :marketcap
+   :shares :adr-ratio :marketcap :market-cap-adjusted
    :revenue :revenue-unit
    :net-profit
    :eps
@@ -845,6 +879,39 @@
                      (count (filter :subindustry rows))))
     rows))
 
+(defn revalue-stats!
+  "Recompute market-cap-adjusted and valuation ratios on data/stats.edn
+  from existing :price, :shares, fundamentals, and :adr-ratio — no zip reread.
+
+  Usage: clj -X:stats-revalue"
+  ([] (revalue-stats! {}))
+  ([_]
+   (let [prices (load-price-by-ticker)
+         before (edn/read-string (slurp stats-path))
+         ps-before (count (filter :price-sales before))
+         rows (mapv (fn [st]
+                      (let [shares (:shares st)
+                            ticker (some-> (:ticker st) str str/upper-case)
+                            px (cond-> prices
+                                 (and ticker (number? (:price st))
+                                      (not (contains? prices ticker)))
+                                 (assoc ticker (double (:price st))))]
+                        (with-valuation st px shares)))
+                    before)
+         ps-after (count (filter :price-sales rows))]
+     (save-stats! rows)
+     (println (format "Wrote %s  (%d companies; price-sales %d → %d; pe=%d  ev-ebit=%d  dy=%d  buyback=%d  mcap-adj=%d)"
+                      stats-path
+                      (count rows)
+                      ps-before
+                      ps-after
+                      (count (filter :price-earnings rows))
+                      (count (filter :ev-ebit rows))
+                      (count (filter :dividend-yield rows))
+                      (count (filter :buyback-yield rows))
+                      (count (filter :market-cap-adjusted rows))))
+     rows)))
+
 (defn fmt-growth
   [x]
   (when x (format "%.1f" (double x))))
@@ -874,6 +941,8 @@
   When operating income is not tagged, a year whose operating expenses were
   derived uses gross profit minus those expenses.
   :adr-ratio (ordinary shares per ADR from data/adr.edn) when known.
+  :market-cap-adjusted (reporting-currency market cap after ADR) when FX allows.
+  Non-USD or non-1 ADR names use that cap for price-sales, PE, yields, and EV.
   :sic, :sector, :industry, and :subindustry come from data/universe-fsds.edn.
 
   Usage: clj -X:stats
@@ -904,13 +973,13 @@
                             (:shares-outstanding row))
                  st (with-sic
                       (try
-                        (let [base (-> (if data
-                                         (company-stats (:facts data) row)
-                                         (select-keys row [:ticker :exchange :cik :entityName]))
-                                       (with-valuation prices shares))
+                        (let [base (if data
+                                     (company-stats (:facts data) row)
+                                     (select-keys row [:ticker :exchange :cik :entityName]))
                               ratio (adr/get-ratio (:ticker base))]
-                          (cond-> base
-                            ratio (assoc :adr-ratio ratio)))
+                          (-> base
+                              (cond-> ratio (assoc :adr-ratio ratio))
+                              (with-valuation prices shares)))
                         (catch Exception ex
                           (println (format "  stats-fail %s (%s)" (:ticker row) (.getMessage ex)))
                           (select-keys row [:ticker :exchange :cik :entityName])))

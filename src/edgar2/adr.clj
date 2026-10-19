@@ -169,8 +169,22 @@
           (when (re-matches #"\d+(?:\.\d+)?" s)
             (Double/parseDouble s))))))
 
+(defn- bare-ads-title?
+  "True when the title is only ADS/GDS wording (no share count)."
+  [title]
+  (let [s (-> (str title)
+              str/lower-case
+              (str/replace #"[.,;:]" "")
+              (str/replace #"\s+" " ")
+              str/trim)]
+    (boolean
+     (re-matches
+      #"(?:petrobras )?american depositary shares(?: \(ads?s?\))?(?: \(evidenced by american(?: depositary receipts)?\))?(?: as evidenced by american)?(?: \( each)?|global depositary shares"
+      s))))
+
 (defn parse-ratio
-  "Ordinary shares per one ADR/ADS from a Security12bTitle, or nil."
+  "Ordinary shares per one ADR/ADS from a Security12bTitle, or nil.
+  Bare \"American Depositary Shares\" (no count) defaults to 1."
   [title]
   (let [t (-> (str title)
               str/lower-case
@@ -223,7 +237,8 @@
       (when-let [[_ w] (re-find (:each word-ratio-re) t)]
         (word->n w))
       (when-let [[_ n] (re-find #"each\s+(?:of\s+which\s+)?represents?\s+(?:a\s+)?(\d+(?:\.\d+)?)\b" t)]
-        (Double/parseDouble n))))))
+        (Double/parseDouble n))
+      (when (bare-ads-title? title) 1)))))
 
 (defn- filing-date
   [filed]

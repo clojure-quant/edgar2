@@ -117,6 +117,59 @@
                                "")]]))
             groups)]]))
 
+(defn reporting-cur
+  "Reporting currency from `:revenue-unit`, or nil for USD / blank."
+  [row]
+  (when-let [u (some-> (:revenue-unit row) str str/trim not-empty)]
+    (let [code (or (second (re-matches #"(?i)([A-Za-z]{3})(?:/.*)?" u)) u)]
+      (when-not (= "USD" (str/upper-case code))
+        (str/upper-case code)))))
+
+(defn market-cap-adjusted
+  "Reporting-currency market cap after ADR. Prefers `:market-cap-adjusted`
+  on the row when present."
+  [row]
+  (or (when (number? (:market-cap-adjusted row))
+        (double (:market-cap-adjusted row)))
+      (stats/market-cap-adjusted row)))
+
+(defn foreign-summary
+  "One row per non-USD reporting currency. `:n` is the company count.
+  `:avg-mkt-cap` is the mean USD `:marketcap` of companies that have one."
+  [rows]
+  (->> rows
+       (filter reporting-cur)
+       (group-by reporting-cur)
+       (map (fn [[cur xs]]
+              (let [mcaps (filterv number? (keep :marketcap xs))]
+                {:reporting-cur cur
+                 :n (count xs)
+                 :avg-mkt-cap (when (seq mcaps)
+                                (/ (reduce + (map double mcaps)) (count mcaps)))})))
+       (sort-by (juxt (comp - :n) :reporting-cur))
+       vec))
+
+(defn- foreign-table
+  [rows]
+  (let [groups (foreign-summary rows)]
+    [:div.table-wrap
+     [:table
+      [:thead
+       [:tr
+        [:th "reporting-cur"]
+        [:th.num "n"]
+        [:th.num "avg-mkt-cap ($M)"]]]
+      (into [:tbody]
+            (map (fn [{:keys [reporting-cur n avg-mkt-cap]}]
+                   [:tr {:key reporting-cur}
+                    [:td [:a (h/navigate :segment {} {:cur reporting-cur})
+                          reporting-cur]]
+                    [:td.num n]
+                    [:td.num (if avg-mkt-cap
+                               (format-value :millions avg-mkt-cap)
+                               "")]]))
+            groups)]]))
+
 (defn- quintile-table
   [rows]
   [:div.table-wrap
@@ -153,4 +206,6 @@
                  (format "%,d" (count (:rows loaded))))]
         (quintile-table (:rows loaded))
         [:h2.stats-section "SIC"]
-        (sic-table (:rows loaded))])]))
+        (sic-table (:rows loaded))
+        [:h2.stats-section "FOREIGN"]
+        (foreign-table (:rows loaded))])]))
