@@ -15,10 +15,9 @@
             [edgar2.download.fx :as fx]
             [edgar2.download.price :as price]
             [edgar2.download.facts-universe :as universe]
+            [edgar2.facts-ds :as facts-ds]
             [jsonista.core :as json])
-  (:import [java.time LocalDate]
-           [java.time.temporal ChronoUnit]
-           [java.util.zip ZipFile]))
+  (:import [java.util.zip ZipFile]))
 
 (def stats-path "data/stats.edn")
 
@@ -99,9 +98,6 @@
    [:ifrs-full :CashAndCashEquivalents]
    [:us-gaap :Cash]])
 
-(def annual-forms
-  #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"})
-
 (def sales-growth-window
   "Number of trailing YoY revenue changes averaged into :sales-growth-yoy."
   7)
@@ -109,23 +105,6 @@
 (def profit-margin-window
   "Number of trailing annual profit margins averaged into :avg-profit-margin."
   10)
-
-(defn parse-date
-  [d]
-  (when d
-    (try (LocalDate/parse (str d))
-         (catch Exception _ nil))))
-
-(defn period-days
-  [start end]
-  (when-let [s (parse-date start)]
-    (when-let [e (parse-date end)]
-      (.between ChronoUnit/DAYS s e))))
-
-(defn annual-duration?
-  [obs]
-  (when-let [days (period-days (:start obs) (:end obs))]
-    (<= 300 days 400)))
 
 (defn observations
   [facts tag-pairs]
@@ -153,7 +132,7 @@
   "Duration facts covering ~12 months, one value per period-end."
   [facts tag-pairs unit]
   (latest-by-end
-   (filter annual-duration?
+   (filter facts-ds/annual-duration?
            (prefer-unit (observations facts tag-pairs) unit))))
 
 (defn first-annual-flows
@@ -170,7 +149,7 @@
   [facts tag-pairs unit]
   (latest-by-end
    (filter #(or (= "FY" (:fp %))
-                (annual-forms (str (:form %))))
+                (facts-ds/annual-forms (str (:form %))))
            (prefer-unit (observations facts tag-pairs) unit))))
 
 (defn first-annual-stocks
