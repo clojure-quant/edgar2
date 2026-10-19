@@ -6,6 +6,7 @@
             [clojure.set :as set]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar2.concepts :as concepts]
             [edgar2.derived :as derived]
             [edgar2.filing :as filing]
             [edgar2.download.dataset :as dataset]
@@ -23,97 +24,27 @@
 
 (def stats-path "data/stats.edn")
 
-(def net-income-tags
-  "US GAAP Net Income (Loss), then IFRS profit as Net Income."
-  [[:us-gaap :NetIncomeLoss]
-   [:ifrs-full :ProfitLoss]
-   [:ifrs-full :ProfitLossAttributableToOwnersOfParent]])
+(defn- concept-data
+  [id]
+  (:data (concepts/get-concept-id id)))
 
-(def eps-tags
-  [[:us-gaap :EarningsPerShareDiluted]
-   [:us-gaap :EarningsPerShareBasic]
-   [:ifrs-full :DilutedEarningsLossPerShare]
-   [:ifrs-full :BasicEarningsLossPerShare]
-   [:ifrs-full :BasicAndDilutedEarningsLossPerShare]])
-
-(def dps-cash-tags
-  "Per-share cash dividend. Used when it falls on the last report date."
-  [[:us-gaap :CommonStockDividendsPerShareCashPaid]])
-
-(def dps-other-tags
-  "Other per-share dividends, used only when they fall on the last report date."
-  [[:us-gaap :CommonStockDividendsPerShare]
-   [:us-gaap :CommonStockDividendsPerShareDeclared]
-   [:ifrs-full :DividendsPaidOrdinaryShares]])
-
-(def dividends-paid-tags
-  "Total cash dividends. US-GAAP total, then ordinary, then common-only, then IFRS financing."
-  [[:us-gaap :PaymentsOfDividends]
-   [:us-gaap :PaymentsOfOrdinaryDividends]
-   [:us-gaap :PaymentsOfDividendsCommonStock]
-   [:ifrs-full :DividendsPaidClassifiedAsFinancingActivities]
-   [:ifrs-full :DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities]
-   [:ifrs-full :DividendsPaid]])
-
-(def stock-repurchase-tags
-  "Cash paid to repurchase common equity. US-GAAP common, then broader equity,
-  then IFRS financing."
-  [[:us-gaap :PaymentsForRepurchaseOfCommonStock]
-   [:us-gaap :PaymentsForRepurchaseOfEquity]
-   [:ifrs-full :PaymentsToAcquireOrRedeemEntitysShares]])
-
-(def asset-tags
-  [[:us-gaap :Assets]
-   [:ifrs-full :Assets]])
-
-(def total-equity-tags
-  "Total equity, already including noncontrolling interest."
-  [[:us-gaap :StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest]
-   [:ifrs-full :Equity]])
-
-(def parent-equity-tags
-  "Equity attributable to the parent. This is total equity when
-  noncontrolling interest is not tagged."
-  [[:us-gaap :StockholdersEquity]
-   [:ifrs-full :EquityAttributableToOwnersOfParent]])
-
-(def nci-tags
-  [[:us-gaap :MinorityInterest]
-   [:ifrs-full :NoncontrollingInterests]])
-
-(def ebit-tags
-  "Operating income. Fallback is net income + interest + tax."
-  [[:us-gaap :OperatingIncomeLoss]
-   [:ifrs-full :ProfitLossFromOperatingActivities]])
-
-(def interest-expense-tags
-  [[:us-gaap :InterestExpense]
-   [:ifrs-full :InterestExpense]
-   [:ifrs-full :InterestExpenseOnBorrowings]])
-
-(def income-tax-tags
-  [[:us-gaap :IncomeTaxExpenseBenefit]
-   [:ifrs-full :IncomeTaxExpenseContinuingOperations]])
-
-(def cash-tag-pairs
-  [[:us-gaap :CashAndCashEquivalentsAtCarryingValue]
-   [:ifrs-full :CashAndCashEquivalents]
-   [:us-gaap :Cash]])
-
-(def preferred-tags
-  [[:us-gaap :PreferredStockValue]])
-
-(def debt-tags
-  [[:us-gaap :LongTermDebtNoncurrent]
-   [:ifrs-full :LongtermBorrowings]
-   [:us-gaap :LongTermDebtCurrent]
-   [:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]
-   [:ifrs-full :ShorttermBorrowings]
-   [:us-gaap :LongTermDebt]
-   [:ifrs-full :Borrowings]
-   [:us-gaap :CommercialPaper]
-   [:us-gaap :ShortTermBorrowings]
-   [:us-gaap :OtherShortTermBorrowings]])
+(def net-income-tags (concept-data :net-income))
+(def eps-tags (concept-data :eps))
+(def dps-cash-tags (concept-data :dps-cash))
+(def dps-other-tags (concept-data :dps-other))
+(def dividends-paid-tags (concept-data :dividends-paid))
+(def stock-repurchase-tags (concept-data :stock-repurchase))
+(def asset-tags (concept-data :assets))
+(def total-equity-tags (concept-data :total-equity))
+(def parent-equity-tags (concept-data :parent-equity))
+(def nci-tags (concept-data :nci))
+(def ebit-tags (concept-data :operating-income))
+(def interest-expense-tags (concept-data :interest-expense))
+(def income-tax-tags (concept-data :income-tax))
+(def cash-tag-pairs (concept-data :cash))
+(def preferred-tags (concept-data :preferred-stock))
+(def debt-tags (concept-data :debt))
+(def revenue-tags (concept-data :revenue))
 
 (def sales-growth-window
   "Number of trailing YoY revenue changes averaged into :sales-growth-yoy."
@@ -126,8 +57,7 @@
 (def stats-fields
   "All concept pairs pulled into the annual report-table."
   (vec (distinct
-        (concat universe/revenue-tags
-                [[:ifrs-full :RevenueFromSaleOfGoods]]
+        (concat revenue-tags
                 net-income-tags
                 eps-tags
                 dps-cash-tags
@@ -343,7 +273,8 @@
                  (= end goods-end) goods)]
     (if (seq chosen)
       chosen
-      (series-mixed rows universe/revenue-tags))))
+      (series-mixed rows revenue-tags))))
+
 
 (defn- row-at-end
   [rows end]
@@ -635,7 +566,7 @@
   (let [table (facts-ds/report-table dss :y stats-fields revenue-unit)
         rows (table-rows table)
         current (first rows)
-        rev (series-mixed rows universe/revenue-tags)
+        rev (series-mixed rows revenue-tags)
         ni (or (series-for rows net-income-tags) [])
         assets (series-mixed rows asset-tags)
         bs-end (some-> (latest-obs assets) :end str)

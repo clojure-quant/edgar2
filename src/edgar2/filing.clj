@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [edgar.download :as dl]
+            [edgar2.concepts :as concepts]
             [edgar2.derived :as derived]
             [clojure.pprint :as pprint]
             [tech.v3.dataset :as ds])
@@ -105,35 +106,44 @@
        vals
        (map latest-by-filed)))
 
-(def ifrs-income-concepts
-  "IFRS local names for lines edgarjure maps only from US-GAAP.
-  Appended after the US-GAAP concepts, so a GAAP tag still wins when both exist."
-  {"Revenue" ["RevenueFromContractsWithCustomers" "Revenue"]
-   "Cost of Revenue" ["CostOfSales"]
-   "Operating Expenses" ["OperatingExpense"]
-   "Operating Income" ["ProfitLossFromOperatingActivities"]
-   "Pre-Tax Income" ["ProfitLossBeforeTax"]
-   "Income Tax Expense" ["IncomeTaxExpenseContinuingOperations"]
-   "EPS Basic" ["BasicEarningsLossPerShare"]
-   "EPS Diluted" ["DilutedEarningsLossPerShare"]})
+(defn- concept-local-names
+  "edgarjure statement :concepts chains are [[label string ...] ...] —
+  schema ConceptChains is strings only, not [taxonomy tag] vectors."
+  [pairs]
+  (mapv (comp name second) pairs))
 
-(def income-fallbacks
-  "Extra concepts appended after a chain. The chain's own tags still win
-  for a period where both are filed. Insurers tag total revenue as Revenues
-  and then stop; contract revenue continues that line."
-  {"Total Revenue" ["RevenueFromContractWithCustomerExcludingAssessedTax"
-                    "RevenueFromContractWithCustomerIncludingAssessedTax"
-                    "SalesRevenueNet"]})
+(defn- concept-names
+  [id]
+  (concept-local-names (:data (concepts/get-concept-id id))))
+
+(defn- concept-names-by-label
+  [id label]
+  (some-> (concepts/get-concept-id id) :data (get label) concept-local-names))
+
+(defn- concept-chain
+  "One edgarjure chain: [label concept-string ...]."
+  [id]
+  (let [{:keys [label data]} (concepts/get-concept-id id)]
+    (into [label] (concept-local-names data))))
+
+(def revenue-total-first
+  "Headline totals before ASC 606 contract subsets.
+  REITs often tag Revenues (or RealEstateRevenueNet) as the full top line
+  while also filing a much smaller RevenueFromContractWithCustomer* amount."
+  (concept-names :revenue))
+
+(defn- prioritize-revenue-concepts
+  "Move known total-revenue tags ahead of contract subsets; keep other order."
+  [concepts]
+  (let [pri-set (set revenue-total-first)
+        preferred (filterv (set concepts) revenue-total-first)
+        other (into [] (remove pri-set) concepts)]
+    (into preferred other)))
 
 (def depreciation-line
   "Depreciation sits with the operating-expense addends. Income-statement
   tags first; the cash-flow total is the last fallback."
-  ["Depreciation"
-   "DepreciationAndAmortisationExpense"
-   "DepreciationExpense"
-   "DepreciationAndAmortization"
-   "Depreciation"
-   "DepreciationDepletionAndAmortization"])
+  (concept-chain :depreciation))
 
 (defn income-industry
   "Same SIC routing edgarjure uses for income-statement concept chains."
@@ -152,9 +162,12 @@
   (let [sic (:sic (e/company-metadata cik))
         chains (:chains (e/concepts-for :income :industry (income-industry sic)))]
     (conj (mapv (fn [[label & concepts]]
-                  (into [label] (concat concepts
-                                        (get ifrs-income-concepts label)
-                                        (get income-fallbacks label))))
+                  (let [concepts (cond-> (vec (concat concepts
+                                                      (concept-names-by-label :ifrs-income-by-label label)
+                                                      (concept-names-by-label :income-fallbacks-by-label label)))
+                                   (#{"Revenue" "Total Revenue"} label)
+                                   prioritize-revenue-concepts)]
+                    (into [label] concepts)))
                 chains)
           depreciation-line)))
 
@@ -177,31 +190,14 @@
          (filter #(or (= "FY" (:fp %))
                       (forms (str (:form %))))))))
 
-(def dividends-paid-label "Dividends Paid")
-
-(def dividends-paid-concepts
-  "Total cash dividends. US-GAAP total, then ordinary, then common-only, then IFRS financing."
-  [[dividends-paid-label
-    "PaymentsOfDividends"
-    "PaymentsOfOrdinaryDividends"
-    "PaymentsOfDividendsCommonStock"
-    "DividendsPaidClassifiedAsFinancingActivities"
-    "DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities"
-    "DividendsPaid"]])
-
-(def stock-repurchase-label "Stock Repurchase")
-
-(def stock-repurchase-concepts
-  "Cash paid to buy back common equity. US-GAAP common, then broader equity,
-  then IFRS financing (PaymentsToAcquireOrRedeemEntitysShares)."
-  [[stock-repurchase-label
-    "PaymentsForRepurchaseOfCommonStock"
-    "PaymentsForRepurchaseOfEquity"
-    "PaymentsToAcquireOrRedeemEntitysShares"]])
+(def dividends-paid-label (:label (concepts/get-concept-id :dividends-paid)))
+(def stock-repurchase-label (:label (concepts/get-concept-id :stock-repurchase)))
 
 (def cashflow-extra-concepts
-  "Dividends and stock repurchase lines pulled with the cash-flow statement."
-  (into dividends-paid-concepts stock-repurchase-concepts))
+  "Dividends and stock repurchase lines pulled with the cash-flow statement.
+  edgarjure requires string concept names in each chain."
+  [(concept-chain :dividends-paid)
+   (concept-chain :stock-repurchase)])
 
 (defn annual-cashflow-rows
   "Full-year cash-flow fact rows (quarterly repeats removed)."

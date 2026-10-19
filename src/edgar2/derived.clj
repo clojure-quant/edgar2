@@ -7,63 +7,30 @@
 
   Operating profit, on those same periods, when operating income is not
   already present: gross profit − operating expenses.
-  Gross profit is the gross-profit line, or revenue − cost of revenue.")
+  Gross profit is the gross-profit line, or revenue − cost of revenue."
+  (:require [edgar2.concepts :as concepts]))
 
-(def operating-expenses "Operating Expenses")
-(def operating-income "Operating Income")
-(def gross-profit "Gross Profit")
-(def revenue "Revenue")
-(def cost-of-revenue "Cost of Revenue")
-(def pretax-income "Pre-Tax Income")
-(def nonoperating-income "Non-Operating Income")
-(def asset-gains "Gain (Loss) on Sale of Assets")
-(def interest-expense "Interest Expense")
+(def operating-expenses (:label (concepts/get-concept-id :operating-expenses)))
+(def operating-income (:label (concepts/get-concept-id :operating-income)))
+(def gross-profit (:label (concepts/get-concept-id :gross-profit)))
+(def revenue (:label (concepts/get-concept-id :revenue)))
+(def cost-of-revenue (:label (concepts/get-concept-id :cost-of-revenue)))
+(def pretax-income (:label (concepts/get-concept-id :pretax-income)))
+(def nonoperating-income (:label (concepts/get-concept-id :nonoperating-income)))
+(def asset-gains (:label (concepts/get-concept-id :asset-gains)))
+(def interest-expense (:label (concepts/get-concept-id :interest-expense)))
+
+(def statement-line-ids
+  [:revenue :cost-of-revenue :gross-profit :operating-expenses
+   :operating-income :nonoperating-income :asset-gains
+   :interest-expense :pretax-income])
 
 (def statement-lines
-  "Line label → concept pairs, first match per line.
-  Same order as the standard income-statement chains, then the IFRS names."
-  [[revenue
-    [[:us-gaap :RevenueFromContractWithCustomerExcludingAssessedTax]
-     [:us-gaap :Revenues]
-     [:us-gaap :SalesRevenueNet]
-     [:us-gaap :SalesRevenueGoodsNet]
-     [:us-gaap :RevenueFromContractWithCustomerIncludingAssessedTax]
-     [:ifrs-full :RevenueFromContractsWithCustomers]
-     [:ifrs-full :Revenue]
-     [:ifrs-full :RevenueFromSaleOfGoods]]]
-   [cost-of-revenue
-    [[:us-gaap :CostOfRevenue]
-     [:us-gaap :CostOfGoodsSold]
-     [:us-gaap :CostOfGoodsAndServicesSold]
-     [:ifrs-full :CostOfSales]]]
-   [gross-profit
-    [[:us-gaap :GrossProfit]
-     [:ifrs-full :GrossProfit]]]
-   [operating-expenses
-    [[:us-gaap :OperatingExpenses]
-     [:ifrs-full :OperatingExpense]]]
-   [operating-income
-    [[:us-gaap :OperatingIncomeLoss]
-     [:ifrs-full :ProfitLossFromOperatingActivities]]]
-   [nonoperating-income
-    [[:us-gaap :NonoperatingIncomeExpense]]]
-   [asset-gains
-    [[:us-gaap :GainLossOnDispositionOfAssets1]
-     [:us-gaap :GainsLossesOnSalesOfAssets]
-     [:us-gaap :GainLossOnDispositionOfAssets]
-     [:us-gaap :GainLossOnSaleOfPropertyPlantEquipment]
-     [:us-gaap :GainLossOnDispositionOfProperty]]]
-   [interest-expense
-    [[:us-gaap :InterestExpense]
-     [:us-gaap :InterestExpenseDebt]
-     [:us-gaap :InterestExpenseNonoperating]
-     [:us-gaap :InterestAndDebtExpense]
-     [:ifrs-full :InterestExpense]
-     [:ifrs-full :InterestExpenseOnBorrowings]]]
-   [pretax-income
-    [[:us-gaap :IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest]
-     [:us-gaap :IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments]
-     [:ifrs-full :ProfitLossBeforeTax]]]])
+  "Line label → concept pairs, first match per line."
+  (mapv (fn [id]
+          (let [{:keys [label data]} (concepts/get-concept-id id)]
+            [label data]))
+        statement-line-ids))
 
 (defn derived-operating-expenses
   "Operating expenses implied by the income-statement identity.

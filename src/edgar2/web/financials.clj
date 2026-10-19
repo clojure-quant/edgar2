@@ -118,7 +118,8 @@
              {:key :profit-margin :digits 4}
              {:key :avg-profit-margin :digits 4}]}
    {:label "Growth"
-    :fields [{:key :sales-growth-yoy :digits 1}]}
+    :fields [{:key :sales-growth-yoy :digits 1}
+             {:key :net-income-change-q-on-y :digits 1}]}
    {:label "Valuation"
     :fields [{:key :ev-ebit :digits 1}
              {:key :pe :source :price-earnings :digits 1}

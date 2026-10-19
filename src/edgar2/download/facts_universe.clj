@@ -4,6 +4,7 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar2.concepts :as concepts]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.facts :as dl]
             [edgar2.util.ticker-info :as ticker-info]
@@ -13,24 +14,16 @@
 (def universe-path "data/universe-facts.edn")
 
 (def common-share-tags
-  [[:dei :EntityCommonStockSharesOutstanding]
-   [:us-gaap :CommonStockSharesOutstanding]])
+  (:data (concepts/get-concept-id :common-shares-outstanding)))
 
 (def ifrs-share-tags
-  [[:ifrs-full :NumberOfSharesOutstanding]])
+  (:data (concepts/get-concept-id :ifrs-shares-outstanding)))
 
 (def weighted-average-share-tags
-  [[:us-gaap :WeightedAverageNumberOfSharesOutstandingBasic]
-   [:us-gaap :WeightedAverageNumberOfSharesOutstandingBasicAndDiluted]
-   [:us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding]])
+  (:data (concepts/get-concept-id :weighted-average-shares)))
 
 (def revenue-tags
-  [[:us-gaap :RevenueFromContractWithCustomerExcludingAssessedTax]
-   [:us-gaap :Revenues]
-   [:us-gaap :SalesRevenueNet]
-   [:us-gaap :RevenueFromContractWithCustomerIncludingAssessedTax]
-   [:ifrs-full :Revenue]
-   [:ifrs-full :RevenueFromContractsWithCustomers]])
+  (:data (concepts/get-concept-id :revenue)))
 
 (defn pad-cik
   "10-digit CIK, or nil when blank / non-numeric."

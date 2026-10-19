@@ -4,6 +4,7 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar2.concepts :as concepts]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds :as dl]
             [edgar2.report.sector :as sector])
@@ -15,15 +16,8 @@
 (def filer-info-path "data/universe-fsds.edn")
 
 (def revenue-tags
-  ["RevenueFromContractWithCustomerExcludingAssessedTax"
-   "Revenues"
-   "SalesRevenueNet"
-   "SalesRevenueGoodsNet"
-   "RevenueFromContractWithCustomerIncludingAssessedTax"
-   "RevenuesNetOfInterestExpense"
-   "InterestAndDividendIncomeOperating"
-   "PremiumsEarnedNet"
-   "RealEstateRevenueNet"])
+  "Local tag names from the canonical :revenue concept (FSDS has no taxonomy)."
+  (mapv (comp name second) (:data (concepts/get-concept-id :revenue))))
 
 (def overview-tags (set revenue-tags))
 
