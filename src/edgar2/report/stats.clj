@@ -151,6 +151,14 @@
   (when (and (number? prev) (number? cur) (not (zero? (double prev))))
     (* 100.0 (/ (- (double cur) (double prev)) (double prev)))))
 
+(defn abs-change-pct
+  "Percent change with |prior| as denominator (Damodaran), so loss narrowing
+  is positive and loss widening is negative."
+  [prev cur]
+  (when (and (number? prev) (number? cur) (not (zero? (double prev))))
+    (* 100.0 (/ (- (double cur) (double prev))
+                (Math/abs (double prev))))))
+
 (defn avg
   [xs]
   (when (seq xs)
@@ -550,6 +558,74 @@
     (let [amount (Math/abs (double v))]
       (when (pos? amount) amount))))
 
+(defn- ni-concept-rank
+  []
+  (into {} (map-indexed (fn [i [_ c]] [(name c) i]) net-income-tags)))
+
+(defn- better-ni-fact?
+  "Prefer reporting-currency match, then later :filed, then earlier tag."
+  [a b revenue-unit ranks]
+  (let [want (str revenue-unit)
+        unit-score (fn [r]
+                     (cond
+                       (str/blank? want) 0
+                       (= (str (:unit r)) want) 0
+                       :else 1))
+        ua (unit-score a)
+        ub (unit-score b)
+        filed (compare (str (:filed a)) (str (:filed b)))]
+    (cond
+      (not= ua ub) (< ua ub)
+      (not= 0 filed) (pos? filed)
+      :else (< (get ranks (str (:concept a)) 9999)
+               (get ranks (str (:concept b)) 9999)))))
+
+(defn quarterly-net-income-series
+  "Oldest-first quarterly net income from `facts-ds/select-data` `:q`.
+
+  One value per period-end, using `net-income-tags` fallbacks. Prefers
+  `revenue-unit`, then later `:filed`, then earlier tag order."
+  [dss revenue-unit]
+  (let [long-ds (facts-ds/select-data dss :q net-income-tags)
+        ranks (ni-concept-rank)
+        rows (filter #(number? (:val %))
+                     (ds/rows long-ds {:nil-missing? true}))
+        chosen (reduce (fn [acc r]
+                         (let [k (str (:end r))
+                               cur (get acc k)]
+                           (if (or (nil? cur)
+                                   (better-ni-fact? r cur revenue-unit ranks))
+                             (assoc acc k r)
+                             acc)))
+                       {}
+                       rows)]
+    (->> chosen
+         vals
+         (map (fn [r] {:end (str (:end r)) :val (as-number (:val r))}))
+         (sort-by :end)
+         vec)))
+
+(defn net-income-change-q-on-y
+  "Most recent quarter net income vs net income 4 quarters earlier (%).
+
+  Values from `facts-ds/select-data` `:q` with `net-income-tags`. The year-ago
+  period is 4 steps earlier on `quarterly-periods` (not on the NI series), so
+  a missing intermediate NI does not shift the comparison. Uses |prior| in the
+  denominator so negative earnings keep the right sign."
+  [dss revenue-unit]
+  (let [ends (->> (ds/rows (facts-ds/quarterly-periods dss) {:nil-missing? true})
+                  (map #(str (:end %)))
+                  (remove str/blank?)
+                  distinct
+                  sort
+                  vec)
+        ni-by (by-end (quarterly-net-income-series dss revenue-unit))
+        cur-end (->> ends reverse (some #(when (contains? ni-by %) %)))
+        idx (when cur-end (.indexOf ends cur-end))]
+    (when (and idx (>= idx 4))
+      (abs-change-pct (get ni-by (nth ends (- idx 4)))
+                      (get ni-by cur-end)))))
+
 (defn company-stats
   "Fundamentals from an `e/facts`-shaped dataset via `report-table`.
 
@@ -571,6 +647,7 @@
                         (:derived-oi income))
         revenue (annual-revenue-series rows)
         growth (avg-sales-growth revenue sales-growth-window)
+        ni-qoy (net-income-change-q-on-y dss revenue-unit)
         margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score revenue)
         oi-score (direction-score oi)
@@ -597,6 +674,7 @@
       (:sales-growth-yoy growth)
       (assoc :sales-growth-yoy (:sales-growth-yoy growth)
              :sales-growth-years (:sales-growth-years growth))
+      (number? ni-qoy) (assoc :net-income-change-q-on-y ni-qoy)
       (number? rev-score) (assoc :revenue-score rev-score)
       (number? oi-score) (assoc :operating-income-score oi-score)
       margin
@@ -790,6 +868,7 @@
    :equity
    :return-on-capital
    :sales-growth-yoy
+   :net-income-change-q-on-y
    :revenue-score
    :operating-income-score
    :price-earnings
@@ -886,7 +965,9 @@
 
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
-  with 7-year mean YoY sales growth (%), profit margin, 10-year mean
+  with 7-year mean YoY sales growth (%),
+  :net-income-change-q-on-y (latest quarter NI vs NI 4 quarters earlier, %,
+  |prior| denominator), profit margin, 10-year mean
   profit margin (Net Income / revenue), return on assets (Net Income / assets),
   return on capital (Net Income / total equity), plus :shares (most recent 10-Q
   when that quarter is at least as recent as the annual report; otherwise

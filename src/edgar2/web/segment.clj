@@ -8,7 +8,7 @@
             [edgar2.web.overview :as overview]))
 
 (def columns
-  [:ticker :entityName :price :mc :ev :pe :ev-ebit])
+  [:ticker :entityName :subindustry :price :mc :ev :pe :ev-ebit])
 
 (def foreign-columns
   [:ticker :reporting-cur :adr-ratio :market-cap-adjusted])
@@ -30,8 +30,8 @@
 
 (defn companies
   "Rows for a SIC description, a reporting currency, or every company with a
-  number for `metric`."
-  [rows {:keys [sic cur metric]}]
+  number for `metric`. When `percentile` is 1..10, keep only that decile band."
+  [rows {:keys [sic cur metric percentile]}]
   (cond
     sic (->> rows
              (filter #(= sic (overview/sic-label %)))
@@ -45,9 +45,16 @@
                         [(if (number? (:marketcap r)) 0 1)
                          (- (double (or (:marketcap r) 0)))
                          (str (:ticker r))])))
-    metric (->> rows
-                (filter (fn [r] (number? (metric r))))
-                (sort-by (fn [r] [(- (double (metric r))) (str (:ticker r))])))
+    metric (let [k metric
+                 with-m (filterv #(number? (k %)) rows)
+                 xs (mapv k with-m)
+                 band (overview/parse-percentile percentile)
+                 filtered (if band
+                            (filterv #(overview/in-percentile? xs band (k %))
+                                     with-m)
+                            with-m)]
+             (sort-by (fn [r] [(- (double (k r))) (str (:ticker r))])
+                      filtered))
     :else []))
 
 (defn- fmt
@@ -62,6 +69,7 @@
               [:a (ticker/company-link ticker) (str ticker)]
               "")
     :entityName (str (:entityName row ""))
+    :subindustry (str (:subindustry row ""))
     :price (or (fmt (:price row) 2) "")
     :mc (if (number? (:marketcap row)) (str (screen/millions (:marketcap row))) "")
     :ev (if (number? (:enterprise-value row)) (str (screen/millions (:enterprise-value row))) "")
@@ -89,14 +97,14 @@
      [:tr
       (for [col columns]
         [:th {:key (str col)
-              :class (when-not (#{:ticker :entityName} col) "num")}
+              :class (when-not (#{:ticker :entityName :subindustry} col) "num")}
          (str col)])]]
     [:tbody
      (for [[i row] (map-indexed vector rows)]
        [:tr {:key (or (:ticker row) i)}
         (for [col columns]
           [:td {:key (str col)
-                :class (when-not (#{:ticker :entityName} col) "num")}
+                :class (when-not (#{:ticker :entityName :subindustry} col) "num")}
            (cell col row)])])]]])
 
 (defn- foreign-company-table
@@ -123,6 +131,8 @@
         sic (param q :sic)
         cur (some-> (param q :cur) str/upper-case)
         metric-name (param q :metric)
+        percentile (param q :percentile)
+        band (overview/parse-percentile percentile)
         spec (metric metric-name)
         loaded (try {:rows (overview/load-rows)}
                     (catch Exception e
@@ -144,9 +154,16 @@
                        (format "%,d" (count rows))
                        cur)]
               (foreign-company-table rows)])
-       spec (let [rows (vec (companies (:rows loaded) {:metric (:key spec)}))]
+       (and metric-name percentile (nil? band))
+       [:p.error (str "percentile must be 1–" overview/percentile-count
+                      ", got " percentile)]
+       spec (let [rows (vec (companies (:rows loaded)
+                                       {:metric (:key spec)
+                                        :percentile percentile}))]
               [:div
-               [:h1 (:label spec)]
+               [:h1 (if band
+                      (str (:label spec) " · P" band)
+                      (:label spec))]
                [:p.quintile-note (format "%s companies" (format "%,d" (count rows)))]
                (company-table rows)])
        metric-name [:p.error (str "Unknown metric " metric-name)]

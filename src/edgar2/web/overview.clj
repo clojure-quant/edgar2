@@ -1,5 +1,5 @@
 (ns edgar2.web.overview
-  "Universe quintiles from data/stats.edn."
+  "Universe percentiles from data/stats.edn."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [hyper.core :as h]
@@ -16,12 +16,17 @@
               {:key :operating-income-score :label "operating-income-score" :fmt :number}
               {:key :avg-profit-margin :label "avg-profit-margin (%)" :fmt :percent}]}
    {:title "GROWTH"
-    :metrics [{:key :sales-growth-yoy :label "sales-growth-yoy (%)" :fmt :number}]}
+    :metrics [{:key :sales-growth-yoy :label "sales-growth-yoy (%)" :fmt :number}
+              {:key :net-income-change-q-on-y :label "net-income-change-q-on-y (%)" :fmt :number}]}
    {:title "VALUATION"
     :metrics [{:key :ev-ebit :label "ev-ebit" :fmt :number}
               {:key :price-earnings :label "pe" :fmt :number}
               {:key :price-sales :label "price-sales" :fmt :number}
               {:key :dividend-yield :label "dividend-yield (%)" :fmt :number}]}])
+
+(def percentile-count
+  "Number of equal-sized bands on the overview / segment pages."
+  10)
 
 (defonce ^:private cache* (atom {:mtime nil :rows nil}))
 
@@ -32,12 +37,39 @@
         idx (min (dec n) (max 0 (dec (int (Math/ceil (* (double p) n))))))]
     (nth sorted idx)))
 
-(defn quintile-cuts
-  "Tops of Q1–Q4 (20th, 40th, 60th, 80th percentile). Empty when xs is empty."
+(defn percentile-cuts
+  "Tops of P1–P9 (10th…90th percentile). Empty when xs is empty."
   [xs]
   (when (seq xs)
-    (let [sorted (vec (sort xs))]
-      (mapv #(quantile sorted %) [0.2 0.4 0.6 0.8]))))
+    (let [sorted (vec (sort xs))
+          fracs (mapv #(/ (double %) percentile-count)
+                      (range 1 percentile-count))]
+      (mapv #(quantile sorted %) fracs))))
+
+(defn parse-percentile
+  "1-based percentile band from a query string, or nil."
+  [s]
+  (when-let [n (try (Long/parseLong (str s))
+                    (catch Exception _ nil))]
+    (when (<= 1 n percentile-count) n)))
+
+(defn in-percentile?
+  "True when `v` falls in 1-based band `p` (1..10) of the distribution `xs`.
+
+  P1 is at or below the 10th percentile cut; P10 is above the 90th.
+  Intermediate bands are (prev-cut, cut]."
+  [xs p v]
+  (let [cuts (percentile-cuts xs)
+        p (long p)]
+    (boolean
+     (when (and (seq cuts) (number? v) (<= 1 p percentile-count))
+       (let [v (double v)
+             lo (when (> p 1) (double (nth cuts (- p 2))))
+             hi (when (< p percentile-count) (double (nth cuts (dec p))))]
+         (cond
+           (= p 1) (<= v hi)
+           (= p percentile-count) (> v lo)
+           :else (and (> v lo) (<= v hi))))))))
 
 (defn- format-value
   [fmt x]
@@ -60,19 +92,32 @@
           (reset! cache* {:mtime mtime :rows rows})
           rows)))))
 
+(defn- percentile-link
+  [metric-key p text]
+  [:a (h/navigate :segment {} {:metric (name metric-key)
+                               :percentile (str p)})
+   text])
+
 (defn- metric-row
   [rows {:keys [label key fmt]}]
   (let [xs (filterv number? (keep key rows))
-        [q1 q2 q3 q4] (quintile-cuts xs)
-        cell (fn [k x] [:td.num {:key k} (if x (format-value fmt x) "")])]
-    [:tr {:key label}
-     [:td [:a (h/navigate :segment {} {:metric (name key)}) label]]
-     [:td.num (count xs)]
-     (cell :q1 q1)
-     (cell :q2 q2)
-     (cell :q3 q3)
-     (cell :q4 q4)
-     [:td.num {:key :q5} (if q4 (str "> " (format-value fmt q4)) "")]]))
+        cuts (percentile-cuts xs)
+        last-cut (when (seq cuts) (last cuts))]
+    (into [:tr {:key label}
+           [:td [:a (h/navigate :segment {} {:metric (name key)}) label]]
+           [:td.num (count xs)]]
+          (concat
+           (map (fn [i cut]
+                  (let [p (inc i)]
+                    [:td.num {:key p}
+                     (when cut
+                       (percentile-link key p (format-value fmt cut)))]))
+                (range (count cuts))
+                (or cuts []))
+           [[:td.num {:key percentile-count}
+             (when last-cut
+               (percentile-link key percentile-count
+                                (str "> " (format-value fmt last-cut))))]]))))
 
 (defn sic-label
   "Industry name, or the older :sic-description when that is all a row has."
@@ -170,25 +215,24 @@
                                "")]]))
             groups)]]))
 
-(defn- quintile-table
+(defn- percentile-table
   [rows]
-  [:div.table-wrap
-   [:table
-    [:thead
-     [:tr
-      [:th "metric"]
-      [:th.num "n"]
-      [:th.num "Q1"]
-      [:th.num "Q2"]
-      [:th.num "Q3"]
-      [:th.num "Q4"]
-      [:th.num "Q5"]]]
-    (into [:tbody]
-          (mapcat (fn [{:keys [title metrics]}]
-                    (cons [:tr.quintile-group {:key title}
-                           [:th {:colspan 7} title]]
-                          (map #(metric-row rows %) metrics)))
-                  groups))]])
+  (let [colspan (+ 2 percentile-count)]
+    [:div.table-wrap
+     [:table
+      [:thead
+       (into [:tr
+              [:th "metric"]
+              [:th.num "n"]]
+             (map (fn [p]
+                    [:th.num {:key p} (str "P" p)])
+                  (range 1 (inc percentile-count))))]
+      (into [:tbody]
+            (mapcat (fn [{:keys [title metrics]}]
+                      (cons [:tr.quintile-group {:key title}
+                             [:th {:colspan colspan} title]]
+                            (map #(metric-row rows %) metrics)))
+                    groups))]]))
 
 (defn overview-page
   [req]
@@ -202,9 +246,9 @@
        [:p.error err]
        [:div
         [:p.quintile-note
-         (format "%s companies. Q1–Q4 are the top of each quintile; Q5 is above Q4."
+         (format "%s companies. P1–P9 are the top of each decile; P10 is above P9."
                  (format "%,d" (count (:rows loaded))))]
-        (quintile-table (:rows loaded))
+        (percentile-table (:rows loaded))
         [:h2.stats-section "SIC"]
         (sic-table (:rows loaded))
         [:h2.stats-section "FOREIGN"]
