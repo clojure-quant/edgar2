@@ -1,5 +1,7 @@
 (ns edgar2.web.ingress-eodhd
-  "Status of the EODHD bar and split downloads, and a button that runs whatever is due."
+  "Status of the EODHD bar and split downloads.
+
+  Download runs whatever is due. Download all always pulls bars and splits."
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [edgar2.eodhd.ingress :as ingress]
@@ -63,9 +65,9 @@
             (.setLength buf 0))))
       (close [] (.flush this)))))
 
-(defn start!
-  "Run the due EODHD downloads on a background thread."
-  []
+(defn- start-job!
+  "Run `run-fn` on a background thread. Further clicks do nothing until it finishes."
+  [run-fn]
   (when (compare-and-set! running* false true)
     (reset! job* {:status :running
                   :lines []
@@ -93,7 +95,7 @@
                                                (swap! job* update :finished (fnil conj #{}) id)
                                                (publish!))
                                        nil))]
-            (ingress/run {}))
+            (run-fn {}))
           (publish!)
           (swap! job* assoc :status :done :current nil :error nil)
           (catch Throwable t
@@ -108,6 +110,16 @@
               (catch Throwable _))
             (reset! running* false)))))
     nil))
+
+(defn start!
+  "Run the due EODHD downloads on a background thread."
+  []
+  (start-job! ingress/run))
+
+(defn start-all!
+  "Download all bar series and splits on a background thread."
+  []
+  (start-job! ingress/run-all))
 
 (defn- state-label
   [item job]
@@ -126,7 +138,7 @@
     [:div
      (nav req)
      [:h1 "Ingress EODHD"]
-     [:p "US common and preferred stocks with at least $20 million turnover (latest session close × volume). Bar download and split download each pull 50 years of daily data and refresh after 3 days. Series are nippy files in data/eodhd/bardb, one symbol per file. The screen reads them through the eodhd split service, so prices are split-adjusted. The token is read from $QUANTASTORE/edgar2.edn."]
+     [:p "Download refreshes bars and splits for US common and preferred stocks with at least $20 million turnover (latest session close × volume) — about 2,000 names. Download all drops that floor and pulls every US equity EODHD lists (~18,000). Each series is 50 years of daily data; files live in data/eodhd/bardb. The screen reads them through the eodhd split service, so prices are split-adjusted. The token is read from $QUANTASTORE/edgar2.edn."]
      [:table
       [:thead
        [:tr [:th "Task"] [:th "As of"] [:th "Limit"] [:th "Status"] [:th "Detail"]]]
@@ -144,18 +156,23 @@
                            "ingress-ok")}
              label]
             [:td (:summary item)]]))]]
-     (cond
-       running? [:button {:type "button" :disabled true}
-                 (str "Running "
-                      (some (fn [item]
-                              (when (= (:id item) (:current job))
-                                (:label item)))
-                            items)
-                      "…")]
-       due? [:button {:type "button"
-                      :data-on:click (h/action (start!))}
-             "Download"]
-       :else [:button {:type "button" :disabled true} "Up to date"])
+     (if running?
+       [:button {:type "button" :disabled true}
+        (str "Running "
+             (some (fn [item]
+                     (when (= (:id item) (:current job))
+                       (:label item)))
+                   items)
+             "…")]
+       [:div.ingress-actions
+        (if due?
+          [:button {:type "button"
+                    :data-on:click (h/action (start!))}
+           "Download"]
+          [:button {:type "button" :disabled true} "Up to date"])
+        [:button {:type "button"
+                  :data-on:click (h/action (start-all!))}
+         "Download all"]])
      (when-let [err (:error job)]
        [:p.error err])
      (when (= :done (:status job))

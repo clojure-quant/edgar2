@@ -2,8 +2,9 @@
   "US equities from EODHD, then 50 years of daily bars and splits.
 
   The token is :eodhd in $QUANTASTORE/edgar2.edn. Equities are common and
-  preferred stock (quanta.eodhd.ds/convert-asset category :equity) whose
-  latest US bulk session has close × volume of at least 20 million.
+  preferred stock (quanta.eodhd.ds/convert-asset category :equity). The
+  due download keeps names with close × volume of at least 20 million;
+  run-all / Download all keeps every equity.
 
   Bars and splits are written as nippy datasets under data/eodhd/bardb,
   one series per symbol, the same file layout as quanta.bar.db.nippy:
@@ -12,7 +13,8 @@
   (open/high/low/close all equal the split factor). Downloads go through
   quanta.eodhd and the same rate limit as the library's list import.
 
-  Usage: clj -X:ingress-eodhd"
+  Usage: clj -X:ingress-eodhd
+         clj -X:ingress-all"
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
@@ -149,44 +151,59 @@
       ex)))
 
 (defn import-equities
-  "Write data/eodhd/equities.edn. Returns the rows, highest turnover first."
-  []
-  (quiet-logs!)
-  (println "Importing US equities with turnover >= 20 million")
-  (flush)
-  (let [api-token (token)
-        assets (try
-                 (m/? (raw/get-exchange-assets api-token "US"))
-                 (catch Exception ex
-                   (throw (reject-bad-token ex))))
-        by-code (into {} (map (juxt :Code identity)) assets)
-        equity-codes (into #{}
-                           (comp (filter equity?) (map :Code))
-                           assets)
-        bulk (m/? (raw/get-day-bulk api-token {:exchange "US"}))
-        rows (->> bulk
-                  (keep (fn [row]
-                          (let [code (:code row)
-                                close (:close row)
-                                volume (:volume row)]
-                            (when (and (string? code)
-                                       (number? close)
-                                       (number? volume)
-                                       (contains? equity-codes code))
-                              (let [turnover (* (double close) (double volume))]
-                                (when (>= turnover turnover-min)
-                                  {:code code
-                                   :name (or (:Name (get by-code code)) "")
-                                   :exchange (:Exchange (get by-code code))
-                                   :turnover (long (Math/round turnover))}))))))
-                  (sort-by :turnover >)
-                  vec)]
-    (when (empty? rows)
-      (throw (ex-info "No US equities with turnover of at least 20 million" {})))
-    (dataset/write-dataset! equities-path {:download-date (today)} rows)
-    (println (format "%d equities" (count rows)))
-    (flush)
-    rows))
+  "Write data/eodhd/equities.edn. Returns the rows, highest turnover first.
+
+  With no args (or :min-turnover matching turnover-min), keeps equities whose
+  latest bulk session has close × volume of at least that floor. Pass
+  :min-turnover 0 to keep every US common and preferred stock."
+  ([] (import-equities {}))
+  ([{:keys [min-turnover] :or {min-turnover turnover-min}}]
+   (quiet-logs!)
+   (let [min-turnover (double (or min-turnover 0.0))
+         all? (not (pos? min-turnover))]
+     (println (if all?
+                "Importing all US common and preferred stocks"
+                (format "Importing US equities with turnover >= %.0f million"
+                        (/ min-turnover 1.0e6))))
+     (flush)
+     (let [api-token (token)
+           assets (try
+                    (m/? (raw/get-exchange-assets api-token "US"))
+                    (catch Exception ex
+                      (throw (reject-bad-token ex))))
+           equities (filterv equity? assets)
+           bulk (m/? (raw/get-day-bulk api-token {:exchange "US"}))
+           bulk-by-code (into {}
+                              (keep (fn [row]
+                                      (when (string? (:code row))
+                                        [(:code row) row])))
+                              bulk)
+           rows (->> equities
+                     (keep (fn [asset]
+                             (let [code (:Code asset)
+                                   row (get bulk-by-code code)
+                                   close (:close row)
+                                   volume (:volume row)
+                                   turnover (if (and (number? close) (number? volume))
+                                              (* (double close) (double volume))
+                                              0.0)]
+                               (when (or all? (>= turnover min-turnover))
+                                 {:code code
+                                  :name (or (:Name asset) "")
+                                  :exchange (:Exchange asset)
+                                  :turnover (long (Math/round turnover))}))))
+                     (sort-by :turnover >)
+                     vec)]
+       (when (empty? rows)
+         (throw (ex-info (if all?
+                           "No US equities from EODHD"
+                           (format "No US equities with turnover of at least %.0f"
+                                   min-turnover))
+                         {})))
+       (dataset/write-dataset! equities-path {:download-date (today)} rows)
+       (println (format "%d equities" (count rows)))
+       (flush)
+       rows))))
 
 (defn- bars-dataset
   "Same shaping as quanta.eodhd.ds/get-bars-eodhd, with the rows already in hand.
@@ -218,8 +235,6 @@
          bars (if (seq rows)
                 (bars-dataset (:calendar opts) rows)
                 (tc/dataset))]
-     (println (:asset opts) "bars" (tc/row-count bars))
-     (flush)
      bars)))
 
 (defn- store-bars [_ctx opts data]
@@ -235,8 +250,6 @@
                  (m/? (ds/get-splits (:eodhd-token ctx)
                                      (select-keys opts [:asset :calendar])
                                      (select-keys opts [:start :end]))))]
-     (println (:asset opts) "splits" (tc/row-count splits))
-     (flush)
      splits)))
 
 (defn- store-splits [_ctx opts data]
@@ -265,6 +278,21 @@
    :capacity 20
    :rate 5})
 
+(defn- with-progress
+  "Wrap a download-fn so every 100 finished series print `n/total downloaded`."
+  [download-fn total]
+  (let [done (atom 0)
+        total (long total)]
+    (fn [ctx opts]
+      (m/sp
+       (try
+         (m/? (download-fn ctx opts))
+         (finally
+           (let [n (swap! done inc)]
+             (when (or (zero? (mod n 100)) (= n total))
+               (println (format "%d/%d downloaded" n total))
+               (flush)))))))))
+
 (defn- download-all [equities download-fn store-fn]
   (quiet-logs!)
   (let [api-token (token)
@@ -272,11 +300,14 @@
         ctx {:eodhd-token api-token}
         tasks (mapv (fn [{:keys [code]}]
                       (merge {:asset code :calendar calendar} window))
-                    equities)]
+                    equities)
+        n (count tasks)]
+    (println (format "0/%d downloaded" n))
+    (flush)
     (m/? (rest-import ctx
                       (merge import-limits
                              {:tasks-opts tasks
-                              :download-fn download-fn
+                              :download-fn (with-progress download-fn n)
                               :store-fn store-fn})))))
 
 (defn- public-error [s]
@@ -310,18 +341,20 @@
   result)
 
 (defn bar-download
-  []
-  (let [equities (import-equities)]
-    (finish! "Bar download" bars-meta-path
-             (download-all equities download-bars store-bars)
-             (count equities))))
+  ([] (bar-download {}))
+  ([opts]
+   (let [equities (import-equities opts)]
+     (finish! "Bar download" bars-meta-path
+              (download-all equities download-bars store-bars)
+              (count equities)))))
 
 (defn split-download
-  []
-  (let [equities (import-equities)]
-    (finish! "Split download" splits-meta-path
-             (download-all equities download-splits store-splits)
-             (count equities))))
+  ([] (split-download {}))
+  ([opts]
+   (let [equities (import-equities opts)]
+     (finish! "Split download" splits-meta-path
+              (download-all equities download-splits store-splits)
+              (count equities)))))
 
 (defn- manifest-status
   [path]
@@ -379,6 +412,24 @@
            :run split-download}
           (manifest-status splits-meta-path))])
 
+(defn- run-items
+  [items work]
+  (doseq [item items]
+    (println (format "%-16s %s  %s"
+                     (:label item)
+                     (if (:due? item) "DUE" "ok")
+                     (:summary item))))
+  (when (empty? work)
+    (println "Nothing to do."))
+  (doseq [item work]
+    (when *step* (*step* {:event :start :id (:id item) :label (:label item)}))
+    (println)
+    (println (str "=== " (:label item) " ==="))
+    (flush)
+    ((:run item))
+    (when *step* (*step* {:event :done :id (:id item)})))
+  items)
+
 (defn run
   "Import the equity list, then download whichever of bars and splits is stale.
 
@@ -387,19 +438,20 @@
   ([_]
    (quiet-logs!)
    (let [items (plan)]
-     (doseq [item items]
-       (println (format "%-16s %s  %s"
-                        (:label item)
-                        (if (:due? item) "DUE" "ok")
-                        (:summary item))))
-     (let [work (filterv :due? items)]
-       (when (empty? work)
-         (println "Nothing to do."))
-       (doseq [item work]
-         (when *step* (*step* {:event :start :id (:id item) :label (:label item)}))
-         (println)
-         (println (str "=== " (:label item) " ==="))
-         (flush)
-         ((:run item))
-         (when *step* (*step* {:event :done :id (:id item)}))))
-     items)))
+     (run-items items (filterv :due? items)))))
+
+(defn run-all
+  "Import every US equity, then download bars and splits for all of them.
+
+  Unlike `run`, this ignores the $20M turnover floor (~2k names) and pulls
+  the full common/preferred list (~18k). Also re-downloads even when fresh.
+
+  Usage: clj -X:ingress-all"
+  ([] (run-all {}))
+  ([_]
+   (quiet-logs!)
+   (let [opts {:min-turnover 0}
+         items (plan)
+         work [(assoc (first items) :run #(bar-download opts))
+               (assoc (second items) :run #(split-download opts))]]
+     (run-items items work))))

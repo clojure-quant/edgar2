@@ -731,12 +731,33 @@
                   [end val]))
               rows)))
 
+(defn- entity-common-shares
+  "Point-in-time shares outstanding from company facts.
+
+  Used when weighted-average share tags are missing (common for IFRS
+  20-F filers such as GSK)."
+  [cik form]
+  (try
+    (->> (ds/mapseq-reader
+          (e/facts cik :concept "EntityCommonStockSharesOutstanding" :form form))
+         (filter #(and (= "dei" (str (:taxonomy %)))
+                       (or (= "shares" (str (:unit %)))
+                           (str/ends-with? (str (:unit %)) "/shares"))
+                       (number? (:val %))
+                       (pos? (double (:val %)))))
+         latest-filed
+         (map (juxt #(str (:end %)) :val))
+         (into {}))
+    (catch Throwable _
+      {})))
+
 (defn class-weighted-shares
   "Shares Basic and Shares Diluted from the latest annual report.
 
   Company facts drop dimensional share counts, so a dual-class filer has
   no share row. Read the weighted-average facts from the filing and keep
-  the listed class."
+  the listed class. When those tags are absent, fall back to
+  dei:EntityCommonStockSharesOutstanding from company facts."
   [cik form]
   (try
     (let [filing (e/filing cik :form form)
@@ -748,15 +769,21 @@
           basic-rows (annual-share-rows facts contexts basic-name)
           diluted-rows (annual-share-rows facts contexts diluted-name)
           member (:member (or (listed-share-class basic-rows)
-                              (listed-share-class diluted-rows)))]
-      (into {}
-            (keep (fn [[concept line]]
-                    (let [values (end-values (if (= concept basic-name)
-                                               basic-rows
-                                               diluted-rows)
-                                             member)]
-                      (when (seq values) [line values]))))
-            weighted-share-names))
+                              (listed-share-class diluted-rows)))
+          weighted (into {}
+                         (keep (fn [[concept line]]
+                                 (let [values (end-values (if (= concept basic-name)
+                                                            basic-rows
+                                                            diluted-rows)
+                                                          member)]
+                                   (when (seq values) [line values]))))
+                         weighted-share-names)]
+      (if (seq weighted)
+        weighted
+        (let [outstanding (entity-common-shares cik form)]
+          (if (seq outstanding)
+            {"Shares Basic" outstanding}
+            {}))))
     (catch Throwable _
       {})))
 

@@ -276,6 +276,12 @@ tr.filings-cat.selected td {
   font-weight: 700;
 }
 
+.ingress-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .ingress-log {
   max-height: 24rem;
   overflow: auto;
