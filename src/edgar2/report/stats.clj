@@ -10,6 +10,7 @@
             [edgar2.filing :as filing]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds-universe :as fsds]
+            [edgar2.adr :as adr]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
             [edgar2.download.facts-universe :as universe]
@@ -786,7 +787,7 @@
 
 (def stats-field-order
   [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
-   :shares :marketcap
+   :shares :adr-ratio :marketcap
    :revenue :revenue-unit
    :net-profit
    :eps
@@ -872,6 +873,7 @@
   (0–100 share of annual years that did not fall versus the prior year).
   When operating income is not tagged, a year whose operating expenses were
   derived uses gross profit minus those expenses.
+  :adr-ratio (ordinary shares per ADR from data/adr.edn) when known.
   :sic, :sector, :industry, and :subindustry come from data/universe-fsds.edn.
 
   Usage: clj -X:stats
@@ -902,10 +904,13 @@
                             (:shares-outstanding row))
                  st (with-sic
                       (try
-                        (-> (if data
-                              (company-stats (:facts data) row)
-                              (select-keys row [:ticker :exchange :cik :entityName]))
-                            (with-valuation prices shares))
+                        (let [base (-> (if data
+                                         (company-stats (:facts data) row)
+                                         (select-keys row [:ticker :exchange :cik :entityName]))
+                                       (with-valuation prices shares))
+                              ratio (adr/get-ratio (:ticker base))]
+                          (cond-> base
+                            ratio (assoc :adr-ratio ratio)))
                         (catch Exception ex
                           (println (format "  stats-fail %s (%s)" (:ticker row) (.getMessage ex)))
                           (select-keys row [:ticker :exchange :cik :entityName])))
@@ -937,7 +942,7 @@
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
@@ -947,6 +952,7 @@
                               (count (filter :return-on-capital out))
                               (count (filter :price out))
                               (count (filter :marketcap out))
+                              (count (filter :adr-ratio out))
                               (count (filter :price-earnings out))
                               (count (filter :enterprise-value out))
                               (count (filter :ev-ebit out))

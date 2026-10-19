@@ -106,8 +106,10 @@
   [{:label "Price"
     :fields [{:key :price :digits 2}
              {:key :shares :millions? true :label "shares (M)"}
+             {:key :adr-ratio :digits 2 :label "adr-ratio"}
              {:key :marketcap :millions? true}
-             {:key :enterprise-value :millions? true}]}
+             {:key :enterprise-value :millions? true}
+             {:key :revenue-unit :label "reporting-cur"}]}
    {:label "Quality"
     :fields [{:key :return-on-assets :digits 4}
              {:key :return-on-capital :digits 4}
@@ -134,7 +136,8 @@
   [row {:keys [key source digits millions?]}]
   (let [v (get row (or source key))]
     (cond
-      (not (number? v)) ""
+      (nil? v) ""
+      (not (number? v)) (str v)
       millions? (str (Math/round (/ (double v) 1.0e6)))
       :else (format (str "%." digits "f") (double v)))))
 
