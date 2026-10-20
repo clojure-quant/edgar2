@@ -3,7 +3,6 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.pprint :as pprint]
-            [clojure.set :as set]
             [clojure.string :as str]
             [edgar.api :as e]
             [edgar2.financials.concepts :as concepts]
@@ -114,16 +113,6 @@
       {:sales-growth-yoy (avg window)
        :sales-growth-years (count window)})))
 
-(defn by-end
-  [series]
-  (into {} (map (juxt #(str (:end %)) :val) series)))
-
-(defn by-ends
-  "end → val for numeric entries of parallel newest-first `ends` / `vals`."
-  [ends vals]
-  (into {} (keep (fn [[e v]] (when (number? v) [e v]))
-                 (map vector ends vals))))
-
 (defn latest-num
   "Newest numeric value and its end from parallel newest-first vectors."
   [ends vals]
@@ -157,47 +146,32 @@
   [row tag-pairs]
   (some (fn [[_ c]] (concept-val row c)) tag-pairs))
 
-(defn series-for
-  "Oldest-first {:end :val} series for the first tag pair with any values.
-  Does not mix tags across years (same as old first-annual-flows)."
-  [rows tag-pairs]
-  (let [col (some (fn [[_ c]]
-                    (let [n (name c)]
-                      (when (some #(number? (get % n)) rows) n)))
-                  tag-pairs)]
-    (when col
-      (->> rows
-           reverse
-           (keep (fn [r]
-                   (let [v (get r col)]
-                     (when (number? v)
-                       {:end (str (:end r)) :val v}))))
-           vec))))
-
-(defn aligned-ends
-  "Period-ends present in both end→val maps, oldest first."
-  [num-by den-by]
-  (sort (set/intersection (set (keys num-by)) (set (keys den-by)))))
-
-(defn latest-aligned
-  "Latest period-end present in both end→val maps."
-  [num-by den-by]
-  (let [ends (aligned-ends num-by den-by)]
-    (when (seq ends)
-      (let [end (last ends)]
-        {:end end :num (num-by end) :den (den-by end)}))))
-
 (defn ratio
   [num den]
   (when (and (number? num) (number? den) (not (zero? (double den))))
     (/ (double num) (double den))))
 
-(defn yearly-ratios
-  "num/den per aligned period, oldest first.
+(defn latest-ratio
+  "Newest num/den from parallel newest-first vectors (row-aligned).
 
-  `nums` and `dens` are newest-first value vectors (same shape as
-  `calc-concept`). Periods where either side is missing, or the
-  denominator is zero, are omitted."
+  Skips periods where either side is missing or the denominator is zero."
+  ([nums dens]
+   (some (fn [[n d]]
+           (when-let [r (ratio n d)]
+             {:num n :den d :ratio r}))
+         (map vector nums dens)))
+  ([ends nums dens]
+   (some (fn [[e n d]]
+           (when-let [r (ratio n d)]
+             {:end e :num n :den d :ratio r}))
+         (map vector ends nums dens))))
+
+(defn yearly-ratios
+  "num/den per row-aligned period, oldest first.
+
+  `nums` and `dens` are newest-first value vectors from the same dataset.
+  Periods where either side is missing, or the denominator is zero, are
+  omitted."
   [nums dens]
   (->> (map ratio (reverse nums) (reverse dens))
        (filterv some?)))
@@ -218,16 +192,6 @@
   (let [s (str/upper-case (str u))]
     (or (= s "USD")
         (str/starts-with? s "USD/"))))
-
-(defn latest-obs
-  [series]
-  (when (seq series)
-    (last series)))
-
-(defn value-at
-  [series end]
-  (when (and (seq series) end)
-    (get (by-end series) (str end))))
 
 (defn later-end
   "Later of two period-end strings."
@@ -282,45 +246,6 @@
     (vec (ds/column dss k))
     []))
 
-(defn annual-ebit
-  "Operating income at the last report `end` from `oi-by`, else net income
-  + interest + tax on that period's report-table row."
-  [rows end oi-by]
-  (let [row (row-at-end rows end)]
-    (or (when-let [v (get oi-by (str end))]
-          (when (number? v)
-            {:ebit (double v) :ebit-end (str end)}))
-        (let [ni (first-concept-val row net-income-tags)
-              interest (first-concept-val row interest-expense-tags)
-              tax (first-concept-val row income-tax-tags)]
-          (when (and ni (or interest tax))
-            {:ebit (+ (double ni)
-                      (double (or interest 0))
-                      (double (or tax 0)))
-             :ebit-end (str end)})))))
-
-(defn basic-if-diluted-older
-  "Basic series when its latest period-end is after diluted's."
-  [diluted basic]
-  (let [de (some-> (latest-obs diluted) :end str)
-        be (some-> (latest-obs basic) :end str)]
-    (cond
-      (and de be (neg? (compare de be))) basic
-      (seq diluted) diluted
-      (seq basic) basic)))
-
-(defn annual-eps-series
-  "Latest annual EPS series. Basic wins when diluted's period-end is older."
-  [rows]
-  (or (basic-if-diluted-older
-       (series-for rows [[:us-gaap :EarningsPerShareDiluted]])
-       (series-for rows [[:us-gaap :EarningsPerShareBasic]]))
-      (basic-if-diluted-older
-       (series-for rows [[:ifrs-full :DilutedEarningsLossPerShare]])
-       (series-for rows [[:ifrs-full :BasicEarningsLossPerShare]]))
-      (series-for rows [[:ifrs-full :BasicAndDilutedEarningsLossPerShare]])
-      []))
-
 (defn annual-dps
   "Per-share dividend at period-end `end`. Cash paid wins. Missing → 0.
 
@@ -341,12 +266,6 @@
                {:val 0.0 :end (str end)})]
     (absorb-currency-decimal cik fact)))
 
-(defn abs-paid
-  [row tag-pairs]
-  (when-let [v (first-concept-val row tag-pairs)]
-    (let [amount (Math/abs (double v))]
-      (when (pos? amount) amount))))
-
 (defn company-stats
   "Fundamentals from an `e/facts`-shaped dataset via `report-table`.
 
@@ -365,13 +284,16 @@
         oi (col-vec concepts :operating-income)
         equity (col-vec concepts :total-equity)
         debt-v (col-vec concepts :debt)
-        ni-by (by-ends ends ni)
-        rev-by (by-ends ends rev)
-        assets-by (by-ends ends assets)
-        equity-by (by-ends ends equity)
+        eps-v (col-vec concepts :eps)
+        paid-v (col-vec concepts :dividends-paid)
+        repurchase-v (col-vec concepts :stock-repurchase)
+        ebit-v (col-vec concepts :ebit)
         bs-end (:end (latest-num ends assets))
         last-end (later-end (:end (latest-num ends rev)) bs-end)
-        eps (latest-obs (annual-eps-series rows))
+        eps (latest-num ends eps-v)
+        paid (:val (latest-num ends paid-v))
+        repurchase (:val (latest-num ends repurchase-v))
+        ebit (latest-num ends ebit-v)
         dps (annual-dps rows last-end (:cik row))
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
         ni-qoy (calc-q/net-income-change-q-on-y
@@ -379,9 +301,9 @@
         margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score (chron-nums rev))
         oi-score (direction-score (chron-nums oi))
-        margin (latest-aligned ni-by rev-by)
-        roa (latest-aligned ni-by assets-by)
-        roc (latest-aligned ni-by equity-by)
+        margin (latest-ratio ends ni rev)
+        roa (latest-ratio ends ni assets)
+        roc (latest-ratio ends ni equity)
         bs-row (or (row-at-end rows bs-end) current)
         debt (let [i (or (some identity
                                (map-indexed (fn [i e] (when (= e bs-end) i)) ends))
@@ -391,14 +313,11 @@
         preferred (first-concept-val bs-row preferred-tags)
         nci (or (concept-val bs-row :MinorityInterest)
                 (concept-val bs-row :NoncontrollingInterests))
-        ebit (annual-ebit rows last-end (by-ends ends oi))
         coverage-end (or (:end margin) last-end)
         coverage-row (or (row-at-end rows coverage-end) current)
         coverage-ni (if margin
                       (:num margin)
                       (first-concept-val coverage-row net-income-tags))
-        paid (abs-paid coverage-row dividends-paid-tags)
-        repurchase (abs-paid coverage-row stock-repurchase-tags)
         coverage (when paid (ratio coverage-ni paid))]
     (cond-> (assoc (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
                    :annual-count annual-count)
@@ -409,17 +328,17 @@
       (number? rev-score) (assoc :revenue-score rev-score)
       (number? oi-score) (assoc :operating-income-score oi-score)
       margin
-      (assoc :profit-margin (ratio (:num margin) (:den margin))
+      (assoc :profit-margin (:ratio margin)
              :net-profit (:num margin)
              :revenue (:den margin))
       (:avg-profit-margin margins)
       (assoc :avg-profit-margin (:avg-profit-margin margins)
              :avg-profit-margin-years (:avg-profit-margin-years margins))
       roa
-      (assoc :return-on-assets (ratio (:num roa) (:den roa))
+      (assoc :return-on-assets (:ratio roa)
              :assets (:den roa))
       roc
-      (assoc :return-on-capital (ratio (:num roc) (:den roc))
+      (assoc :return-on-capital (:ratio roc)
              :equity (:den roc)
              :roc-end (:end roc))
       (and eps (number? (:val eps)))
@@ -432,7 +351,8 @@
       (number? cash) (assoc :cash cash)
       (number? preferred) (assoc :preferred-stock preferred)
       (number? nci) (assoc :noncontrolling-interest nci)
-      (:ebit ebit) (assoc :ebit (:ebit ebit) :ebit-end (:ebit-end ebit))
+      (and ebit (number? (:val ebit)))
+      (assoc :ebit (:val ebit) :ebit-end (:end ebit))
       (number? coverage) (assoc :dividend-coverage coverage))))
 
 (defn load-price-by-ticker
@@ -628,22 +548,6 @@
         ordered (mapv #(select-fields % stats-field-order) rows)]
     (spit tmp (with-out-str (pprint/pprint ordered)))
     (.renameTo (io/file tmp) (io/file stats-path))))
-
-(defn merge-sic!
-  "Add :sic, :sector, :industry, and :subindustry from universe-fsds.edn
-  onto the current data/stats.edn, without rebuilding fundamentals."
-  []
-  (let [rows (mapv #(with-sic % (load-sic-index))
-                   (edn/read-string (slurp stats-path)))]
-    (save-stats! rows)
-    (println (format "Wrote %s  (%d companies; sic=%d  sector=%d  industry=%d  subindustry=%d)"
-                     stats-path
-                     (count rows)
-                     (count (filter :sic rows))
-                     (count (filter :sector rows))
-                     (count (filter :industry rows))
-                     (count (filter :subindustry rows))))
-    rows))
 
 (defn revalue-stats!
   "Recompute market-cap-adjusted and valuation ratios on data/stats.edn

@@ -150,18 +150,70 @@
           (ends table)
           reported)))
 
+(defn concept-absolute
+  "Per-row absolute values for `concept-id` on a report-table (newest first).
+
+  Non-positive amounts become nil (cash outflows stored as negatives in XBRL
+  still yield a positive amount)."
+  [table concept-id]
+  (mapv (fn [v]
+          (when (number? v)
+            (let [amount (Math/abs (double v))]
+              (when (pos? amount) amount))))
+        (facts-ds/calc-concept table concept-id)))
+
+(defn- first-tag-val
+  [row tag-pairs]
+  (some (fn [[_ c]]
+          (as-number (get row (name c))))
+        tag-pairs))
+
+(defn derived-ebit-row
+  "EBIT for one report-table row: net income + interest + tax.
+
+  Nil unless net income is present and at least one of interest or tax is."
+  [row]
+  (let [ni (first-tag-val row (:data (concepts/get-concept-id :net-income)))
+        interest (first-tag-val row (:data (concepts/get-concept-id :interest-expense)))
+        tax (first-tag-val row (:data (concepts/get-concept-id :income-tax)))]
+    (when (and ni (or interest tax))
+      (+ (double ni)
+         (double (or interest 0))
+         (double (or tax 0))))))
+
+(defn derived-ebit
+  "Per-row derived EBIT (net income + interest + tax), newest first."
+  [ds]
+  (mapv derived-ebit-row (ds/rows ds {:nil-missing? true})))
+
+(defn actual-or-derived-ebit
+  "Per-row EBIT: prefer reported `ebit-concept` values, else derived.
+
+  `ebit-concept` is a newest-first vector aligned with `ds` (e.g. operating
+  income from `calc-concept` / `operating-income`). Comparison is row by
+  row — a missing reported value falls back to `derived-ebit` for that row."
+  [ds ebit-concept]
+  (mapv (fn [reported derived]
+          (or (when (number? reported) reported) derived))
+        ebit-concept
+        (derived-ebit ds)))
+
 (def concept-ids
   "Concept :ids whose per-period vectors are added by `calc-concepts`."
-  [:revenue :net-income :assets :operating-income :total-equity :debt])
+  [:revenue :net-income :assets :operating-income :total-equity :debt :eps
+   :dividends-paid :stock-repurchase :ebit])
 
 (defn calc-concepts
   "Wide dataset of calculated concepts aligned with `ds-annual`.
 
   Keeps `:filed :period :end` from the report-table. Adds one column per
   entry in `concept-ids` (column name = concept `:id`). Values are
-  newest-first, same row order as `ds-annual`."
+  newest-first, same row order as `ds-annual`. `:dividends-paid` and
+  `:stock-repurchase` are absolute (positive) amounts. `:ebit` prefers
+  operating income, else net income + interest + tax."
   [ds-annual]
-  (let [period (ds/select-columns ds-annual [:filed :period :end])]
+  (let [period (ds/select-columns ds-annual [:filed :period :end])
+        oi (operating-income ds-annual)]
     (-> period
         (ds/add-or-update-column :revenue
                                  (facts-ds/calc-concept ds-annual :revenue))
@@ -169,9 +221,16 @@
                                  (facts-ds/calc-concept ds-annual :net-income))
         (ds/add-or-update-column :assets
                                  (facts-ds/calc-concept ds-annual :assets))
-        (ds/add-or-update-column :operating-income
-                                 (operating-income ds-annual))
+        (ds/add-or-update-column :operating-income oi)
         (ds/add-or-update-column :total-equity
                                  (total-equity ds-annual))
         (ds/add-or-update-column :debt
-                                 (interest-bearing-debt ds-annual)))))
+                                 (interest-bearing-debt ds-annual))
+        (ds/add-or-update-column :eps
+                                 (facts-ds/calc-concept ds-annual :eps))
+        (ds/add-or-update-column :dividends-paid
+                                 (concept-absolute ds-annual :dividends-paid))
+        (ds/add-or-update-column :stock-repurchase
+                                 (concept-absolute ds-annual :stock-repurchase))
+        (ds/add-or-update-column :ebit
+                                 (actual-or-derived-ebit ds-annual oi)))))
