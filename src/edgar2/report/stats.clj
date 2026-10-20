@@ -126,24 +126,6 @@
   [table]
   (vec (ds/rows table {:nil-missing? true})))
 
-(defn- as-number
-  "Keep integral doubles as longs so stats match JSON integer facts."
-  [v]
-  (when (number? v)
-    (if (and (float? v)
-             (== (double v) (Math/rint (double v)))
-             (<= (Math/abs (double v)) (double Long/MAX_VALUE)))
-      (long v)
-      v)))
-
-(defn concept-val
-  [row concept]
-  (as-number (get row (name concept))))
-
-(defn first-concept-val
-  [row tag-pairs]
-  (some (fn [[_ c]] (concept-val row c)) tag-pairs))
-
 (defn ratio-row
   "num/den for one period. Nil when either side is missing or den is zero."
   [num den]
@@ -189,16 +171,6 @@
     (or (= s "USD")
         (str/starts-with? s "USD/"))))
 
-(defn later-end
-  "Later of two period-end strings."
-  [a b]
-  (->> [a b] (remove str/blank?) sort last))
-
-(defn- row-at-end
-  [rows end]
-  (when-not (str/blank? (str end))
-    (some #(when (= (str end) (str (:end %))) %) rows)))
-
 (defn- col-vec
   "Values of column `k` on `ds` as a vector (empty when missing)."
   [dss k]
@@ -224,15 +196,24 @@
         oi (col-vec concepts :operating-income)
         equity (col-vec concepts :total-equity)
         debt-v (col-vec concepts :debt)
+        cash-v (col-vec concepts :cash)
+        preferred-v (col-vec concepts :preferred-stock)
+        nci-v (col-vec concepts :nci)
         eps-v (col-vec concepts :eps)
         dps-v (col-vec concepts :dps)
         ebit-v (col-vec concepts :ebit)
         concept-rows (vec (ds/rows concepts {:nil-missing? true}))
         bs-end (:end (latest-num ends assets))
-        last-end (later-end (:end (latest-num ends rev)) bs-end)
-        eps (latest-num ends eps-v)
-        dps (or (latest-num ends dps-v) {:val 0.0 :end last-end})
-        ebit (latest-num ends ebit-v)
+        bs-i (or (some identity
+                       (map-indexed (fn [i e] (when (= e bs-end) i)) ends))
+                 0)
+        debt (nth debt-v bs-i nil)
+        cash (nth cash-v bs-i nil)
+        preferred (nth preferred-v bs-i nil)
+        nci (nth nci-v bs-i nil)
+        eps (most-recent eps-v)
+        dps (or (most-recent dps-v) 0.0)
+        ebit (most-recent ebit-v)
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
         ni-qoy (calc-q/net-income-change-q-on-y
                 (facts-ds/report-table dss :q net-income-tags))
@@ -246,15 +227,6 @@
         revenue (most-recent rev)
         assets-val (most-recent assets)
         equity-val (most-recent equity)
-        bs-row (or (row-at-end rows bs-end) current)
-        debt (let [i (or (some identity
-                               (map-indexed (fn [i e] (when (= e bs-end) i)) ends))
-                         0)]
-               (nth debt-v i nil))
-        cash (first-concept-val bs-row cash-tag-pairs)
-        preferred (first-concept-val bs-row preferred-tags)
-        nci (or (concept-val bs-row :MinorityInterest)
-                (concept-val bs-row :NoncontrollingInterests))
         div (div-cov/calculate-dividend-coverage
              (or (first rows) current)
              (or (first concept-rows) {}))]
@@ -280,16 +252,13 @@
       (number? roc)
       (assoc :return-on-capital roc
              :equity equity-val)
-      (and eps (number? (:val eps)))
-      (assoc :eps (:val eps))
-      (and dps (number? (:val dps)))
-      (assoc :dps (:val dps))
+      (number? eps) (assoc :eps eps)
+      (number? dps) (assoc :dps dps)
       (number? debt) (assoc :debt debt :debt-end bs-end)
       (number? cash) (assoc :cash cash)
       (number? preferred) (assoc :preferred-stock preferred)
       (number? nci) (assoc :noncontrolling-interest nci)
-      (and ebit (number? (:val ebit)))
-      (assoc :ebit (:val ebit) :ebit-end (:end ebit)))))
+      (number? ebit) (assoc :ebit ebit))))
 
 (defn load-price-by-ticker
   "ticker → close from data/prices.edn."
@@ -364,6 +333,8 @@
                       (number? repurchase) (pos? (double repurchase)))
              (* 100.0 (/ (double repurchase) (double vmcap))))
         ebit (when (number? (:ebit st)) (:ebit st))
+        ;; Balance-sheet add-ons from the same period as :debt / :cash
+        ;; (assets end). Missing legs count as 0 in EV.
         ev (when vmcap
              (+ (double vmcap)
                 (double (or (:debt st) 0))

@@ -201,7 +201,7 @@
 (def concept-ids
   "Concept :ids whose per-period vectors are added by `calc-concepts`."
   [:revenue :net-income :assets :operating-income :total-equity :debt :eps :dps
-   :dividends-paid :stock-repurchase :ebit])
+   :dividends-paid :stock-repurchase :ebit :cash :preferred-stock :nci])
 
 (defn calc-concepts
   "Wide dataset of calculated concepts aligned with `ds-annual`.
@@ -235,4 +235,10 @@
         (ds/add-or-update-column :stock-repurchase
                                  (concept-absolute ds-annual :stock-repurchase))
         (ds/add-or-update-column :ebit
-                                 (actual-or-derived-ebit ds-annual oi)))))
+                                 (actual-or-derived-ebit ds-annual oi))
+        (ds/add-or-update-column :cash
+                                 (facts-ds/calc-concept ds-annual :cash))
+        (ds/add-or-update-column :preferred-stock
+                                 (facts-ds/calc-concept ds-annual :preferred-stock))
+        (ds/add-or-update-column :nci
+                                 (facts-ds/calc-concept ds-annual :nci)))))
