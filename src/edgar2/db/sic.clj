@@ -31,15 +31,9 @@
               {:by-cik {} :by-ticker {}}
               (dataset/read-rows f)))))
 
-(defn with-sic
-  "Copy SIC names from universe-fsds onto a stats row.
-  CIK wins; ticker is the fallback."
-  [st {:keys [by-cik by-ticker]}]
-  (let [info (or (get by-cik (some-> (:cik st) str str/trim))
-                 (get by-ticker (some-> (:ticker st) str str/trim str/upper-case)))]
-    (cond-> st
-      (:sic info) (assoc :sic (:sic info))
-      (:sector info) (assoc :sector (:sector info))
-      (:industry info) (assoc :industry (:industry info))
-      (:subindustry info) (assoc :subindustry (:subindustry info))
-      (:sic-description info) (assoc :sic-description (:sic-description info)))))
+(defn sic-data
+  "SIC fields from universe-fsds for `cik`: `:sic`, `:sector`, `:industry`,
+  `:subindustry`, and `:sic-description` when present."
+  [cik {:keys [by-cik]}]
+  (or (get by-cik (some-> cik str str/trim))
+      {}))

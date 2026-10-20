@@ -116,19 +116,19 @@
          shares (or shares
                     (when data (universe/shares-outstanding (:facts data)))
                     (:shares-outstanding row))]
-     (db-sic/with-sic
-       (try
-         (let [st (merge (if dss (annual/calculate-annual dss) {})
-                         (universe-data row))
-               mc (valuation/calculate-marketcap st prices shares)
-               caps (dissoc mc :vmcap)
-               val (valuation/calculate-valuation st (:vmcap mc))]
-           (merge st caps val))
-         (catch Exception ex
-           (println (format "  stats-fail %s (%s)"
-                            (or (:ticker row) cik) (.getMessage ex)))
-           (universe-data row)))
-       sic-index))))
+     (try
+       (let [annual-map (if dss (annual/calculate-annual dss) {})
+             mc (valuation/calculate-marketcap annual-map prices shares row)
+             val (valuation/calculate-valuation annual-map (:vmcap mc))]
+         (merge annual-map
+                (universe-data row)
+                (dissoc mc :vmcap)
+                val
+                (db-sic/sic-data cik sic-index)))
+       (catch Exception ex
+         (println (format "  stats-fail %s (%s)"
+                          (or (:ticker row) cik) (.getMessage ex)))
+         (merge (universe-data row) (db-sic/sic-data cik sic-index)))))))
 
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
