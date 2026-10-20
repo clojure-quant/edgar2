@@ -11,7 +11,6 @@
             [edgar2.download.facts-universe :as universe]
             [edgar2.db.sic :as db-sic]
             [edgar2.db.universe :as db-universe]
-            [edgar2.adr :as adr]
             [edgar2.financials.calc.annual :as annual]
             [edgar2.financials.calc.valuation :as valuation])
   (:import [java.util.zip ZipFile]))
@@ -105,10 +104,11 @@
 (defn stats-one
   "One stats row for `cik` from companyfacts dataset `dss` (nil when missing).
 
-  Runs `annual/calculate-annual` (when `dss` is present), ADR ratio, market
-  valuation, and SIC enrichment. Looks up the universe row by `cik` unless
-  `:row` is passed. Optional opts for the batch path: `:row`, `:prices`,
-  `:sic-index`, `:shares`, `:data` (raw companyfacts map for shares-outstanding)."
+  Runs `annual/calculate-annual` (when `dss` is present), market valuation
+  (including ADR ratio), and SIC enrichment. Looks up the universe row by
+  `cik` unless `:row` is passed. Optional opts for the batch path: `:row`,
+  `:prices`, `:sic-index`, `:shares`, `:data` (raw companyfacts map for
+  shares-outstanding)."
   ([dss cik]
    (stats-one dss cik {}))
   ([dss cik {:keys [row prices sic-index shares data]}]
@@ -120,11 +120,9 @@
                     (:shares-outstanding row))]
      (db-sic/with-sic
        (try
-         (let [base (add-universe-data
-                     (if dss (annual/calculate-annual dss) {})
-                     row)
-               ratio (adr/get-ratio (:ticker base))
-               st (cond-> base ratio (assoc :adr-ratio ratio))
+         (let [st (add-universe-data
+                   (if dss (annual/calculate-annual dss) {})
+                   row)
                mc (valuation/calculate-marketcap st prices shares)
                st' (-> st
                        (dissoc :price-sales :price-earnings :dividend-yield

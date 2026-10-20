@@ -1,6 +1,7 @@
 (ns edgar2.financials.calc.valuation
   "Market-cap and valuation ratios from stats fundamentals."
   (:require [clojure.string :as str]
+            [edgar2.adr :as adr]
             [edgar2.download.fx :as fx]))
 
 (defn usd-unit?
@@ -39,18 +40,20 @@
 (defn calculate-marketcap
   "Listing price × shares, plus adjusted / valuation market cap.
 
-  Returns a map with present keys among `:shares`, `:price`, `:marketcap`,
+  Looks up `:adr-ratio` from `data/adr.edn` when known. Returns a map with
+  present keys among `:adr-ratio`, `:shares`, `:price`, `:marketcap`,
   `:market-cap-adjusted`, and `:vmcap` (the cap later passed to
   `calculate-valuation` — adjusted when `needs-mcap-adjust?`)."
   [stats-map price-by-ticker shares]
   (let [price (get price-by-ticker (str/upper-case (str (:ticker stats-map))))
         mcap (when (and price (number? shares))
                (* (double price) (double shares)))
-        ratio (:adr-ratio stats-map)
+        ratio (or (:adr-ratio stats-map) (adr/get-ratio (:ticker stats-map)))
         mcap-adj (market-cap-adjusted mcap (:revenue-unit stats-map) ratio)
         need-adj? (needs-mcap-adjust? (:revenue-unit stats-map) ratio)
         vmcap (if need-adj? mcap-adj mcap)]
     (cond-> {}
+      ratio (assoc :adr-ratio ratio)
       (number? shares) (assoc :shares shares)
       price (assoc :price price)
       mcap (assoc :marketcap mcap)
