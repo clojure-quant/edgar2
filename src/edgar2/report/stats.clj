@@ -124,13 +124,9 @@
                    (if dss (annual/calculate-annual dss) {})
                    row)
                mc (valuation/calculate-marketcap st prices shares)
-               st' (-> st
-                       (dissoc :price-sales :price-earnings :dividend-yield
-                               :buyback-yield :enterprise-value :ev-ebit
-                               :market-cap-adjusted)
-                       (merge (dissoc mc :vmcap)))
-               val (valuation/calculate-valuation st' (:vmcap mc))]
-           (merge st' val))
+               caps (dissoc mc :vmcap)
+               val (valuation/calculate-valuation st (:vmcap mc))]
+           (merge st caps val))
          (catch Exception ex
            (println (format "  stats-fail %s (%s)"
                             (or (:ticker row) cik) (.getMessage ex)))

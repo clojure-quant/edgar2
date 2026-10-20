@@ -67,36 +67,20 @@
   `:price-earnings`, `:dividend-yield`, `:buyback-yield`,
   `:enterprise-value`, and `:ev-ebit` when computable.
 
-  When the report is not USD or `:adr-ratio` is not 1, ratios use the
-  adjusted (reporting-currency) cap against same-currency fundamentals.
-  Otherwise PE is market cap / Net Income, else USD price / USD EPS;
-  dividend yield is dividends paid / market cap, else USD DPS / price.
-  Missing debt / preferred / NCI / cash legs count as 0 in EV."
+  PE is market cap / Net Income; dividend yield is dividends paid / market
+  cap. Missing debt / preferred / NCI / cash legs count as 0 in EV."
   [stats-map market-cap]
   (let [vmcap (when (number? market-cap) market-cap)
-        price (when (number? (:price stats-map)) (:price stats-map))
-        ratio (:adr-ratio stats-map)
-        need-adj? (needs-mcap-adjust? (:revenue-unit stats-map) ratio)
-        report-usd? (usd-unit? (:revenue-unit stats-map))
         rev (when (number? (:revenue stats-map)) (:revenue stats-map))
         ni (when (number? (:net-profit stats-map)) (:net-profit stats-map))
-        eps (when (number? (:eps stats-map)) (:eps stats-map))
-        dps (when (number? (:dps stats-map)) (:dps stats-map))
         paid (when (number? (:dividends-paid stats-map)) (:dividends-paid stats-map))
         repurchase (when (number? (:stock-repurchase stats-map))
                      (:stock-repurchase stats-map))
         ebit (when (number? (:ebit stats-map)) (:ebit stats-map))
-        pe (cond
-             (and vmcap (number? ni) (not (zero? (double ni))))
-             (/ (double vmcap) (double ni))
-             (and (not need-adj?) report-usd? price (number? eps)
-                  (not (zero? (double eps))))
-             (/ (double price) (double eps)))
-        dy (cond
-             (and vmcap (pos? (double vmcap)) (number? paid) (pos? (double paid)))
-             (* 100.0 (/ (double paid) (double vmcap)))
-             (and (not need-adj?) report-usd? price (pos? (double price)) (number? dps))
-             (* 100.0 (/ (double dps) (double price))))
+        pe (when (and vmcap (number? ni) (not (zero? (double ni))))
+             (/ (double vmcap) (double ni)))
+        dy (when (and vmcap (pos? (double vmcap)) (number? paid) (pos? (double paid)))
+             (* 100.0 (/ (double paid) (double vmcap))))
         by (when (and vmcap (pos? (double vmcap))
                       (number? repurchase) (pos? (double repurchase)))
              (* 100.0 (/ (double repurchase) (double vmcap))))
