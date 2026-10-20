@@ -200,7 +200,7 @@
 
 (def concept-ids
   "Concept :ids whose per-period vectors are added by `calc-concepts`."
-  [:revenue :net-income :assets :operating-income :total-equity :debt :eps
+  [:revenue :net-income :assets :operating-income :total-equity :debt :eps :dps
    :dividends-paid :stock-repurchase :ebit])
 
 (defn calc-concepts
@@ -228,6 +228,8 @@
                                  (interest-bearing-debt ds-annual))
         (ds/add-or-update-column :eps
                                  (facts-ds/calc-concept ds-annual :eps))
+        (ds/add-or-update-column :dps
+                                 (facts-ds/calc-concept ds-annual :dps))
         (ds/add-or-update-column :dividends-paid
                                  (concept-absolute ds-annual :dividends-paid))
         (ds/add-or-update-column :stock-repurchase

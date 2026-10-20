@@ -93,13 +93,10 @@
     :data [[:us-gaap :IncomeTaxExpenseBenefit]
            [:ifrs-full :IncomeTaxExpenseContinuingOperations]]}
 
-   {:id :dps-cash
-    :label "Dividends Per Share (Cash)"
-    :data [[:us-gaap :CommonStockDividendsPerShareCashPaid]]}
-
-   {:id :dps-other
-    :label "Dividends Per Share (Other)"
-    :data [[:us-gaap :CommonStockDividendsPerShare]
+   {:id :dps
+    :label "Dividends Per Share"
+    :data [[:us-gaap :CommonStockDividendsPerShareCashPaid]
+           [:us-gaap :CommonStockDividendsPerShare]
            [:us-gaap :CommonStockDividendsPerShareDeclared]
            [:ifrs-full :DividendsPaidOrdinaryShares]]}
 

@@ -7,7 +7,6 @@
             [edgar.api :as e]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.derived :as derived]
-            [edgar2.filing :as filing]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds-universe :as fsds]
             [edgar2.adr :as adr]
@@ -31,8 +30,7 @@
 
 (def net-income-tags (concept-data :net-income))
 (def eps-tags (concept-data :eps))
-(def dps-cash-tags (concept-data :dps-cash))
-(def dps-other-tags (concept-data :dps-other))
+(def dps-tags (concept-data :dps))
 (def dividends-paid-tags (concept-data :dividends-paid))
 (def stock-repurchase-tags (concept-data :stock-repurchase))
 (def asset-tags (concept-data :assets))
@@ -61,8 +59,7 @@
         (concat revenue-tags
                 net-income-tags
                 eps-tags
-                dps-cash-tags
-                dps-other-tags
+                dps-tags
                 dividends-paid-tags
                 stock-repurchase-tags
                 asset-tags
@@ -203,68 +200,12 @@
   (when-not (str/blank? (str end))
     (some #(when (= (str end) (str (:end %))) %) rows)))
 
-(defn- whole-dollar?
-  "True when v is a positive whole number. A split ($.98 …) tag lands here as 98."
-  [v]
-  (and (number? v)
-       (>= (double v) 1.0)
-       (< (Math/abs (- (double v) (Math/rint (double v)))) 1e-6)))
-
-(defn- primary-html
-  "Primary filing document, cached under data/ix-html."
-  [cik accn]
-  (let [f (io/file "data/ix-html" (str accn ".htm"))]
-    (or (when (.exists f) (slurp f))
-        (when-let [html (e/html {:cik (universe/pad-cik cik)
-                                 :accessionNumber (str accn)})]
-          (.mkdirs (.getParentFile f))
-          (spit f html)
-          html))))
-
-(defn- absorb-currency-decimal
-  "Read ($.98 per share) as 0.98 when the tagged fact is the whole number 98."
-  [cik {:keys [val end accn taxonomy tag] :as fact}]
-  (if-not (and cik accn taxonomy tag (whole-dollar? val))
-    fact
-    (try
-      (if-let [html (primary-html cik accn)]
-        (if-let [v (filing/leading-currency-decimal
-                    html
-                    (str (name taxonomy) ":" (name tag))
-                    end
-                    val)]
-          (assoc fact :val v)
-          fact)
-        fact)
-      (catch Throwable _
-        fact))))
-
 (defn- col-vec
   "Values of column `k` on `ds` as a vector (empty when missing)."
   [dss k]
   (if (ds/has-column? dss k)
     (vec (ds/column dss k))
     []))
-
-(defn annual-dps
-  "Per-share dividend at period-end `end`. Cash paid wins. Missing → 0.
-
-  A filing that shows ($.98 per share) with only 98 inside the tag is
-  read as 0.98."
-  [rows end cik]
-  (let [row (row-at-end rows end)
-        pair (or (some (fn [p] (when (number? (concept-val row (second p))) p))
-                       dps-cash-tags)
-                 (some (fn [p] (when (number? (concept-val row (second p))) p))
-                       dps-other-tags))
-        fact (if pair
-               {:val (concept-val row (second pair))
-                :end (str end)
-                :accn (:accn row)
-                :taxonomy (first pair)
-                :tag (second pair)}
-               {:val 0.0 :end (str end)})]
-    (absorb-currency-decimal cik fact)))
 
 (defn company-stats
   "Fundamentals from an `e/facts`-shaped dataset via `report-table`.
@@ -285,16 +226,17 @@
         equity (col-vec concepts :total-equity)
         debt-v (col-vec concepts :debt)
         eps-v (col-vec concepts :eps)
+        dps-v (col-vec concepts :dps)
         paid-v (col-vec concepts :dividends-paid)
         repurchase-v (col-vec concepts :stock-repurchase)
         ebit-v (col-vec concepts :ebit)
         bs-end (:end (latest-num ends assets))
         last-end (later-end (:end (latest-num ends rev)) bs-end)
         eps (latest-num ends eps-v)
+        dps (or (latest-num ends dps-v) {:val 0.0 :end last-end})
         paid (:val (latest-num ends paid-v))
         repurchase (:val (latest-num ends repurchase-v))
         ebit (latest-num ends ebit-v)
-        dps (annual-dps rows last-end (:cik row))
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
         ni-qoy (calc-q/net-income-change-q-on-y
                 (facts-ds/report-table dss :q net-income-tags))
