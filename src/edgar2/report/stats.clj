@@ -16,6 +16,7 @@
             [edgar2.download.facts-universe :as universe]
             [edgar2.financials.calc.concept :as calc-concept]
             [edgar2.financials.calc.quarterly :as calc-q]
+            [edgar2.financials.calc.row.dividend-coverage :as div-cov]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar.xbrl :as xbrl]
             [jsonista.core :as json]
@@ -225,15 +226,12 @@
         debt-v (col-vec concepts :debt)
         eps-v (col-vec concepts :eps)
         dps-v (col-vec concepts :dps)
-        paid-v (col-vec concepts :dividends-paid)
-        repurchase-v (col-vec concepts :stock-repurchase)
         ebit-v (col-vec concepts :ebit)
+        concept-rows (vec (ds/rows concepts {:nil-missing? true}))
         bs-end (:end (latest-num ends assets))
         last-end (later-end (:end (latest-num ends rev)) bs-end)
         eps (latest-num ends eps-v)
         dps (or (latest-num ends dps-v) {:val 0.0 :end last-end})
-        paid (:val (latest-num ends paid-v))
-        repurchase (:val (latest-num ends repurchase-v))
         ebit (latest-num ends ebit-v)
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
         ni-qoy (calc-q/net-income-change-q-on-y
@@ -257,16 +255,12 @@
         preferred (first-concept-val bs-row preferred-tags)
         nci (or (concept-val bs-row :MinorityInterest)
                 (concept-val bs-row :NoncontrollingInterests))
-        coverage-end (or (some (fn [[e r]] (when (number? r) e))
-                               (map vector ends (ratio ni rev)))
-                         last-end)
-        coverage-row (or (row-at-end rows coverage-end) current)
-        coverage-ni (if (number? margin)
-                      net-profit
-                      (first-concept-val coverage-row net-income-tags))
-        coverage (when paid (ratio-row coverage-ni paid))]
-    (cond-> (assoc (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
-                   :annual-count annual-count)
+        div (div-cov/calculate-dividend-coverage
+             (or (first rows) current)
+             (or (first concept-rows) {}))]
+    (cond-> (merge (assoc (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
+                          :annual-count annual-count)
+                   div)
       (:sales-growth-yoy growth)
       (assoc :sales-growth-yoy (:sales-growth-yoy growth)
              :sales-growth-years (:sales-growth-years growth))
@@ -290,15 +284,12 @@
       (assoc :eps (:val eps))
       (and dps (number? (:val dps)))
       (assoc :dps (:val dps))
-      (number? paid) (assoc :dividends-paid paid)
-      (number? repurchase) (assoc :stock-repurchase repurchase)
       (number? debt) (assoc :debt debt :debt-end bs-end)
       (number? cash) (assoc :cash cash)
       (number? preferred) (assoc :preferred-stock preferred)
       (number? nci) (assoc :noncontrolling-interest nci)
       (and ebit (number? (:val ebit)))
-      (assoc :ebit (:val ebit) :ebit-end (:end ebit))
-      (number? coverage) (assoc :dividend-coverage coverage))))
+      (assoc :ebit (:val ebit) :ebit-end (:end ebit)))))
 
 (defn load-price-by-ticker
   "ticker → close from data/prices.edn."
