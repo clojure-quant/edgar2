@@ -1,4 +1,4 @@
-(ns edgar2.derived
+(ns edgar2.financials.derived
   "Derived income-statement lines shared by the financials page and stats.
 
   Operating expenses, when that line is not already present:
@@ -8,7 +8,7 @@
   Operating profit, on those same periods, when operating income is not
   already present: gross profit − operating expenses.
   Gross profit is the gross-profit line, or revenue − cost of revenue."
-  (:require [edgar2.concepts :as concepts]))
+  (:require [edgar2.financials.concepts :as concepts]))
 
 (def operating-expenses (:label (concepts/get-concept-id :operating-expenses)))
 (def operating-income (:label (concepts/get-concept-id :operating-income)))

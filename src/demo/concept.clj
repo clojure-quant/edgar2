@@ -1,8 +1,8 @@
 (ns demo.concept
   "Demo: calc-concept :revenue on annual report-tables for XOM, BP, SONY."
   (:require [edgar.api :as e]
-            [edgar2.concepts :as concepts]
-            [edgar2.facts-ds :as facts-ds]
+            [edgar2.financials.concepts :as concepts]
+            [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.filing :as filing]
             [tech.v3.dataset :as ds]))
 

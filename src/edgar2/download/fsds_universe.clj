@@ -4,7 +4,7 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
-            [edgar2.concepts :as concepts]
+            [edgar2.financials.concepts :as concepts]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds :as dl]
             [edgar2.report.sector :as sector])

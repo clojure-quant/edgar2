@@ -1,6 +1,6 @@
 (ns demo.report-table
   (:require [edgar.api :as e]
-            [edgar2.facts-ds :as facts-ds]
+            [edgar2.financials.facts-ds :as facts-ds]
             [tablecloth.api :as tc]
             [tech.v3.dataset :as ds]
             [edgar2.filing :refer [resolve-filer2]]

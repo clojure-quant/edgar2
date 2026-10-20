@@ -6,8 +6,8 @@
             [clojure.set :as set]
             [clojure.string :as str]
             [edgar.api :as e]
-            [edgar2.concepts :as concepts]
-            [edgar2.derived :as derived]
+            [edgar2.financials.concepts :as concepts]
+            [edgar2.financials.derived :as derived]
             [edgar2.filing :as filing]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds-universe :as fsds]
@@ -16,7 +16,9 @@
             [edgar2.download.fx :as fx]
             [edgar2.download.price :as price]
             [edgar2.download.facts-universe :as universe]
-            [edgar2.facts-ds :as facts-ds]
+            [edgar2.financials.calc.concept :as calc-concept]
+            [edgar2.financials.calc.quarterly :as calc-q]
+            [edgar2.financials.facts-ds :as facts-ds]
             [edgar.xbrl :as xbrl]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
@@ -81,14 +83,6 @@
   (when (and (number? prev) (number? cur) (not (zero? (double prev))))
     (* 100.0 (/ (- (double cur) (double prev)) (double prev)))))
 
-(defn abs-change-pct
-  "Percent change with |prior| as denominator (Damodaran), so loss narrowing
-  is positive and loss widening is negative."
-  [prev cur]
-  (when (and (number? prev) (number? cur) (not (zero? (double prev))))
-    (* 100.0 (/ (- (double cur) (double prev))
-                (Math/abs (double prev))))))
-
 (defn avg
   [xs]
   (when (seq xs)
@@ -141,18 +135,6 @@
   [vals]
   (->> vals reverse (filterv number?)))
 
-(defn plus-at-end
-  "Add `extra` onto `base` where both share a period-end."
-  [base extra]
-  (if (empty? extra)
-    (vec base)
-    (let [extra-by (by-end extra)]
-      (mapv (fn [row]
-              (if-let [v (get extra-by (str (:end row)))]
-                (update row :val #(+ (double %) (double v)))
-                row))
-            base))))
-
 (defn table-rows
   [table]
   (vec (ds/rows table {:nil-missing? true})))
@@ -192,16 +174,6 @@
                        {:end (str (:end r)) :val v}))))
            vec))))
 
-(defn total-equity-series
-  "Total equity. Prefer a tag that already includes noncontrolling interest.
-  Otherwise parent equity, plus noncontrolling interest on years that tag it."
-  [rows]
-  (let [inclusive (series-for rows total-equity-tags)]
-    (if (seq inclusive)
-      inclusive
-      (plus-at-end (or (series-for rows parent-equity-tags) [])
-                   (or (series-for rows nci-tags) [])))))
-
 (defn aligned-ends
   "Period-ends present in both end→val maps, oldest first."
   [num-by den-by]
@@ -221,16 +193,21 @@
     (/ (double num) (double den))))
 
 (defn yearly-ratios
-  "num/den for each shared period-end, oldest first.
-  A year with a zero denominator is omitted."
-  [num-by den-by]
-  (vec (keep (fn [end] (ratio (num-by end) (den-by end)))
-             (aligned-ends num-by den-by))))
+  "num/den per aligned period, oldest first.
+
+  `nums` and `dens` are newest-first value vectors (same shape as
+  `calc-concept`). Periods where either side is missing, or the
+  denominator is zero, are omitted."
+  [nums dens]
+  (->> (map ratio (reverse nums) (reverse dens))
+       (filterv some?)))
 
 (defn avg-profit-margin
-  "Mean of the last `n` annual profit margins (net income / revenue)."
-  [ni-by rev-by n]
-  (let [window (take-last n (yearly-ratios ni-by rev-by))]
+  "Mean of the last `n` annual profit margins (net income / revenue).
+
+  `ni` and `rev` are newest-first value vectors."
+  [ni rev n]
+  (let [window (take-last n (yearly-ratios ni rev))]
     (when (seq window)
       {:avg-profit-margin (avg window)
        :avg-profit-margin-years (count window)})))
@@ -298,107 +275,19 @@
       (catch Throwable _
         fact))))
 
-(defn approx=
-  "True when a and b are within 2% or 1 unit (tag double-counts)."
-  [a b]
-  (and (number? a) (number? b)
-       (let [a (double a)
-             b (double b)]
-         (<= (Math/abs (- a b))
-             (max 1.0 (* 0.02 (Math/abs b)))))))
-
-(defn sum-unique
-  "Sum xs, counting near-duplicate tags once."
-  [xs]
-  (loop [acc [] xs (filter number? xs)]
-    (if-let [x (first xs)]
-      (if (some #(approx= % x) acc)
-        (recur acc (next xs))
-        (recur (conj acc (double x)) (next xs)))
-      (when (seq acc)
-        (reduce + acc)))))
-
-(defn interest-bearing-debt
-  "Interest-bearing debt from one wide report-table row.
-
-  Term debt is the noncurrent portion plus the current portion when both
-  are tagged, otherwise the long-term debt total (US-GAAP LongTermDebt or
-  IFRS Borrowings). Commercial paper and other short-term borrowings are
-  added unless they repeat that current portion."
-  [row]
-  (when row
-    (let [at (fn [c] (concept-val row c))
-          non (or (at :LongTermDebtNoncurrent) (at :LongtermBorrowings))
-          cur (or (at :LongTermDebtCurrent)
-                  (at :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings)
-                  (at :ShorttermBorrowings))
-          ltd (or (at :LongTermDebt) (at :Borrowings))
-          term (cond
-                 (and (number? non) (number? cur)) (+ (double non) (double cur))
-                 (and (number? non) (number? ltd)
-                      (> (double ltd) (* 1.01 (double non)))) (double ltd)
-                 (number? non) (double non)
-                 (number? ltd) (double ltd)
-                 (number? cur) (double cur))
-          already (when (and (number? cur) (number? term)
-                             (or (and (number? non) (number? cur))
-                                 (approx= ltd term)))
-                    cur)
-          extras (sum-unique
-                  (remove #(approx= % already)
-                          [(at :CommercialPaper)
-                           (at :ShortTermBorrowings)
-                           (at :OtherShortTermBorrowings)]))]
-      (when (or term extras)
-        (+ (double (or term 0)) (double (or extras 0)))))))
-
-(defn first-present
-  "Period-end → value. Earlier maps win when an end is in more than one."
-  [maps]
-  (reduce (fn [acc m] (merge m acc)) {} maps))
-
-(defn statement-by-item
-  "Annual {line {end value}} for the lines edgar2.derived fills."
-  [rows]
-  (into {}
-        (keep (fn [[label tags]]
-                (let [by-end (first-present
-                              (keep (fn [pair]
-                                      (when-let [series (series-for rows [pair])]
-                                        (when (seq series)
-                                          (into {} (map (juxt #(str (:end %)) :val) series)))))
-                                    tags))]
-                  (when (seq by-end)
-                    [label by-end])))
-              derived/statement-lines)))
-
-(defn with-derived-income
-  "Reported lines plus derived operating expenses and, where those
-  expenses were derived and operating income is absent, operating income
-  = gross profit − operating expenses.
-
-  `:derived-oi` is only the operating-income periods this call filled."
-  [rows]
-  (let [by-item (statement-by-item rows)
-        ends (->> (vals by-item) (mapcat keys) distinct sort vec)
-        filled (derived/with-derived-lines by-item ends)
-        before (get by-item derived/operating-income)]
-    {:lines filled
-     :derived-oi (into {}
-                       (keep (fn [[end v]]
-                               (when (and (number? v)
-                                          (not (number? (get before end))))
-                                 [end v]))
-                             (get filled derived/operating-income)))}))
+(defn- col-vec
+  "Values of column `k` on `ds` as a vector (empty when missing)."
+  [dss k]
+  (if (ds/has-column? dss k)
+    (vec (ds/column dss k))
+    []))
 
 (defn annual-ebit
-  "Operating income at the last report `end`. Otherwise derived operating
-  income at that date. Otherwise net income + interest + tax."
-  [rows end derived-oi]
+  "Operating income at the last report `end` from `oi-by`, else net income
+  + interest + tax on that period's report-table row."
+  [rows end oi-by]
   (let [row (row-at-end rows end)]
-    (or (when-let [v (first-concept-val row ebit-tags)]
-          {:ebit v :ebit-end (str end)})
-        (when-let [v (get derived-oi (str end))]
+    (or (when-let [v (get oi-by (str end))]
           (when (number? v)
             {:ebit (double v) :ebit-end (str end)}))
         (let [ni (first-concept-val row net-income-tags)
@@ -458,74 +347,6 @@
     (let [amount (Math/abs (double v))]
       (when (pos? amount) amount))))
 
-(defn- ni-concept-rank
-  []
-  (into {} (map-indexed (fn [i [_ c]] [(name c) i]) net-income-tags)))
-
-(defn- better-ni-fact?
-  "Prefer reporting-currency match, then later :filed, then earlier tag."
-  [a b revenue-unit ranks]
-  (let [want (str revenue-unit)
-        unit-score (fn [r]
-                     (cond
-                       (str/blank? want) 0
-                       (= (str (:unit r)) want) 0
-                       :else 1))
-        ua (unit-score a)
-        ub (unit-score b)
-        filed (compare (str (:filed a)) (str (:filed b)))]
-    (cond
-      (not= ua ub) (< ua ub)
-      (not= 0 filed) (pos? filed)
-      :else (< (get ranks (str (:concept a)) 9999)
-               (get ranks (str (:concept b)) 9999)))))
-
-(defn quarterly-net-income-series
-  "Oldest-first quarterly net income from `facts-ds/select-data` `:q`.
-
-  One value per period-end, using `net-income-tags` fallbacks. Prefers
-  `revenue-unit`, then later `:filed`, then earlier tag order."
-  [dss revenue-unit]
-  (let [long-ds (facts-ds/select-data dss :q net-income-tags)
-        ranks (ni-concept-rank)
-        rows (filter #(number? (:val %))
-                     (ds/rows long-ds {:nil-missing? true}))
-        chosen (reduce (fn [acc r]
-                         (let [k (str (:end r))
-                               cur (get acc k)]
-                           (if (or (nil? cur)
-                                   (better-ni-fact? r cur revenue-unit ranks))
-                             (assoc acc k r)
-                             acc)))
-                       {}
-                       rows)]
-    (->> chosen
-         vals
-         (map (fn [r] {:end (str (:end r)) :val (as-number (:val r))}))
-         (sort-by :end)
-         vec)))
-
-(defn net-income-change-q-on-y
-  "Most recent quarter net income vs net income 4 quarters earlier (%).
-
-  Values from `facts-ds/select-data` `:q` with `net-income-tags`. The year-ago
-  period is 4 steps earlier on `quarterly-periods` (not on the NI series), so
-  a missing intermediate NI does not shift the comparison. Uses |prior| in the
-  denominator so negative earnings keep the right sign."
-  [dss revenue-unit]
-  (let [ends (->> (ds/rows (facts-ds/quarterly-periods dss) {:nil-missing? true})
-                  (map #(str (:end %)))
-                  (remove str/blank?)
-                  distinct
-                  sort
-                  vec)
-        ni-by (by-end (quarterly-net-income-series dss revenue-unit))
-        cur-end (->> ends reverse (some #(when (contains? ni-by %) %)))
-        idx (when cur-end (.indexOf ends cur-end))]
-    (when (and idx (>= idx 4))
-      (abs-change-pct (get ni-by (nth ends (- idx 4)))
-                      (get ni-by cur-end)))))
-
 (defn company-stats
   "Fundamentals from an `e/facts`-shaped dataset via `report-table`.
 
@@ -537,37 +358,40 @@
         ends (mapv #(str (:end %)) rows)
         current (first rows)
         annual-count (ds/row-count (facts-ds/annual-periods dss))
-        rev (facts-ds/calc-concept table :revenue)
-        assets (facts-ds/calc-concept table :assets)
-        oi-rep (facts-ds/calc-concept table :operating-income)
-        ni-by (by-end (or (series-for rows net-income-tags) []))
+        concepts (calc-concept/calc-concepts table)
+        rev (col-vec concepts :revenue)
+        ni (col-vec concepts :net-income)
+        assets (col-vec concepts :assets)
+        oi (col-vec concepts :operating-income)
+        equity (col-vec concepts :total-equity)
+        debt-v (col-vec concepts :debt)
+        ni-by (by-ends ends ni)
         rev-by (by-ends ends rev)
         assets-by (by-ends ends assets)
+        equity-by (by-ends ends equity)
         bs-end (:end (latest-num ends assets))
         last-end (later-end (:end (latest-num ends rev)) bs-end)
         eps (latest-obs (annual-eps-series rows))
         dps (annual-dps rows last-end (:cik row))
-        income (with-derived-income rows)
-        oi (mapv (fn [e v]
-                   (or (when (number? v) v)
-                       (get (:derived-oi income) e)))
-                 ends oi-rep)
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
-        ni-qoy (net-income-change-q-on-y dss revenue-unit)
-        margins (avg-profit-margin ni-by rev-by profit-margin-window)
+        ni-qoy (calc-q/net-income-change-q-on-y
+                (facts-ds/report-table dss :q net-income-tags))
+        margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score (chron-nums rev))
         oi-score (direction-score (chron-nums oi))
-        equity-by (by-end (total-equity-series rows))
         margin (latest-aligned ni-by rev-by)
         roa (latest-aligned ni-by assets-by)
         roc (latest-aligned ni-by equity-by)
         bs-row (or (row-at-end rows bs-end) current)
-        debt (interest-bearing-debt bs-row)
+        debt (let [i (or (some identity
+                               (map-indexed (fn [i e] (when (= e bs-end) i)) ends))
+                         0)]
+               (nth debt-v i nil))
         cash (first-concept-val bs-row cash-tag-pairs)
         preferred (first-concept-val bs-row preferred-tags)
         nci (or (concept-val bs-row :MinorityInterest)
                 (concept-val bs-row :NoncontrollingInterests))
-        ebit (annual-ebit rows last-end (:derived-oi income))
+        ebit (annual-ebit rows last-end (by-ends ends oi))
         coverage-end (or (:end margin) last-end)
         coverage-row (or (row-at-end rows coverage-end) current)
         coverage-ni (if margin
@@ -587,25 +411,21 @@
       margin
       (assoc :profit-margin (ratio (:num margin) (:den margin))
              :net-profit (:num margin)
-             :revenue (:den margin)
-             :margin-end (:end margin))
+             :revenue (:den margin))
       (:avg-profit-margin margins)
       (assoc :avg-profit-margin (:avg-profit-margin margins)
              :avg-profit-margin-years (:avg-profit-margin-years margins))
       roa
       (assoc :return-on-assets (ratio (:num roa) (:den roa))
-             :assets (:den roa)
-             :roa-end (:end roa))
+             :assets (:den roa))
       roc
       (assoc :return-on-capital (ratio (:num roc) (:den roc))
              :equity (:den roc)
              :roc-end (:end roc))
       (and eps (number? (:val eps)))
-      (assoc :eps (:val eps)
-             :eps-end (:end eps))
+      (assoc :eps (:val eps))
       (and dps (number? (:val dps)))
-      (assoc :dps (:val dps)
-             :dps-end (:end dps))
+      (assoc :dps (:val dps))
       (number? paid) (assoc :dividends-paid paid)
       (number? repurchase) (assoc :stock-repurchase repurchase)
       (number? debt) (assoc :debt debt :debt-end bs-end)
@@ -870,6 +690,44 @@
   [x]
   (when x (/ (Math/round (* (double x) 10000.0)) 10000.0)))
 
+(defn- universe-row-by-cik
+  [cik]
+  (let [want (universe/pad-cik cik)]
+    (some #(when (= (universe/pad-cik (:cik %)) want) %)
+          (load-universe))))
+
+(defn stats-one
+  "One stats row for `cik` from companyfacts dataset `dss` (nil when missing).
+
+  Runs `company-stats` (when `dss` is present), ADR ratio, market valuation,
+  and SIC enrichment. Looks up the universe row by `cik` unless `:row` is
+  passed. Optional opts for the batch path: `:row`, `:prices`, `:sic-index`,
+  `:shares`, `:data` (raw companyfacts map for shares-outstanding)."
+  ([dss cik]
+   (stats-one dss cik {}))
+  ([dss cik {:keys [row prices sic-index shares data]}]
+   (let [row (or row (universe-row-by-cik cik) {:cik (str cik)})
+         prices (or prices (load-price-by-ticker))
+         sic-index (or sic-index (load-sic-index))
+         shares (or shares
+                    (when data (universe/shares-outstanding (:facts data)))
+                    (:shares-outstanding row))]
+     (with-sic
+       (try
+         (let [base (if dss
+                      (company-stats dss row)
+                      (select-keys row [:ticker :exchange :cik :entityName
+                                        :revenue-unit]))
+               ratio (adr/get-ratio (:ticker base))]
+           (-> base
+               (cond-> ratio (assoc :adr-ratio ratio))
+               (with-valuation prices shares)))
+         (catch Exception ex
+           (println (format "  stats-fail %s (%s)"
+                            (or (:ticker row) cik) (.getMessage ex)))
+           (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])))
+       sic-index))))
+
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
   with 7-year mean YoY sales growth (%),
@@ -925,20 +783,12 @@
                  shares (or (when data
                               (universe/shares-outstanding (:facts data)))
                             (:shares-outstanding row))
-                 st (with-sic
-                      (try
-                        (let [base (if dss
-                                     (company-stats dss row)
-                                     (select-keys row [:ticker :exchange :cik :entityName
-                                                       :revenue-unit]))
-                              ratio (adr/get-ratio (:ticker base))]
-                          (-> base
-                              (cond-> ratio (assoc :adr-ratio ratio))
-                              (with-valuation prices shares)))
-                        (catch Exception ex
-                          (println (format "  stats-fail %s (%s)" (:ticker row) (.getMessage ex)))
-                          (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])))
-                      sic-index)
+                 st (stats-one dss (:cik row)
+                               {:row row
+                                :prices prices
+                                :sic-index sic-index
+                                :shares shares
+                                :data data})
                  i' (inc i)]
              (when (or (zero? (mod i' 250)) (= i' total))
                (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roc=%s"

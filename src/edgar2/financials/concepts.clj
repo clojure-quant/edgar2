@@ -1,4 +1,4 @@
-(ns edgar2.concepts
+(ns edgar2.financials.concepts
   "Canonical XBRL concept fallback chains for the project.
 
   Each concept is {:id :label :data}. :data is usually a priority-ordered

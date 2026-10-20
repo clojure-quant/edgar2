@@ -5,9 +5,9 @@
             [clojure.test :refer [deftest is testing]]
             [edgar.api :as e]
             [edgar.xbrl :as xbrl]
-            [edgar2.concepts :as concepts]
+            [edgar2.financials.concepts :as concepts]
             [edgar2.download.facts :as dl]
-            [edgar2.facts-ds :as facts-ds]
+            [edgar2.financials.facts-ds :as facts-ds]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
   (:import [java.util.zip ZipFile]))

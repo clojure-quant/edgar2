@@ -2,8 +2,8 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [edgar.download :as dl]
-            [edgar2.concepts :as concepts]
-            [edgar2.derived :as derived]
+            [edgar2.financials.concepts :as concepts]
+            [edgar2.financials.derived :as derived]
             [clojure.pprint :as pprint]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]

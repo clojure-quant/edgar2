@@ -1,6 +1,6 @@
-(ns edgar2.facts-ds
+(ns edgar2.financials.facts-ds
   (:require [clojure.string :as str]
-            [edgar2.concepts :as concepts]
+            [edgar2.financials.concepts :as concepts]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]
            [java.time.temporal ChronoUnit]))
