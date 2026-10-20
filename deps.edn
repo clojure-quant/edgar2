@@ -5,7 +5,9 @@
         org.pinkgorilla/timbre {:mvn/version "0.0.8"}
         scicloj/tablecloth {:mvn/version "8.024"}}
  :aliases
- {; cli queries
+ {:test {:extra-paths ["test"]
+         :main-opts ["-e" "(require '[clojure.test :as t] '[clojure.java.io :as io] '[clojure.string :as str]) (let [nses (->> (.listFiles (io/file \"test/edgar2\")) (map #(.getName %)) (filter #(.endsWith % \"_test.clj\")) (map #(-> % (subs 0 (- (count %) 4)) (str/replace \"_\" \"-\") (->> (str \"edgar2.\") symbol))) (mapv #(doto % require))) r (apply t/run-tests nses)] (System/exit (+ (:fail r) (:error r))))"]}
+  ; cli queries
   :run {:main-opts ["-m" "edgar2.filing"]}
   :download {:exec-fn edgar2.filing/download
              :exec-args {:ticker "XOM" :years 5}}

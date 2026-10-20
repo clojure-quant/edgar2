@@ -12,11 +12,6 @@
 
 (def default-ticker "XOM")
 
-;; SEC's company_tickers.json currently maps XOM to ExxonMobil Holdings Corp
-;; (CIK 0002115436), a new registrant with no 10-Ks. Annual financials live
-;; on EXXON MOBIL CORP (CIK 0000034088).
-(def operating-cik "0000034088")
-
 (def identity-header
   (or (System/getenv "EDGAR_IDENTITY")
       "clojure-quant edgar2 research@clojure-quant.org"))
@@ -25,6 +20,9 @@
 
 (def annual-form-names
   ["10-K" "20-F" "40-F"])
+
+(def periodic-form-names
+  #{"10-K" "10-Q" "20-F" "40-F" "10-K/A" "10-Q/A" "20-F/A" "40-F/A"})
 
 (defn annual-form
   "10-K, or 20-F / 40-F when that is the annual report."
@@ -35,14 +33,37 @@
             annual-form-names)
       "10-K"))
 
+(defn- has-annual-filing?
+  [cik]
+  (boolean (some #(seq (e/filings cik :form % :limit 1)) annual-form-names)))
+
+(defn- accession-filer-cik
+  "Leading CIK in an accession number (NNNNNNNNNN-YY-######)."
+  [accession]
+  (when-let [m (re-find #"^(\d+)-" (str accession))]
+    (format "%010d" (Long/parseLong (second m)))))
+
+(defn- operating-cik-from-submissions
+  "When `mapped` is a shell/successor CIK with no annual report, find the
+  operating filer from accession prefixes on periodic forms listed on its
+  submissions (e.g. XOM → Holdings 0002115436 → EXXON MOBIL 0000034088)."
+  [mapped]
+  (->> (e/filings mapped :limit 100)
+       (filter #(contains? periodic-form-names (:form %)))
+       (keep #(accession-filer-cik (:accessionNumber %)))
+       (remove #{mapped})
+       distinct
+       (some #(when (has-annual-filing? %) %))))
+
 (defn resolve-filer
+  "CIK to use for financials. Prefer the ticker's mapped CIK when it has a
+  10-K/20-F/40-F; otherwise follow accession prefixes on its submissions to
+  the operating registrant that actually files annual reports."
   [ticker]
-  (let [mapped (e/cik ticker)
-        t (str/upper-case (str ticker))]
+  (let [mapped (e/cik ticker)]
     (cond
-      (some #(seq (e/filings mapped :form % :limit 1)) annual-form-names) mapped
-      (= t "XOM") operating-cik
-      :else mapped)))
+      (has-annual-filing? mapped) mapped
+      :else (or (operating-cik-from-submissions mapped) mapped))))
 
 (defn fye-month
   "Month (\"06\", \"12\") from SEC :fiscal-year-end (\"0630\") or an :end date."

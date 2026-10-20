@@ -5,7 +5,12 @@
            [java.time.temporal ChronoUnit]))
 
 (def period-cols
+  "Columns taken from companyfacts when building annual/quarterly periods."
   [:accn :filed :form :fy :fp :start :end :frame])
+
+(def report-period-cols
+  "Period columns kept on `select-data` / `report-table` rows."
+  [:filed :period :end])
 
 (def annual-forms
   #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"})
@@ -72,6 +77,15 @@
        sort
        last))
 
+(defn- period-label
+  "Label `fy-fp` (e.g. 2025-Q2, 2025-FY)."
+  [row]
+  (str (:fy row) "-" (:fp row)))
+
+(defn- with-period
+  [row]
+  (assoc row :period (period-label row)))
+
 (defn- synthesize-q4
   "Q4 period for an annual filing when companyfacts omit the quarterly footnote.
 
@@ -95,43 +109,65 @@
 (defn annual-periods
   "Reduce an `e/facts` dataset to one annual period row per fiscal year-end.
 
-  Uses ~12-month duration windows (`annual-duration?`, 300–400 days) on any
-  form (10-K / 20-F / 40-F, and foreign 6-K annuals). Groups by `:end` so
-  comparative years restated later still produce a row; the latest `:filed`
-  observation supplies `:accn` / `:start` / …
+  Keeps only `:fp` FY facts with ~12-month windows (`annual-duration?`,
+  300–400 days), on any form (10-K / 20-F / 40-F, and foreign 6-K annuals).
+  Year-to-date or prior-year windows tagged Q2/Q3 on a 10-Q are excluded.
 
-  Returns a dataset of `:accn :filed :form :fy :fp :start :end :frame`."
+  When one filing date carries several FY windows (current year plus
+  comparatives), only the row with the latest `:start` is kept. Remaining
+  rows are then uniqued by `:end` (latest `:filed` wins) so a restatement
+  on a later 10-K replaces the earlier filing’s period.
+
+  Returns a dataset of `:accn :filed :form :fy :fp :start :end :frame :period`
+  (`:period` is `fy-fp`, e.g. 2025-FY)."
   [facts]
   (let [rows (->> (ds/rows facts {:nil-missing? true})
-                  (filter annual-duration?)
+                  (filter #(and (= "FY" (str (:fp %)))
+                                (annual-duration? %)))
                   (map #(select-keys % period-cols)))
-        best (->> rows
+        per-filing (->> rows
+                        (group-by #(str (:filed %)))
+                        vals
+                        (map (fn [rs]
+                               (last (sort-by #(str (:start %)) rs)))))
+        best (->> per-filing
                   (group-by #(str (:end %)))
                   vals
                   (map (fn [rs] (last (sort-by #(str (:filed %)) rs))))
                   (sort-by #(str (:end %)))
-                  vec)]
+                  (mapv with-period))]
     (ds/->dataset best {:dataset-name "annual-filing-periods"})))
+
+(defn- not-fy?
+  "Quarterly tables never keep `:fp` FY (those are annual windows)."
+  [row]
+  (not= "FY" (str (:fp row))))
 
 (defn quarterly-periods
   "Reduce an `e/facts` dataset to one quarterly period row per filing.
 
-  10-Qs supply Q1–Q3 (~3-month windows). Annual reports supply Q4: the
-  quarterly footnote when present in companyfacts, otherwise synthesized from
-  the annual period and the preceding 10-Q end (modern 10-Ks often omit the
-  Q4 duration fact). Together that yields four quarterly periods per year.
+  10-Qs supply Q1–Q3 (~3-month windows). Annual reports supply Q4 when the
+  10-K carries an explicit quarterly footnote (`:fp` Q4), otherwise Q4 is
+  synthesized from the annual period and the preceding 10-Q end. Rows tagged
+  `:fp` FY are never kept — even ~90-day windows on a 10-K — so mid-year
+  comparatives mislabeled FY do not appear as quarters.
 
-  Returns a dataset of `:accn :filed :form :fy :fp :start :end :frame`."
+  Returns a dataset of `:accn :filed :form :fy :fp :start :end :frame :period`
+  (`:period` is `fy-fp`, e.g. 2025-Q2)."
   [facts]
-  (let [from-10q (filing-periods facts quarterly-forms quarterly-duration?)
-        from-10k (filing-periods facts annual-forms quarterly-duration?)
+  (let [from-10q (->> (filing-periods facts quarterly-forms quarterly-duration?)
+                      (filterv not-fy?))
+        from-10k (->> (filing-periods facts annual-forms quarterly-duration?)
+                      (filterv not-fy?))
         annuals (filing-periods facts annual-forms annual-duration?)
         covered-ends (into #{} (map #(str (:end %)) from-10k))
         synthesized (->> annuals
                          (remove #(contains? covered-ends (str (:end %))))
                          (keep #(synthesize-q4 % from-10q)))
         rows (->> (concat from-10q from-10k synthesized)
-                  (sort-by (juxt #(str (:filed %)) #(str (:form %)) #(str (:end %)))))]
+                  (map with-period)
+                  (sort-by (juxt #(str (:filed %)) #(str (:form %)) #(str (:end %))))
+                  vec)]
     (ds/->dataset rows {:dataset-name "quarterly-filing-periods"})))
 
 (defn- field-pair
@@ -179,10 +215,10 @@
   `[[:dei :EntityCommonStockSharesOutstanding]
     [:us-gaap :CostOfRevenue]]`.
 
-  Returns a long-format dataset: period columns from `annual-periods` /
-  `quarterly-periods`, plus `:taxonomy :concept :unit :val` (and `:label`
-  when present). Instant facts (no `:start`) match on `:accn` (and `:end`
-  when it aligns); duration facts also require `:start`."
+  Returns a long-format dataset with period columns `:filed :period :end`,
+  plus `:taxonomy :concept :unit :val` (and `:label` when present). Instant
+  facts (no `:start`) match on `:accn` (and `:end` when it aligns); duration
+  facts also require `:start`."
   [dss q-or-y fields]
   (let [periods (case q-or-y
                   :y (annual-periods dss)
@@ -193,7 +229,7 @@
         by-end (group-by #(str (:end %)) period-rows)
         by-accn (group-by #(str (:accn %)) period-rows)
         wanted (set (map field-pair fields))
-        out-cols (into period-cols [:taxonomy :concept :label :unit :val :filed])
+        out-cols (into report-period-cols [:taxonomy :concept :label :unit :val])
         rows (->> (ds/rows dss {:nil-missing? true})
                   (keep (fn [fact]
                           (when (contains? wanted
@@ -201,7 +237,7 @@
                                             (str (:concept fact))])
                             (when-let [period (matching-period fact by-accn-end by-end by-accn)]
                               (-> fact
-                                  (merge (select-keys period period-cols))
+                                  (merge (select-keys period report-period-cols))
                                   ;; keep the fact's own :filed for restatement preference
                                   (assoc :filed (:filed fact))
                                   (select-keys out-cols))))))
@@ -257,7 +293,7 @@
                (get ranks [(str (:taxonomy b)) (str (:concept b))] 9999)))))
 
 (defn- pivot-keeping-periods
-  "Wide table: period columns plus one column per concept name.
+  "Wide table: `:filed :period :end` plus one column per concept name.
   One value per [end, concept]; unit/`fields` order break ties."
   [long-ds fields unit]
   (let [ranks (field-rank fields)
@@ -274,7 +310,7 @@
                   vals
                   (group-by #(str (:end %)))
                   (map (fn [[_ facts]]
-                         (let [period (select-keys (first facts) period-cols)
+                         (let [period (select-keys (first facts) report-period-cols)
                                vals (into {}
                                           (map (fn [f] [(str (:concept f)) (:val f)])
                                                facts))]
@@ -287,9 +323,9 @@
   "Wide report for `fields` over annual (`:y`) or quarterly (`:q`) periods.
 
   `select-data`, then pivot to one row per period (newest `:end` first) with
-  period columns (`:accn :filed :form :fy :fp :start :end :frame`) kept and
-  one column per concept. Optional `unit` prefers matching monetary units
-  (share / per-share units are always eligible)."
+  period columns `:filed :period :end` and one column per concept. Optional
+  `unit` prefers matching monetary units (share / per-share units are always
+  eligible)."
   ([dss q-or-y fields]
    (report-table dss q-or-y fields nil))
   ([dss q-or-y fields unit]

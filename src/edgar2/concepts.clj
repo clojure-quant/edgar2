@@ -5,7 +5,8 @@
   seq of [taxonomy tag] pairs. A few entries use a label→pairs map instead
   (see :ifrs-income-by-label and :income-fallbacks-by-label).
 
-  Other namespaces should call get-concept-id only.")
+  Public API: get-concept-id, series-mixed."
+  (:require [tech.v3.dataset :as ds]))
 
 (def concepts
   [{:id :revenue
@@ -208,3 +209,31 @@
   "Concept record for `id`, or nil."
   [id]
   (get concept-dict id))
+
+(defn- as-number
+  [v]
+  (when (number? v)
+    (if (and (float? v)
+             (== (double v) (Math/rint (double v)))
+             (<= (Math/abs (double v)) (double Long/MAX_VALUE)))
+      (long v)
+      v)))
+
+(defn series-mixed
+  "Oldest-first [{:end :val :concept} ...] from a wide `report-table` dataset.
+
+  `tag-pairs` is a priority list of `[taxonomy concept-kw]` (same shape as
+  concept `:data`). For each period row, the first tag whose local-name
+  column is numeric wins — so later years may pick a different concept
+  than earlier years (e.g. NetIncomeLoss then ProfitLoss)."
+  [table tag-pairs]
+  (->> (ds/rows table {:nil-missing? true})
+       reverse
+       (keep (fn [row]
+               (some (fn [[_tax concept]]
+                       (when-let [v (as-number (get row (name concept)))]
+                         {:end (str (:end row))
+                          :val v
+                          :concept concept}))
+                     tag-pairs)))
+       vec))
