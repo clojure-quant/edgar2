@@ -1,4 +1,4 @@
-(ns edgar2.report.sector
+(ns edgar2.db.sector
   "OSHA SIC names from resources/sic.edn."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]

@@ -7,7 +7,7 @@
             [edgar2.financials.concepts :as concepts]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds :as dl]
-            [edgar2.report.sector :as sector])
+            [edgar2.db.sector :as sector])
   (:import [java.io BufferedReader InputStreamReader]
            [java.nio.charset StandardCharsets]
            [java.time LocalDate]

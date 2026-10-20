@@ -1,26 +1,28 @@
 (ns edgar2.report.stats
   "Universe fundamentals from companyfacts.zip: sales growth, margin, ROC."
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
+            [edgar.xbrl :as xbrl]
+            [jsonista.core :as json]
+            [tech.v3.dataset :as ds]
             [edgar.api :as e]
-            [edgar2.financials.concepts :as concepts]
-            [edgar2.financials.derived :as derived]
-            [edgar2.download.dataset :as dataset]
-            [edgar2.download.fsds-universe :as fsds]
-            [edgar2.adr :as adr]
             [edgar2.download.facts :as dl]
             [edgar2.download.fx :as fx]
             [edgar2.download.price :as price]
             [edgar2.download.facts-universe :as universe]
+            [edgar2.db.sic :as db-sic]
+            [edgar2.db.universe :as db-universe]
+            [edgar2.financials.concepts :as concepts]
+            [edgar2.financials.derived :as derived]
+            
+            [edgar2.adr :as adr]
+            
             [edgar2.financials.calc.concept :as calc-concept]
             [edgar2.financials.calc.quarterly :as calc-q]
             [edgar2.financials.calc.row.dividend-coverage :as div-cov]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar.xbrl :as xbrl]
-            [jsonista.core :as json]
-            [tech.v3.dataset :as ds])
+            )
   (:import [java.util.zip ZipFile]))
 
 (def stats-path "data/stats.edn")
@@ -357,13 +359,6 @@
       (and ev (number? ebit) (not (zero? (double ebit))))
       (assoc :ev-ebit (/ ev (double ebit))))))
 
-(defn load-universe
-  []
-  (when-not (.exists (io/file universe/universe-path))
-    (throw (ex-info "Missing universe file; run clj -X:universe-facts first"
-                    {:path universe/universe-path})))
-  (dataset/read-rows universe/universe-path))
-
 (defn read-cik-json
   [zf cik]
   (when cik
@@ -371,45 +366,6 @@
       (when entry
         (with-open [in (.getInputStream zf entry)]
           (json/read-value in json/keyword-keys-object-mapper))))))
-
-(defn load-sic-index
-  "Lookups from data/universe-fsds.edn: :by-cik and :by-ticker.
-  Each value carries :sic, :sector, :industry, and :subindustry.
-  Empty when that file is missing."
-  []
-  (let [f (io/file fsds/filer-info-path)]
-    (if-not (.exists f)
-      (do (println (format "  no %s; sic left blank" fsds/filer-info-path))
-          {:by-cik {} :by-ticker {}})
-      (reduce (fn [idx row]
-                (let [text (fn [k]
-                             (some-> (get row k) str str/trim not-empty))
-                      info (cond-> {}
-                             (text :sic) (assoc :sic (text :sic))
-                             (text :sector) (assoc :sector (text :sector))
-                             (text :industry) (assoc :industry (text :industry))
-                             (text :subindustry) (assoc :subindustry (text :subindustry))
-                             (text :sic-description) (assoc :sic-description (text :sic-description)))
-                      cik (text :cik)
-                      ticker (some-> (text :ticker) str/upper-case)]
-                  (cond-> idx
-                    (and cik (seq info)) (update :by-cik assoc cik info)
-                    (and ticker (seq info)) (update :by-ticker assoc ticker info))))
-              {:by-cik {} :by-ticker {}}
-              (dataset/read-rows f)))))
-
-(defn with-sic
-  "Copy SIC names from universe-fsds onto a stats row.
-  CIK wins; ticker is the fallback."
-  [st {:keys [by-cik by-ticker]}]
-  (let [info (or (get by-cik (some-> (:cik st) str str/trim))
-                 (get by-ticker (some-> (:ticker st) str str/trim str/upper-case)))]
-    (cond-> st
-      (:sic info) (assoc :sic (:sic info))
-      (:sector info) (assoc :sector (:sector info))
-      (:industry info) (assoc :industry (:industry info))
-      (:subindustry info) (assoc :subindustry (:subindustry info))
-      (:sic-description info) (assoc :sic-description (:sic-description info)))))
 
 (def stats-field-order
   [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
@@ -456,39 +412,6 @@
     (spit tmp (with-out-str (pprint/pprint ordered)))
     (.renameTo (io/file tmp) (io/file stats-path))))
 
-(defn revalue-stats!
-  "Recompute market-cap-adjusted and valuation ratios on data/stats.edn
-  from existing :price, :shares, fundamentals, and :adr-ratio — no zip reread.
-
-  Usage: clj -X:stats-revalue"
-  ([] (revalue-stats! {}))
-  ([_]
-   (let [prices (load-price-by-ticker)
-         before (edn/read-string (slurp stats-path))
-         ps-before (count (filter :price-sales before))
-         rows (mapv (fn [st]
-                      (let [shares (:shares st)
-                            ticker (some-> (:ticker st) str str/upper-case)
-                            px (cond-> prices
-                                 (and ticker (number? (:price st))
-                                      (not (contains? prices ticker)))
-                                 (assoc ticker (double (:price st))))]
-                        (with-valuation st px shares)))
-                    before)
-         ps-after (count (filter :price-sales rows))]
-     (save-stats! rows)
-     (println (format "Wrote %s  (%d companies; price-sales %d → %d; pe=%d  ev-ebit=%d  dy=%d  buyback=%d  mcap-adj=%d)"
-                      stats-path
-                      (count rows)
-                      ps-before
-                      ps-after
-                      (count (filter :price-earnings rows))
-                      (count (filter :ev-ebit rows))
-                      (count (filter :dividend-yield rows))
-                      (count (filter :buyback-yield rows))
-                      (count (filter :market-cap-adjusted rows))))
-     rows)))
-
 (defn fmt-growth
   [x]
   (when x (format "%.1f" (double x))))
@@ -501,12 +424,6 @@
   [x]
   (when x (/ (Math/round (* (double x) 10000.0)) 10000.0)))
 
-(defn- universe-row-by-cik
-  [cik]
-  (let [want (universe/pad-cik cik)]
-    (some #(when (= (universe/pad-cik (:cik %)) want) %)
-          (load-universe))))
-
 (defn stats-one
   "One stats row for `cik` from companyfacts dataset `dss` (nil when missing).
 
@@ -517,13 +434,13 @@
   ([dss cik]
    (stats-one dss cik {}))
   ([dss cik {:keys [row prices sic-index shares data]}]
-   (let [row (or row (universe-row-by-cik cik) {:cik (str cik)})
+   (let [row (or row (db-universe/universe-row-by-cik cik) {:cik (str cik)})
          prices (or prices (load-price-by-ticker))
-         sic-index (or sic-index (load-sic-index))
+         sic-index (or sic-index (db-sic/load-sic-index))
          shares (or shares
                     (when data (universe/shares-outstanding (:facts data)))
                     (:shares-outstanding row))]
-     (with-sic
+     (db-sic/with-sic
        (try
          (let [base (if dss
                       (company-stats dss row)
@@ -569,9 +486,9 @@
   ([{:keys [limit force]}]
    (e/init! dl/identity-header)
    (let [zip-path (dl/ensure-zip! {:force force})
-         all (load-universe)
+         all (db-universe/load-universe)
          prices (load-price-by-ticker)
-         sic-index (load-sic-index)
+         sic-index (db-sic/load-sic-index)
          filers (vec (cond->> all limit (take (long limit))))
          total (count filers)]
      (println (format "stats  %d of %d universe  ← %s"
