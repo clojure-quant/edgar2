@@ -4,7 +4,7 @@
             [edgar2.filing :as filing]
             [edgar2.financials.calc.concept :as calc]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.report.stats :as stats]))
+            [edgar2.financials.calc.annual :as annual]))
 
 (def ticker "AAPL")
 
@@ -15,12 +15,10 @@
 
 (defn annual-concepts
   "Annual report-table + `calc-concepts` for `ticker`."
-  ([ticker]
-   (annual-concepts ticker nil))
-  ([ticker revenue-unit]
-   (let [facts (load-facts ticker)
-         table (facts-ds/report-table facts :y stats/stats-fields revenue-unit)]
-     (calc/calc-concepts table))))
+  [ticker]
+  (let [facts (load-facts ticker)
+        table (facts-ds/report-table facts :y annual/annual-fields)]
+    (calc/calc-concepts table)))
 
 (defn run
   "Load demo ticker facts, print calc-concepts table."
