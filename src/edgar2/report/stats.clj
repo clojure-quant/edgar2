@@ -157,7 +157,8 @@
   Usage: clj -X:stats
          clj -X:stats :limit 25"
   ([] (stats {}))
-  ([{:keys [limit force]}]
+  ([{:keys [limit force]
+     :or {force false}}]
    (e/init! dl/identity-header)
    (let [zip-path (dl/ensure-zip! {:force force})
          all (db-universe/load-universe)

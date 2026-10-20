@@ -136,6 +136,8 @@
                   (map (fn [rs] (last (sort-by #(str (:filed %)) rs))))
                   (sort-by #(str (:end %)))
                   (mapv with-period))]
+    (when (empty? best)
+      (throw (ex-info "no annual reports available" {})))
     (ds/->dataset best {:dataset-name "annual-filing-periods"})))
 
 (defn- not-fy?
@@ -168,6 +170,8 @@
                   (map with-period)
                   (sort-by (juxt #(str (:filed %)) #(str (:form %)) #(str (:end %))))
                   vec)]
+    (when (empty? rows)
+      (throw (ex-info "no quarterly reports available" {})))
     (ds/->dataset rows {:dataset-name "quarterly-filing-periods"})))
 
 (defn- field-pair
