@@ -20,8 +20,8 @@
            [:us-gaap :PremiumsEarnedNet]
            [:us-gaap :RevenueFromContractWithCustomerExcludingAssessedTax]
            [:us-gaap :RevenueFromContractWithCustomerIncludingAssessedTax]
-           [:ifrs-full :RevenueFromContractsWithCustomers]
            [:ifrs-full :Revenue]
+           [:ifrs-full :RevenueFromContractsWithCustomers]
            [:ifrs-full :RevenueFromSaleOfGoods]]}
 
    {:id :cost-of-revenue

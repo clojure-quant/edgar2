@@ -1,9 +1,9 @@
-(ns edgar2.demo
+(ns demo.report-table
   (:require [edgar.api :as e]
             [edgar2.facts-ds :as facts-ds]
             [tablecloth.api :as tc]
             [tech.v3.dataset :as ds]
-            [edgar2.filing :refer [resolve-filer]]
+            [edgar2.filing :refer [resolve-filer2]]
             ))
 
 (def demo-fields
@@ -18,11 +18,11 @@
 (comment
   (e/init! "Your Name your@email.com")
   
-  (def dss (e/facts (resolve-filer "XOM") ))
+  (def dss (e/facts (resolve-filer2 "XOM") ))
   
-  (def dss2 (e/facts "MSFT"))
+  (def dss (e/facts "MSFT"))
 
-  (def dss2 (e/facts "SONY"))
+  (def dss (e/facts "SONY"))
   
   dss
   

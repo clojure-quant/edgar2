@@ -65,6 +65,42 @@
       (has-annual-filing? mapped) mapped
       :else (or (operating-cik-from-submissions mapped) mapped))))
 
+;; SEC company_tickers maps XOM → ExxonMobil Holdings (0002115436), not CORP.
+(def ^:private xom-operating-cik "0000034088")
+
+(defn resolve-filer2
+  "CIK to use for financials, with an explicit XOM override.
+
+  Returns EXXON MOBIL CORP (`0000034088`) for XOM; every other ticker stays
+  on `e/cik` — no annual-filing probe and no accession-prefix walk.
+
+  Why the XOM hack is enough (and correct today)
+  ----------------------------------------------
+  `e/cik` / company_tickers.json binds each symbol to one registrant CIK.
+  After Exxon’s holding-company reorganization, that file maps **XOM** to
+  **ExxonMobil Holdings Corp** (`0002115436`): a new Exchange Act registrant
+  that owns the operating company and carries the listed ticker, but does
+  **not** file the historical 10-K series. Annual (and most XBRL) financials
+  still live on **EXXON MOBIL CORP** (`0000034088`).
+
+  So `(e/facts \"XOM\")` hits Holdings and yields empty or thin annual
+  periods; `(e/facts \"0000034088\")` is the operating companyfacts the
+  screens need.
+
+  A universe scan of ~7.8k primary common tickers found that **only XOM**
+  currently needs this remap: every other listed CIK either already has
+  annual filings on the mapped registrant, or is a SPAC/fund/new listing
+  with no operating successor that carries 10-Ks. Accession-prefix discovery
+  (`operating-cik-from-submissions` / `resolve-filer`) generalizes the same
+  Holdings→CORP link for XOM, but adds SEC round-trips for a case that is
+  unique in the listing file. Hard-coding CORP for XOM is therefore a
+  deliberate, documented exception — revisit if SEC retargets the ticker or
+  another succession shows up the same way."
+  [ticker]
+  (if (= (str/upper-case (str ticker)) "XOM")
+    xom-operating-cik
+    (e/cik ticker)))
+
 (defn fye-month
   "Month (\"06\", \"12\") from SEC :fiscal-year-end (\"0630\") or an :end date."
   [fiscal-year-end]

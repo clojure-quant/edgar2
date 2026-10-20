@@ -1,9 +1,9 @@
 (ns edgar2.facts-ds
   (:require [clojure.string :as str]
+            [edgar2.concepts :as concepts]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]
            [java.time.temporal ChronoUnit]))
-
 (def period-cols
   "Columns taken from companyfacts when building annual/quarterly periods."
   [:accn :filed :form :fy :fp :start :end :frame])
@@ -335,3 +335,31 @@
                     (ds/->dataset rows)
                     long-ds)]
      (pivot-keeping-periods filtered fields unit))))
+
+(defn- as-number
+  [v]
+  (when (number? v)
+    (if (and (float? v)
+             (== (double v) (Math/rint (double v)))
+             (<= (Math/abs (double v)) (double Long/MAX_VALUE)))
+      (long v)
+      v)))
+
+(defn calc-concept
+  "Per-row value for `concept-id` from a wide report-table dataset.
+
+  Looks up the concept's priority `[taxonomy tag]` list, then for each row
+  walks that list and returns the first numeric column named by the tag's
+  local name (same mixed-tag rule as `concepts/series-mixed` / stats
+  `series-mixed`, but as a column aligned with `ds` — no filtering, no
+  reordering). Missing concept or missing columns yield nil for that row.
+
+  Returns a vector of values, one per row."
+  [ds concept-id]
+  (let [tag-pairs (or (:data (concepts/get-concept-id concept-id)) [])
+        col-names (mapv (fn [[_tag concept]] (name concept)) tag-pairs)]
+    (mapv (fn [row]
+            (some (fn [col]
+                    (as-number (get row col)))
+                  col-names))
+          (ds/rows ds {:nil-missing? true}))))
