@@ -21,12 +21,10 @@
   "Delegates to `valuation/market-cap-adjusted` (web overview)."
   valuation/market-cap-adjusted)
 
-(defn add-universe-data
-  "Copy identity / reporting-currency fields from a universe-facts `row`
-  onto a stats map (same keys written to data/stats.edn)."
-  [st row]
-  (merge (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
-         st))
+(defn universe-data
+  "Identity / reporting-currency fields from a universe-facts `row`."
+  [row]
+  (select-keys row [:ticker :exchange :cik :entityName :revenue-unit]))
 
 (defn load-price-by-ticker
   "ticker → close from data/prices.edn."
@@ -120,9 +118,8 @@
                     (:shares-outstanding row))]
      (db-sic/with-sic
        (try
-         (let [st (add-universe-data
-                   (if dss (annual/calculate-annual dss) {})
-                   row)
+         (let [st (merge (if dss (annual/calculate-annual dss) {})
+                         (universe-data row))
                mc (valuation/calculate-marketcap st prices shares)
                caps (dissoc mc :vmcap)
                val (valuation/calculate-valuation st (:vmcap mc))]
@@ -130,7 +127,7 @@
          (catch Exception ex
            (println (format "  stats-fail %s (%s)"
                             (or (:ticker row) cik) (.getMessage ex)))
-           (add-universe-data {} row)))
+           (universe-data row)))
        sic-index))))
 
 (defn stats
