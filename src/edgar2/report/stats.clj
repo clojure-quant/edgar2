@@ -105,30 +105,30 @@
   Runs `annual/calculate-annual` (when `dss` is present), market valuation
   (including ADR ratio), and SIC enrichment. Looks up the universe row by
   `cik` unless `:row` is passed. Optional opts for the batch path: `:row`,
-  `:prices`, `:sic-index`, `:shares`, `:data` (raw companyfacts map for
+  `:prices`, `:sic-db`, `:shares`, `:data` (raw companyfacts map for
   shares-outstanding)."
   ([dss cik]
    (stats-one dss cik {}))
-  ([dss cik {:keys [row prices sic-index shares data]}]
+  ([dss cik {:keys [row prices sic-db shares data]}]
    (let [row (or row (db-universe/universe-row-by-cik cik) {:cik (str cik)})
          prices (or prices (load-price-by-ticker))
-         sic-index (or sic-index (db-sic/load-sic-index))
+         sic-db (or sic-db (db-sic/load-sic-index))
          shares (or shares
                     (when data (universe/shares-outstanding (:facts data)))
                     (:shares-outstanding row))]
      (try
        (let [annual-map (if dss (annual/calculate-annual dss) {})
-             mc (valuation/calculate-marketcap annual-map prices shares row)
-             val (valuation/calculate-valuation annual-map (:vmcap mc))]
+             mc-map (valuation/calculate-marketcap annual-map prices shares row)
+             valuation-map (valuation/calculate-valuation annual-map (:vmcap mc-map))]
          (merge annual-map
                 (universe-data row)
-                (dissoc mc :vmcap)
-                val
-                (db-sic/sic-data cik sic-index)))
+                (dissoc mc-map :vmcap)
+                valuation-map
+                (db-sic/sic-data cik sic-db)))
        (catch Exception ex
          (println (format "  stats-fail %s (%s)"
                           (or (:ticker row) cik) (.getMessage ex)))
-         (merge (universe-data row) (db-sic/sic-data cik sic-index)))))))
+         (merge (universe-data row) (db-sic/sic-data cik sic-db)))))))
 
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
@@ -162,7 +162,7 @@
    (let [zip-path (dl/ensure-zip! {:force force})
          all (db-universe/load-universe)
          prices (load-price-by-ticker)
-         sic-index (db-sic/load-sic-index)
+         sic-db (db-sic/load-sic-index)
          filers (vec (cond->> all limit (take (long limit))))
          total (count filers)]
      (println (format "stats  %d of %d universe  ← %s"
@@ -188,7 +188,7 @@
                  st (stats-one dss (:cik row)
                                {:row row
                                 :prices prices
-                                :sic-index sic-index
+                                :sic-db sic-db
                                 :shares shares
                                 :data data})
                  i' (inc i)]
