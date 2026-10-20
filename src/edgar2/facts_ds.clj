@@ -350,9 +350,9 @@
 
   Looks up the concept's priority `[taxonomy tag]` list, then for each row
   walks that list and returns the first numeric column named by the tag's
-  local name (same mixed-tag rule as `concepts/series-mixed` / stats
-  `series-mixed`, but as a column aligned with `ds` — no filtering, no
-  reordering). Missing concept or missing columns yield nil for that row.
+  local name (same mixed-tag rule as `concepts/series-mixed`, but as a
+  column aligned with `ds` — no filtering, no reordering). Missing concept
+  or missing columns yield nil for that row.
 
   Returns a vector of values, one per row."
   [ds concept-id]

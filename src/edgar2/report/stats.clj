@@ -97,12 +97,12 @@
 (defn direction-score
   "Share of years that did not fall versus the prior year, from 0 to 100.
 
-  Each annual value after the first scores 1 when value − prior >= 0,
-  otherwise 0. The score is 100 times that count divided by the number of
-  year-to-year steps. The first year has no prior year, so it is omitted."
-  [series]
-  (let [vals (mapv :val series)
-        steps (keep (fn [[prev cur]]
+  `vals` is oldest-first numbers. Each value after the first scores 1 when
+  value − prior >= 0, otherwise 0. The score is 100 times that count divided
+  by the number of year-to-year steps. The first year has no prior, so it is
+  omitted."
+  [vals]
+  (let [steps (keep (fn [[prev cur]]
                       (when (and (number? prev) (number? cur))
                         (if (>= (double cur) (double prev)) 1 0)))
                     (map vector vals (rest vals)))]
@@ -110,10 +110,11 @@
       (* 100.0 (/ (double (reduce + steps)) (count steps))))))
 
 (defn avg-sales-growth
-  "Mean of the last `n` year-over-year revenue changes (%)."
-  [revenue-annual n]
-  (let [vals (mapv :val revenue-annual)
-        growths (vec (keep identity (map yoy-pct vals (rest vals))))
+  "Mean of the last `n` year-over-year revenue changes (%).
+
+  `vals` is oldest-first revenue numbers."
+  [vals n]
+  (let [growths (vec (keep identity (map yoy-pct vals (rest vals))))
         window (take-last n growths)]
     (when (seq window)
       {:sales-growth-yoy (avg window)
@@ -122,6 +123,23 @@
 (defn by-end
   [series]
   (into {} (map (juxt #(str (:end %)) :val) series)))
+
+(defn by-ends
+  "end → val for numeric entries of parallel newest-first `ends` / `vals`."
+  [ends vals]
+  (into {} (keep (fn [[e v]] (when (number? v) [e v]))
+                 (map vector ends vals))))
+
+(defn latest-num
+  "Newest numeric value and its end from parallel newest-first vectors."
+  [ends vals]
+  (some (fn [[e v]] (when (number? v) {:end e :val v}))
+        (map vector ends vals)))
+
+(defn chron-nums
+  "Oldest-first numbers from a newest-first `calc-concept` vector."
+  [vals]
+  (->> vals reverse (filterv number?)))
 
 (defn plus-at-end
   "Add `extra` onto `base` where both share a period-end."
@@ -174,18 +192,6 @@
                        {:end (str (:end r)) :val v}))))
            vec))))
 
-(defn series-mixed
-  "Oldest-first {:end :val} series: per period, first tag-pair with a value.
-   each year can pick a different tag. Year 1 might use Revenues, year 2 SalesRevenueNet, 
-   if thats the first hit in the priority list for that row."
-  [rows tag-pairs]
-  (->> rows
-       reverse
-       (keep (fn [r]
-               (when-let [v (first-concept-val r tag-pairs)]
-                 {:end (str (:end r)) :val v})))
-       vec))
-
 (defn total-equity-series
   "Total equity. Prefer a tag that already includes noncontrolling interest.
   Otherwise parent equity, plus noncontrolling interest on years that tag it."
@@ -197,20 +203,17 @@
                    (or (series-for rows nci-tags) [])))))
 
 (defn aligned-ends
-  "Period-ends present in both series, oldest first."
-  [num-series den-series]
-  (sort (set/intersection (set (keys (by-end num-series)))
-                          (set (keys (by-end den-series))))))
+  "Period-ends present in both end→val maps, oldest first."
+  [num-by den-by]
+  (sort (set/intersection (set (keys num-by)) (set (keys den-by)))))
 
 (defn latest-aligned
-  "Latest period-end that exists in both series."
-  [num-series den-series]
-  (let [n (by-end num-series)
-        d (by-end den-series)
-        ends (aligned-ends num-series den-series)]
+  "Latest period-end present in both end→val maps."
+  [num-by den-by]
+  (let [ends (aligned-ends num-by den-by)]
     (when (seq ends)
       (let [end (last ends)]
-        {:end end :num (n end) :den (d end)}))))
+        {:end end :num (num-by end) :den (den-by end)}))))
 
 (defn ratio
   [num den]
@@ -220,16 +223,14 @@
 (defn yearly-ratios
   "num/den for each shared period-end, oldest first.
   A year with a zero denominator is omitted."
-  [num-series den-series]
-  (let [n (by-end num-series)
-        d (by-end den-series)]
-    (vec (keep (fn [end] (ratio (n end) (d end)))
-               (aligned-ends num-series den-series)))))
+  [num-by den-by]
+  (vec (keep (fn [end] (ratio (num-by end) (den-by end)))
+             (aligned-ends num-by den-by))))
 
 (defn avg-profit-margin
   "Mean of the last `n` annual profit margins (net income / revenue)."
-  [ni rev n]
-  (let [window (take-last n (yearly-ratios ni rev))]
+  [ni-by rev-by n]
+  (let [window (take-last n (yearly-ratios ni-by rev-by))]
     (when (seq window)
       {:avg-profit-margin (avg window)
        :avg-profit-margin-years (count window)})))
@@ -390,18 +391,6 @@
                                  [end v]))
                              (get filled derived/operating-income)))}))
 
-(defn series-plus
-  "Reported rows, then values from `extra` on period-ends the series lacks."
-  [reported extra]
-  (let [have (set (map #(str (:end %)) reported))]
-    (->> (concat reported
-                 (keep (fn [[end v]]
-                         (when (and (number? v) (not (have (str end))))
-                           {:end (str end) :val v}))
-                       extra))
-         (sort-by #(str (:end %)))
-         vec)))
-
 (defn annual-ebit
   "Operating income at the last report `end`. Otherwise derived operating
   income at that date. Otherwise net income + interest + tax."
@@ -545,27 +534,33 @@
   [dss {:keys [revenue-unit] :as row}]
   (let [table (facts-ds/report-table dss :y stats-fields revenue-unit)
         rows (table-rows table)
+        ends (mapv #(str (:end %)) rows)
         current (first rows)
         annual-count (ds/row-count (facts-ds/annual-periods dss))
-        rev (series-mixed rows revenue-tags)
-        ni (or (series-for rows net-income-tags) [])
-        assets (series-mixed rows asset-tags)
-        bs-end (some-> (latest-obs assets) :end str)
-        last-end (later-end (some-> (latest-obs rev) :end str) bs-end)
+        rev (facts-ds/calc-concept table :revenue)
+        assets (facts-ds/calc-concept table :assets)
+        oi-rep (facts-ds/calc-concept table :operating-income)
+        ni-by (by-end (or (series-for rows net-income-tags) []))
+        rev-by (by-ends ends rev)
+        assets-by (by-ends ends assets)
+        bs-end (:end (latest-num ends assets))
+        last-end (later-end (:end (latest-num ends rev)) bs-end)
         eps (latest-obs (annual-eps-series rows))
         dps (annual-dps rows last-end (:cik row))
         income (with-derived-income rows)
-        oi (series-plus (series-mixed rows ebit-tags)
-                        (:derived-oi income))
-        growth (avg-sales-growth rev sales-growth-window)
+        oi (mapv (fn [e v]
+                   (or (when (number? v) v)
+                       (get (:derived-oi income) e)))
+                 ends oi-rep)
+        growth (avg-sales-growth (chron-nums rev) sales-growth-window)
         ni-qoy (net-income-change-q-on-y dss revenue-unit)
-        margins (avg-profit-margin ni rev profit-margin-window)
-        rev-score (direction-score rev)
-        oi-score (direction-score oi)
-        equity (total-equity-series rows)
-        margin (latest-aligned ni rev)
-        roa (latest-aligned ni assets)
-        roc (latest-aligned ni equity)
+        margins (avg-profit-margin ni-by rev-by profit-margin-window)
+        rev-score (direction-score (chron-nums rev))
+        oi-score (direction-score (chron-nums oi))
+        equity-by (by-end (total-equity-series rows))
+        margin (latest-aligned ni-by rev-by)
+        roa (latest-aligned ni-by assets-by)
+        roc (latest-aligned ni-by equity-by)
         bs-row (or (row-at-end rows bs-end) current)
         debt (interest-bearing-debt bs-row)
         cash (first-concept-val bs-row cash-tag-pairs)
