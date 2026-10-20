@@ -143,25 +143,24 @@
   [row tag-pairs]
   (some (fn [[_ c]] (concept-val row c)) tag-pairs))
 
-(defn ratio
+(defn ratio-row
+  "num/den for one period. Nil when either side is missing or den is zero."
   [num den]
   (when (and (number? num) (number? den) (not (zero? (double den))))
     (/ (double num) (double den))))
 
-(defn latest-ratio
-  "Newest num/den from parallel newest-first vectors (row-aligned).
+(defn ratio
+  "Per-row num/den from parallel newest-first vectors (row-aligned).
 
-  Skips periods where either side is missing or the denominator is zero."
-  ([nums dens]
-   (some (fn [[n d]]
-           (when-let [r (ratio n d)]
-             {:num n :den d :ratio r}))
-         (map vector nums dens)))
-  ([ends nums dens]
-   (some (fn [[e n d]]
-           (when-let [r (ratio n d)]
-             {:end e :num n :den d :ratio r}))
-         (map vector ends nums dens))))
+  Returns a newest-first vector; nil where either side is missing or the
+  denominator is zero."
+  [nums dens]
+  (mapv ratio-row nums dens))
+
+(defn most-recent
+  "First numeric value in a newest-first vector."
+  [vals]
+  (some #(when (number? %) %) vals))
 
 (defn yearly-ratios
   "num/den per row-aligned period, oldest first.
@@ -170,8 +169,7 @@
   Periods where either side is missing, or the denominator is zero, are
   omitted."
   [nums dens]
-  (->> (map ratio (reverse nums) (reverse dens))
-       (filterv some?)))
+  (->> (ratio nums dens) reverse (filterv number?)))
 
 (defn avg-profit-margin
   "Mean of the last `n` annual profit margins (net income / revenue).
@@ -243,9 +241,13 @@
         margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score (chron-nums rev))
         oi-score (direction-score (chron-nums oi))
-        margin (latest-ratio ends ni rev)
-        roa (latest-ratio ends ni assets)
-        roc (latest-ratio ends ni equity)
+        margin (most-recent (ratio ni rev))
+        roa (most-recent (ratio ni assets))
+        roc (most-recent (ratio ni equity))
+        net-profit (most-recent ni)
+        revenue (most-recent rev)
+        assets-val (most-recent assets)
+        equity-val (most-recent equity)
         bs-row (or (row-at-end rows bs-end) current)
         debt (let [i (or (some identity
                                (map-indexed (fn [i e] (when (= e bs-end) i)) ends))
@@ -255,12 +257,14 @@
         preferred (first-concept-val bs-row preferred-tags)
         nci (or (concept-val bs-row :MinorityInterest)
                 (concept-val bs-row :NoncontrollingInterests))
-        coverage-end (or (:end margin) last-end)
+        coverage-end (or (some (fn [[e r]] (when (number? r) e))
+                               (map vector ends (ratio ni rev)))
+                         last-end)
         coverage-row (or (row-at-end rows coverage-end) current)
-        coverage-ni (if margin
-                      (:num margin)
+        coverage-ni (if (number? margin)
+                      net-profit
                       (first-concept-val coverage-row net-income-tags))
-        coverage (when paid (ratio coverage-ni paid))]
+        coverage (when paid (ratio-row coverage-ni paid))]
     (cond-> (assoc (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
                    :annual-count annual-count)
       (:sales-growth-yoy growth)
@@ -269,20 +273,19 @@
       (number? ni-qoy) (assoc :net-income-change-q-on-y ni-qoy)
       (number? rev-score) (assoc :revenue-score rev-score)
       (number? oi-score) (assoc :operating-income-score oi-score)
-      margin
-      (assoc :profit-margin (:ratio margin)
-             :net-profit (:num margin)
-             :revenue (:den margin))
+      (number? margin)
+      (assoc :profit-margin margin
+             :net-profit net-profit
+             :revenue revenue)
       (:avg-profit-margin margins)
       (assoc :avg-profit-margin (:avg-profit-margin margins)
              :avg-profit-margin-years (:avg-profit-margin-years margins))
-      roa
-      (assoc :return-on-assets (:ratio roa)
-             :assets (:den roa))
-      roc
-      (assoc :return-on-capital (:ratio roc)
-             :equity (:den roc)
-             :roc-end (:end roc))
+      (number? roa)
+      (assoc :return-on-assets roa
+             :assets assets-val)
+      (number? roc)
+      (assoc :return-on-capital roc
+             :equity equity-val)
       (and eps (number? (:val eps)))
       (assoc :eps (:val eps))
       (and dps (number? (:val dps)))
