@@ -9,7 +9,8 @@
 
 (def groups
   [{:title "SEGMENT"
-    :metrics [{:key :marketcap :label "marketcap ($M)" :fmt :millions}]}
+    :metrics [{:key :marketcap :label "marketcap ($M)" :fmt :millions}
+              {:key :annual-count :label "annual-report-count" :fmt :integer}]}
    {:title "QUALITY"
     :metrics [{:key :return-on-capital :label "return-on-capital (%)" :fmt :percent}
               {:key :revenue-score :label "revenue-score" :fmt :number}
@@ -22,7 +23,8 @@
     :metrics [{:key :ev-ebit :label "ev-ebit" :fmt :number}
               {:key :price-earnings :label "pe" :fmt :number}
               {:key :price-sales :label "price-sales" :fmt :number}
-              {:key :dividend-yield :label "dividend-yield (%)" :fmt :number}]}])
+              {:key :dividend-yield :label "dividend-yield (%)" :fmt :number}
+              {:key :buyback-yield :label "buyback-yield (%)" :fmt :number}]}])
 
 (def percentile-count
   "Number of equal-sized bands on the overview / segment pages."
@@ -76,6 +78,7 @@
   (case fmt
     :millions (str (long (Math/round (/ (double x) 1.0e6))))
     :percent (format "%.1f" (* 100.0 (double x)))
+    :integer (str (long (Math/round (double x))))
     :number (format "%.1f" (double x))))
 
 (defn load-rows

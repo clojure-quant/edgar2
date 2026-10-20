@@ -176,7 +176,8 @@
 
 (defn series-mixed
   "Oldest-first {:end :val} series: per period, first tag-pair with a value.
-  Same idea as old annual-flows / annual-stocks over several tags."
+   each year can pick a different tag. Year 1 might use Revenues, year 2 SalesRevenueNet, 
+   if thats the first hit in the priority list for that row."
   [rows tag-pairs]
   (->> rows
        reverse
@@ -254,27 +255,6 @@
   "Later of two period-end strings."
   [a b]
   (->> [a b] (remove str/blank?) sort last))
-
-(defn annual-revenue-series
-  "Annual revenue for sales growth and the revenue score.
-
-  One IFRS series, not a mix: `ifrs-full` Revenue, or
-  RevenueFromSaleOfGoods when that series' latest period-end is later.
-  When both end on the same date, Revenue is the total and wins.
-  With neither tag, US-GAAP revenue tags are used."
-  [rows]
-  (let [total (series-for rows [[:ifrs-full :Revenue]])
-        goods (series-for rows [[:ifrs-full :RevenueFromSaleOfGoods]])
-        total-end (some-> (latest-obs total) :end str)
-        goods-end (some-> (latest-obs goods) :end str)
-        end (later-end total-end goods-end)
-        chosen (cond
-                 (= end total-end) total
-                 (= end goods-end) goods)]
-    (if (seq chosen)
-      chosen
-      (series-mixed rows revenue-tags))))
-
 
 (defn- row-at-end
   [rows end]
@@ -566,6 +546,7 @@
   (let [table (facts-ds/report-table dss :y stats-fields revenue-unit)
         rows (table-rows table)
         current (first rows)
+        annual-count (ds/row-count (facts-ds/annual-periods dss))
         rev (series-mixed rows revenue-tags)
         ni (or (series-for rows net-income-tags) [])
         assets (series-mixed rows asset-tags)
@@ -576,11 +557,10 @@
         income (with-derived-income rows)
         oi (series-plus (series-mixed rows ebit-tags)
                         (:derived-oi income))
-        revenue (annual-revenue-series rows)
-        growth (avg-sales-growth revenue sales-growth-window)
+        growth (avg-sales-growth rev sales-growth-window)
         ni-qoy (net-income-change-q-on-y dss revenue-unit)
         margins (avg-profit-margin ni rev profit-margin-window)
-        rev-score (direction-score revenue)
+        rev-score (direction-score rev)
         oi-score (direction-score oi)
         equity (total-equity-series rows)
         margin (latest-aligned ni rev)
@@ -601,7 +581,8 @@
         paid (abs-paid coverage-row dividends-paid-tags)
         repurchase (abs-paid coverage-row stock-repurchase-tags)
         coverage (when paid (ratio coverage-ni paid))]
-    (cond-> (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
+    (cond-> (assoc (select-keys row [:ticker :exchange :cik :entityName :revenue-unit])
+                   :annual-count annual-count)
       (:sales-growth-yoy growth)
       (assoc :sales-growth-yoy (:sales-growth-yoy growth)
              :sales-growth-years (:sales-growth-years growth))
@@ -790,7 +771,7 @@
 
 (def stats-field-order
   [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
-   :shares :adr-ratio :marketcap :market-cap-adjusted
+   :shares :adr-ratio :marketcap :market-cap-adjusted :annual-count
    :revenue :revenue-unit
    :net-profit
    :eps
@@ -902,7 +883,8 @@
   profit margin (Net Income / revenue), return on assets (Net Income / assets),
   return on capital (Net Income / total equity), plus :shares (most recent 10-Q
   when that quarter is at least as recent as the annual report; otherwise
-  the annual report), :price, :marketcap, :price-sales,
+  the annual report), :annual-count (distinct annual periods in companyfacts),
+  :price, :marketcap, :price-sales,
   :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
   :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),

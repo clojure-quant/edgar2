@@ -3,7 +3,7 @@
 
   The token is :eodhd in $QUANTASTORE/edgar2.edn. Equities are common and
   preferred stock (quanta.eodhd.ds/convert-asset category :equity). The
-  due download keeps names with close × volume of at least 20 million;
+  due download keeps names with close × volume of at least 5 million;
   run-all / Download all keeps every equity.
 
   Bars and splits are written as nippy datasets under data/eodhd/bardb,
@@ -47,7 +47,7 @@
 
 (def turnover-min
   "Minimum close × volume, in dollars, on the latest bulk session."
-  20000000.0)
+  5000000.0)
 
 (def history-years 50)
 (def max-days 3)
@@ -279,10 +279,14 @@
    :rate 5})
 
 (defn- with-progress
-  "Wrap a download-fn so every 100 finished series print `n/total downloaded`."
+  "Wrap a download-fn so every 100 finished series print `n/total downloaded`.
+
+  Captures `*out*` at wrap time so missionary worker threads still write to
+  the caller’s writer (the ingress-eodhd page binds a line buffer there)."
   [download-fn total]
   (let [done (atom 0)
-        total (long total)]
+        total (long total)
+        out *out*]
     (fn [ctx opts]
       (m/sp
        (try
@@ -290,8 +294,9 @@
          (finally
            (let [n (swap! done inc)]
              (when (or (zero? (mod n 100)) (= n total))
-               (println (format "%d/%d downloaded" n total))
-               (flush)))))))))
+               (binding [*out* out]
+                 (println (format "%d/%d downloaded" n total))
+                 (flush))))))))))
 
 (defn- download-all [equities download-fn store-fn]
   (quiet-logs!)
@@ -443,7 +448,7 @@
 (defn run-all
   "Import every US equity, then download bars and splits for all of them.
 
-  Unlike `run`, this ignores the $20M turnover floor (~2k names) and pulls
+  Unlike `run`, this ignores the $5M turnover floor (~2k names) and pulls
   the full common/preferred list (~18k). Also re-downloads even when fresh.
 
   Usage: clj -X:ingress-all"

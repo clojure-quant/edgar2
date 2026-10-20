@@ -83,7 +83,10 @@
                        (swap! job* assoc :lines (vec (take-last 80 @lines))))
             on-line (fn [line]
                       (swap! lines conj line)
-                      (when (> (- (System/currentTimeMillis) @flushed-at) 400)
+                      ;; Always publish progress lines; throttle the rest so
+                      ;; hyper is not flooded by chatty import noise.
+                      (if (or (str/includes? line "downloaded")
+                              (> (- (System/currentTimeMillis) @flushed-at) 400))
                         (publish!)))]
         (try
           (binding [*out* (line-writer on-line)
@@ -138,7 +141,7 @@
     [:div
      (nav req)
      [:h1 "Ingress EODHD"]
-     [:p "Download refreshes bars and splits for US common and preferred stocks with at least $20 million turnover (latest session close × volume) — about 2,000 names. Download all drops that floor and pulls every US equity EODHD lists (~18,000). Each series is 50 years of daily data; files live in data/eodhd/bardb. The screen reads them through the eodhd split service, so prices are split-adjusted. The token is read from $QUANTASTORE/edgar2.edn."]
+     [:p "Download refreshes bars and splits for US common and preferred stocks with at least $5 million turnover (latest session close × volume) — about 2,000 names. Download all drops that floor and pulls every US equity EODHD lists (~18,000). Each series is 50 years of daily data; files live in data/eodhd/bardb. The screen reads them through the eodhd split service, so prices are split-adjusted. The token is read from $QUANTASTORE/edgar2.edn."]
      [:table
       [:thead
        [:tr [:th "Task"] [:th "As of"] [:th "Limit"] [:th "Status"] [:th "Detail"]]]

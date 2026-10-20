@@ -9,7 +9,7 @@
   clusters cuts an average-linkage tree on correlation distance.
 
   The ticker list for `clj -X:nearness` is the EODHD equity list:
-  latest-session turnover of at least 20 million, and a bar file on disk.
+  latest-session turnover of at least 5 million, and a bar file on disk.
 
   Usage: clj -X:nearness"
   (:require [clojure.java.io :as io]
@@ -422,7 +422,7 @@
     path))
 
 (defn- turnover-tickers
-  "EODHD equities with a bar file. The list is already turnover >= 20 million."
+  "EODHD equities with a bar file. The list is already turnover >= 5 million."
   []
   (let [{:keys [items lines]} (universe/eodhd {})]
     (doseq [line lines]
@@ -437,7 +437,7 @@
         tickers (turnover-tickers)]
     (when (empty? tickers)
       (throw (ex-info "No EODHD equities with bar files. Run clj -X:ingress-eodhd." {})))
-    (println (format "nearness for %d equities with turnover >= 20 million" (count tickers)))
+    (println (format "nearness for %d equities with turnover >= 5 million" (count tickers)))
     (flush)
     (let [series (load-returns tickers)
           _ (when (empty? series)
