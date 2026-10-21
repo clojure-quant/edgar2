@@ -16,7 +16,10 @@
   #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"})
 
 (def quarterly-forms
-  #{"10-Q" "10-Q/A"})
+  "10-Q for US issuers; 6-K for foreign private issuers' interim reports.
+  Companyfacts often lacks 6-K XBRL (many FPIs only ship numeric facts on
+  20-F), so quarterly coverage for those names may still be thin."
+  #{"10-Q" "10-Q/A" "6-K" "6-K/A"})
 
 (defn parse-date
   [d]
@@ -106,12 +109,21 @@
        :end (str end-d)
        :frame (calendar-duration-frame end-d)})))
 
+(defn- period-ended-by-filing?
+  "True when the period-end is on or before the filing date.
+
+  Drops forward-looking FY windows (e.g. next-year tax rate) that share a
+  filing with the completed annual and would otherwise win latest-`:start`."
+  [row]
+  (not (pos? (compare (str (:end row)) (str (:filed row))))))
+
 (defn annual-periods
   "Reduce an `e/facts` dataset to one annual period row per fiscal year-end.
 
   Keeps only `:fp` FY facts with ~12-month windows (`annual-duration?`,
   300–400 days), on any form (10-K / 20-F / 40-F, and foreign 6-K annuals).
   Year-to-date or prior-year windows tagged Q2/Q3 on a 10-Q are excluded.
+  Windows whose `:end` is after `:filed` are dropped (forward stubs).
 
   When one filing date carries several FY windows (current year plus
   comparatives), only the row with the latest `:start` is kept. Remaining
@@ -123,7 +135,8 @@
   [facts]
   (let [rows (->> (ds/rows facts {:nil-missing? true})
                   (filter #(and (= "FY" (str (:fp %)))
-                                (annual-duration? %)))
+                                (annual-duration? %)
+                                (period-ended-by-filing? %)))
                   (map #(select-keys % period-cols)))
         per-filing (->> rows
                         (group-by #(str (:filed %)))
@@ -148,11 +161,12 @@
 (defn quarterly-periods
   "Reduce an `e/facts` dataset to one quarterly period row per filing.
 
-  10-Qs supply Q1–Q3 (~3-month windows). Annual reports supply Q4 when the
-  10-K carries an explicit quarterly footnote (`:fp` Q4), otherwise Q4 is
-  synthesized from the annual period and the preceding 10-Q end. Rows tagged
-  `:fp` FY are never kept — even ~90-day windows on a 10-K — so mid-year
-  comparatives mislabeled FY do not appear as quarters.
+  10-Qs (and FPI 6-Ks when present in companyfacts) supply Q1–Q3 (~3-month
+  windows). Annual reports supply Q4 when the 10-K/20-F carries an explicit
+  quarterly footnote (`:fp` Q4), otherwise Q4 is synthesized from the annual
+  period and the preceding 10-Q/6-K end. Rows tagged `:fp` FY are never kept
+  — even ~90-day windows on a 10-K — so mid-year comparatives mislabeled FY
+  do not appear as quarters.
 
   Returns a dataset of `:accn :filed :form :fy :fp :start :end :frame :period`
   (`:period` is `fy-fp`, e.g. 2025-Q2)."
