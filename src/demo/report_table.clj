@@ -23,6 +23,11 @@
   (def dss (e/facts "MSFT"))
 
   (def dss (e/facts "SONY"))
+
+  ; taxonomy cef
+  (def dss (e/facts "ACP"))
+  
+  (ds/filter dss #(= "cef" (str (:taxonomy %))))
   
   dss
   

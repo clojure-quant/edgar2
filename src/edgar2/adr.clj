@@ -11,21 +11,6 @@
 
 (def adr-path "data/adr.edn")
 
-(def ^:private ratio-by-ticker
-  "ticker → :ratio from data/adr.edn. Built on first get-ratio call."
-  (delay
-    (into {}
-          (keep (fn [{:keys [ticker ratio]}]
-                  (when (and ticker (number? ratio))
-                    [(str/upper-case (str ticker)) ratio])))
-          (or (dataset/read-rows adr-path) []))))
-
-(defn get-ratio
-  "Ordinary shares per one ADR/ADS for `ticker`, or nil when unknown."
-  [ticker]
-  (when-let [t (some-> ticker str str/trim not-empty str/upper-case)]
-    (get @ratio-by-ticker t)))
-
 (def foreign-annual-forms
   #{"20-F" "20-F/A" "40-F" "40-F/A"})
 

@@ -118,7 +118,7 @@
                     (:shares-outstanding row))]
      (try
        (let [annual-map (if dss (annual/calculate-annual dss) {})
-             mc-map (valuation/calculate-marketcap annual-map prices shares row)
+             mc-map (valuation/calculate-marketcap prices shares row)
              valuation-map (valuation/calculate-valuation annual-map (:vmcap mc-map))]
          (merge annual-map
                 (universe-data row)
@@ -149,7 +149,7 @@
   (0–100 share of annual years that did not fall versus the prior year).
   When operating income is not tagged, a year whose operating expenses were
   derived uses gross profit minus those expenses.
-  :adr-ratio (ordinary shares per ADR from data/adr.edn) when known.
+  :adr-ratio (ordinary shares per ADR from data/adr-list.edn) when known.
   :market-cap-adjusted (reporting-currency market cap after ADR) when FX allows.
   Non-USD or non-1 ADR names use that cap for price-sales, PE, yields, and EV.
   :sic, :sector, :industry, and :subindustry come from data/universe-fsds.edn.
