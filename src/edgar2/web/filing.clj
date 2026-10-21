@@ -191,6 +191,90 @@
   (and (instance? clojure.lang.ExceptionInfo e)
        (= 404 (:status (ex-data e)))))
 
+(defn- sec-miss?
+  "EDGAR has no index at this CIK, or the index did not name a form."
+  [e]
+  (and (instance? clojure.lang.ExceptionInfo e)
+       (or (http-404? e)
+           (= :edgar.filing/not-found (:type (ex-data e))))))
+
+(defn- accession-cik
+  "Leading CIK of an accession number (the submitter, often a filing agent)."
+  [accession]
+  (second (re-find #"^(\d{10})-\d{2}-\d{6}$" (str accession))))
+
+(defn- cik-dir-names
+  "Padded and unpadded directory names used under data/filings."
+  [cik]
+  (when-let [s (some-> cik str str/trim not-empty)]
+    (when (re-matches #"\d+" s)
+      (let [n (parse-long s)]
+        [(format "%010d" n) (str n)]))))
+
+(defn- cached-doc
+  "A document already stored under data/filings, or nil.
+  Checks the route CIK and the accession-prefix CIK. Older saves used the
+  submitter CIK taken from the accession number."
+  [cik accession doc-name]
+  (when (and accession doc-name)
+    (let [names (distinct (mapcat cik-dir-names [cik (accession-cik accession)]))
+          root (io/file filing/filing-dir)]
+      (when (.isDirectory root)
+        (some (fn [^java.io.File form-dir]
+                (when (.isDirectory form-dir)
+                  (some (fn [cik-name]
+                          (let [f (io/file form-dir cik-name accession doc-name)]
+                            (when (.isFile f) f)))
+                        names)))
+              (.listFiles root))))))
+
+(defn- index-filing
+  "Filing map from the archives index stored under `cik`."
+  [cik accession]
+  (let [cik (padded-cik cik)
+        stub {:cik cik :accessionNumber accession}
+        idx (ef/filing-index stub)
+        primary (ef/primary-doc idx)
+        form (:formType idx)]
+    (if form
+      (assoc stub
+             :form form
+             :primaryDocument (:name primary)
+             :filingDate (:filingDate idx))
+      (throw (ex-info "Could not determine form type from filing index"
+                      {:type :edgar.filing/not-found
+                       :accession-number accession
+                       :cik cik})))))
+
+(defn- load-filing
+  "Filing map for `accession`.
+
+  `cik` is the issuer from the route. The accession prefix is the submitter.
+  For agent-filed documents (accession prefix 0001193125 is Donnelley) the
+  files live under the issuer, and the submitter index often answers 503.
+  edgarjure turns that into \"Filing not found\" and never tries the issuer.
+  Try the issuer archives path first; a 5xx is retried on the other CIK and
+  only then rethrown."
+  [cik accession]
+  (let [candidates (vec (->> [(padded-cik cik) (padded-cik (accession-cik accession))]
+                             (remove nil?)
+                             distinct))]
+    (loop [i 0
+           hard nil]
+      (if (>= i (count candidates))
+        (when hard (throw hard))
+        (let [result (try
+                       {:ok (index-filing (nth candidates i) accession)}
+                       (catch clojure.lang.ExceptionInfo e
+                         {:err e}))
+              err (:err result)]
+          (cond
+            (:ok result) (:ok result)
+            (sec-miss? err) (recur (inc i) hard)
+            (< (inc i) (count candidates)) (recur (inc i) (or hard err))
+            hard (throw hard)
+            :else (throw err)))))))
+
 (defn- try-primary
   "Download `f`, or nil when SEC has no document at that CIK."
   [f]
@@ -322,27 +406,29 @@
   Paper filings resolve to scanned.pdf when that scan is on the index."
   [cik accession]
   (filing/ensure-identity!)
-  (let [f (e/filing-by-accession accession)
-        issuer (padded-cik cik)
-        issuer-filing (if issuer (assoc f :cik issuer) f)]
-    (or (some->> (try-primary issuer-filing) (prefer-viewable issuer-filing))
-        (when-not (same-cik? (:cik issuer-filing) (:cik f))
-          (some->> (try-primary f) (prefer-viewable f))))))
+  (when-let [f (load-filing cik accession)]
+    (let [issuer (padded-cik cik)
+          issuer-filing (if issuer (assoc f :cik issuer) f)]
+      (or (some->> (try-primary issuer-filing) (prefer-viewable issuer-filing))
+          (when-not (same-cik? (:cik issuer-filing) (:cik f))
+            (some->> (try-primary f) (prefer-viewable f)))))))
 
 (defn filing-doc-file
   "Path of one document in a filing, such as an image beside the HTML.
   `cik` is the issuer. The accession prefix is the submitter, so the issuer
   path is tried first, same as `raw-filing-file`."
   [cik accession doc-name]
-  (filing/ensure-identity!)
-  (let [doc (safe-doc-name doc-name)
-        f (when doc (e/filing-by-accession accession))
-        issuer (padded-cik cik)
-        issuer-filing (if issuer (assoc f :cik issuer) f)]
-    (when f
-      (or (try-doc issuer-filing doc)
-          (when-not (same-cik? (:cik issuer-filing) (:cik f))
-            (try-doc f doc))))))
+  (when-let [doc (safe-doc-name doc-name)]
+    (or (when-not (paper-filename? doc)
+          (cached-doc cik accession doc))
+        (do
+          (filing/ensure-identity!)
+          (when-let [f (load-filing cik accession)]
+            (let [issuer (padded-cik cik)
+                  issuer-filing (if issuer (assoc f :cik issuer) f)]
+              (or (try-doc issuer-filing doc)
+                  (when-not (same-cik? (:cik issuer-filing) (:cik f))
+                    (try-doc f doc)))))))))
 
 (defn- redirect
   [url]
