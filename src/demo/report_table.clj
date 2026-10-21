@@ -1,10 +1,12 @@
 (ns demo.report-table
-  (:require [edgar.api :as e]
-            [edgar2.financials.facts-ds :as facts-ds]
-            [tablecloth.api :as tc]
-            [tech.v3.dataset :as ds]
-            [edgar2.filing :refer [resolve-filer2]]
-            ))
+  (:require 
+   [clojure.string :as str]
+   [clojure.pprint]
+   [tech.v3.dataset :as ds]
+   [tablecloth.api :as tc]
+   [edgar.api :as e]
+   [edgar2.financials.facts-ds :as facts-ds]
+   [edgar2.filing :refer [resolve-filer2]]))
 
 (def demo-fields
   [[:dei :EntityCommonStockSharesOutstanding]
@@ -29,8 +31,23 @@
   
   (ds/filter dss #(= "cef" (str (:taxonomy %))))
   
+  (def dss (e/facts "TAK"))
+
   dss
+  (defn f [row]
+    (let [s (:concept row)]
+      (and (not (nil? s))
+           (not (str/blank? s)) 
+           (str/includes? (str/lower-case s) "dividend")
+           )))
+
+  (-> dss
+      (ds/filter f)
+      (ds/filter #(= "2025-06-25" (:filed %)))
+      (tc/select-columns [:filed :concept :val])
+      (ds/print-all))
   
+
   (facts-ds/annual-periods dss)
   (facts-ds/quarterly-periods dss)
 

@@ -61,4 +61,3 @@ From `universe-facts.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats
 
 
 `:ticker` and `:years` work on the download and report aliases. `:financials` takes `:n`: fiscal years when annual, quarters when `:period` is quarterly. `:years` is still accepted there as a synonym for `:n`.
-

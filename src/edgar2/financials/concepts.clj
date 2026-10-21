@@ -98,16 +98,18 @@
     :data [[:us-gaap :CommonStockDividendsPerShareCashPaid]
            [:us-gaap :CommonStockDividendsPerShare]
            [:us-gaap :CommonStockDividendsPerShareDeclared]
-           [:ifrs-full :DividendsPaidOrdinaryShares]]}
+           [:ifrs-full :DividendsPaidOrdinarySharesPerShare]]}
 
    {:id :dividends-paid
     :label "Dividends Paid"
     :data [[:us-gaap :PaymentsOfDividends]
            [:us-gaap :PaymentsOfOrdinaryDividends]
            [:us-gaap :PaymentsOfDividendsCommonStock]
+           [:ifrs-full :DividendsPaid]
+           [:ifrs-full :DividendsPaidOrdinaryShares]
            [:ifrs-full :DividendsPaidClassifiedAsFinancingActivities]
            [:ifrs-full :DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities]
-           [:ifrs-full :DividendsPaid]]}
+           ]}
 
    {:id :stock-repurchase
     :label "Stock Repurchase"
