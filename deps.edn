@@ -28,6 +28,7 @@
   :download-universe-fsds {:exec-fn edgar2.download.fsds-universe/filer-info}
   :download-fx {:exec-fn edgar2.download.fx/download-fx}
   :adr {:exec-fn edgar2.adr/run}
+  :adr-list {:exec-fn edgar2.download.adr-list/run}
   ; universe 
   :universe-facts {:exec-fn edgar2.download.facts-universe/universe}
   :stats {:exec-fn edgar2.report.stats/stats}
