@@ -15,7 +15,8 @@
     :metrics [{:key :return-on-capital :label "return-on-capital (%)" :fmt :percent}
               {:key :revenue-score :label "revenue-score" :fmt :number}
               {:key :operating-income-score :label "operating-income-score" :fmt :number}
-              {:key :avg-profit-margin :label "avg-profit-margin (%)" :fmt :percent}]}
+              {:key :avg-profit-margin :label "avg-profit-margin (%)" :fmt :percent}
+              {:key :debt2ebitda :label "debt2ebitda" :fmt :number}]}
    {:title "GROWTH"
     :metrics [{:key :sales-growth-yoy :label "sales-growth-yoy (%)" :fmt :number}
               {:key :net-income-change-q-on-y :label "net-income-change-q-on-y (%)" :fmt :number}]}

@@ -1,4 +1,4 @@
-(ns edgar2.screen
+(ns edgar2.screen.core
   "Run one screen from the registry.
 
   A screen map has :universe and :calculate. :universe returns the

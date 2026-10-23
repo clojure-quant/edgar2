@@ -116,7 +116,8 @@
              {:key :revenue-score :digits 1}
              {:key :operating-income-score :digits 1}
              {:key :profit-margin :digits 4}
-             {:key :avg-profit-margin :digits 4}]}
+             {:key :avg-profit-margin :digits 4}
+             {:key :debt2ebitda :digits 2}]}
    {:label "Growth"
     :fields [{:key :sales-growth-yoy :digits 1}
              {:key :net-income-change-q-on-y :digits 1}]}

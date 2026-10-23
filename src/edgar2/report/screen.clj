@@ -2,7 +2,7 @@
   "Stats rows and the display fields the fundamental screens share.
 
   `load-stats` and `millions` are also used by the company pages.
-  The screens themselves live in edgar2.algo and run through edgar2.screen."
+  The screens themselves live in edgar2.algo and run through edgar2.screen.core."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]

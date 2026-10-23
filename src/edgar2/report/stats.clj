@@ -9,6 +9,7 @@
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
             [edgar2.download.facts-universe :as universe]
+            [edgar2.db.price-change :as db-price-change]
             [edgar2.db.sic :as db-sic]
             [edgar2.db.universe :as db-universe]
             [edgar2.financials.calc.annual :as annual]
@@ -44,6 +45,7 @@
 
 (def stats-field-order
   [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
+   :change50 :change200 :change400
    :shares :adr-ratio :marketcap :market-cap-adjusted :annual-count
    :revenue :revenue-unit
    :net-profit
@@ -65,7 +67,9 @@
    :enterprise-value
    :ev-ebit
    :ebit
+   :ebitda
    :debt
+   :debt2ebitda
    :cash])
 
 (defn select-fields
@@ -103,10 +107,10 @@
   "One stats row for `cik` from companyfacts dataset `dss` (nil when missing).
 
   Runs `annual/calculate-annual` (when `dss` is present), market valuation
-  (including ADR ratio), and SIC enrichment. Looks up the universe row by
-  `cik` unless `:row` is passed. Optional opts for the batch path: `:row`,
-  `:prices`, `:sic-db`, `:shares`, `:data` (raw companyfacts map for
-  shares-outstanding)."
+  (including ADR ratio), SIC enrichment, and the cached price changes
+  for the ticker. Looks up the universe row by `cik` unless `:row` is
+  passed. Optional opts for the batch path: `:row`, `:prices`, `:sic-db`,
+  `:shares`, `:data` (raw companyfacts map for shares-outstanding)."
   ([dss cik]
    (stats-one dss cik {}))
   ([dss cik {:keys [row prices sic-db shares data]}]
@@ -115,7 +119,8 @@
          sic-db (or sic-db (db-sic/load-sic-index))
          shares (or shares
                     (when data (universe/shares-outstanding (:facts data)))
-                    (:shares-outstanding row))]
+                    (:shares-outstanding row))
+         changes (db-price-change/get-change (:ticker row))]
      (try
        (let [annual-map (if dss (annual/calculate-annual dss) {})
              mc-map (valuation/calculate-marketcap prices shares row)
@@ -124,11 +129,12 @@
                 (universe-data row)
                 (dissoc mc-map :vmcap)
                 valuation-map
-                (db-sic/sic-data cik sic-db)))
+                (db-sic/sic-data cik sic-db)
+                changes))
        (catch Exception ex
          (println (format "  stats-fail %s (%s)"
                           (or (:ticker row) cik) (.getMessage ex)))
-         (merge (universe-data row) (db-sic/sic-data cik sic-db)))))))
+         (merge (universe-data row) (db-sic/sic-data cik sic-db) changes))))))
 
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
@@ -139,13 +145,16 @@
   return on capital (Net Income / total equity), plus :shares (most recent 10-Q
   when that quarter is at least as recent as the annual report; otherwise
   the annual report), :annual-count (distinct annual periods in companyfacts),
-  :price, :marketcap, :price-sales,
+  :price, :change50, :change200, :change400
+  (close / closeN - 1 from data/price-change.edn, when that ticker is there),
+  :marketcap, :price-sales,
   :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
   :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),
   :buyback-yield (USD stock repurchase / USD market cap),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
-  :ev-ebit, :revenue-score, and :operating-income-score
+  :ev-ebit, :ebitda (EBIT + depreciation + amortization),
+  :debt2ebitda (debt / EBITDA), :revenue-score, and :operating-income-score
   (0–100 share of annual years that did not fall versus the prior year).
   When operating income is not tagged, a year whose operating expenses were
   derived uses gross profit minus those expenses.
@@ -219,7 +228,7 @@
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  chg50=%d  chg200=%d  chg400=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-yoy out))
@@ -228,6 +237,9 @@
                               (count (filter :return-on-assets out))
                               (count (filter :return-on-capital out))
                               (count (filter :price out))
+                              (count (filter :change50 out))
+                              (count (filter :change200 out))
+                              (count (filter :change400 out))
                               (count (filter :marketcap out))
                               (count (filter :adr-ratio out))
                               (count (filter :price-earnings out))

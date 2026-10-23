@@ -28,6 +28,8 @@
 (def preferred-tags (concept-data :preferred-stock))
 (def debt-tags (concept-data :debt))
 (def revenue-tags (concept-data :revenue))
+(def depreciation-tags (concept-data :depreciation))
+(def amortization-tags (concept-data :amortization))
 
 (def sales-growth-window
   "Number of trailing YoY revenue changes averaged into :sales-growth-yoy."
@@ -56,6 +58,8 @@
                 cash-tag-pairs
                 preferred-tags
                 debt-tags
+                depreciation-tags
+                amortization-tags
                 (mapcat second derived/statement-lines)))))
 
 (defn- yoy-pct
@@ -94,12 +98,6 @@
       {:sales-growth-yoy (avg window)
        :sales-growth-years (count window)})))
 
-(defn latest-num
-  "Newest numeric value and its end from parallel newest-first vectors."
-  [ends vals]
-  (some (fn [[e v]] (when (number? v) {:end e :val v}))
-        (map vector ends vals)))
-
 (defn chron-nums
   "Oldest-first numbers from a newest-first `calc-concept` vector."
   [vals]
@@ -127,6 +125,61 @@
   "First numeric value in a newest-first vector."
   [vals]
   (some #(when (number? %) %) vals))
+
+(def ^:private combined-da-order
+  "Cash-flow or statement totals that already include depreciation and
+  amortization. Earlier names win."
+  ["DepreciationDepletionAndAmortization"
+   "DepreciationAndAmortization"
+   "DepreciationAndAmortisationExpense"
+   "AdjustmentsForDepreciationAndAmortisationExpense"])
+
+(def ^:private combined-da-tags (set combined-da-order))
+
+(defn- tag-names
+  [pairs]
+  (mapv (comp name second) pairs))
+
+(defn- first-num
+  "First numeric column in `names` on one report-table row."
+  [row names]
+  (some (fn [n]
+          (let [v (get row n)]
+            (when (number? v) v)))
+        names))
+
+(defn- depreciation-and-amortization
+  "Newest-first [depreciation amortization] from a report-table.
+
+  A combined D&A tag is returned as depreciation and amortization is nil
+  on that row, so adding the vectors does not count amortization twice.
+  Otherwise each concept contributes its own first numeric tag."
+  [table]
+  (let [dep-names (tag-names depreciation-tags)
+        pure-dep (filterv (complement combined-da-tags) dep-names)
+        amort-names (tag-names amortization-tags)
+        rows (ds/rows table {:nil-missing? true})]
+    [(mapv (fn [row]
+             (or (first-num row combined-da-order)
+                 (first-num row pure-dep)))
+           rows)
+     (mapv (fn [row]
+             (when-not (number? (first-num row combined-da-order))
+               (first-num row amort-names)))
+           rows)]))
+
+(defn ebitda-vec
+  "Per-row EBITDA, newest first: EBIT + depreciation + amortization.
+
+  Nil when EBIT is missing or both addends are missing. A missing addend
+  counts as zero."
+  [ebit dep amort]
+  (mapv (fn [e d a]
+          (when (and (number? e) (or (number? d) (number? a)))
+            (+ (double e)
+               (double (or d 0))
+               (double (or a 0)))))
+        ebit dep amort))
 
 (defn yearly-ratios
   "num/den per row-aligned period, oldest first.
@@ -162,7 +215,6 @@
   [dss]
   (let [table (facts-ds/report-table dss :y annual-fields)
         rows (table-rows table)
-        ends (mapv #(str (:end %)) rows)
         current (first rows)
         annual-count (ds/row-count (facts-ds/annual-periods dss))
         concepts (calc-concept/calc-concepts table)
@@ -178,18 +230,19 @@
         eps-v (col-vec concepts :eps)
         dps-v (col-vec concepts :dps)
         ebit-v (col-vec concepts :ebit)
+        [dep-v amort-v] (depreciation-and-amortization table)
+        ebitda-v (ebitda-vec ebit-v dep-v amort-v)
         concept-rows (vec (ds/rows concepts {:nil-missing? true}))
-        bs-end (:end (latest-num ends assets))
-        bs-i (or (some identity
-                       (map-indexed (fn [i e] (when (= e bs-end) i)) ends))
-                 0)
-        debt (nth debt-v bs-i nil)
-        cash (nth cash-v bs-i nil)
-        preferred (nth preferred-v bs-i nil)
-        nci (nth nci-v bs-i nil)
+        debt (most-recent debt-v)
+        cash (most-recent cash-v)
+        preferred (most-recent preferred-v)
+        nci (most-recent nci-v)
         eps (most-recent eps-v)
         dps (or (most-recent dps-v) 0.0)
         ebit (most-recent ebit-v)
+        ebitda (most-recent ebitda-v)
+        debt-v-div-ebitda (ratio debt-v ebitda-v)
+        debt2ebitda (most-recent debt-v-div-ebitda)
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
         ni-qoy (calc-q/net-income-change-q-on-y
                 (facts-ds/report-table dss :q net-income-tags))
@@ -228,8 +281,10 @@
              :equity equity-val)
       (number? eps) (assoc :eps eps)
       (number? dps) (assoc :dps dps)
-      (number? debt) (assoc :debt debt :debt-end bs-end)
+      (number? debt) (assoc :debt debt)
       (number? cash) (assoc :cash cash)
       (number? preferred) (assoc :preferred-stock preferred)
       (number? nci) (assoc :noncontrolling-interest nci)
-      (number? ebit) (assoc :ebit ebit))))
+      (number? ebit) (assoc :ebit ebit)
+      (number? ebitda) (assoc :ebitda ebitda)
+      (number? debt2ebitda) (assoc :debt2ebitda debt2ebitda))))

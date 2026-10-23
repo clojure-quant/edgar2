@@ -2,7 +2,7 @@
   "One page for every screen."
   (:require [clojure.string :as str]
             [hyper.core :as h]
-            [edgar2.screen :as screen]
+            [edgar2.screen.core :as screen]
             [edgar2.screen.registry :as registry]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))

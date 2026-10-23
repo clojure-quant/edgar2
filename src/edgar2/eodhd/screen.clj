@@ -157,22 +157,25 @@
   "Canonical options map. This map is the result-cache key, so two
   reports that differ in any option, including :reverse, do not share
   a cached table."
-  [{:keys [label notes sort-by limit decimals reverse] :or {label "hit"}}]
+  [{:keys [label notes sort-by limit decimals reverse raw] :or {label "hit"}}]
   {:label label
    :notes (vec (or notes []))
    :sort-by sort-by
    :limit limit
    :decimals (or decimals {})
-   :reverse (true? reverse)})
+   :reverse (true? reverse)
+   :raw (true? raw)})
 
-(defn- compute [algo {:keys [label notes limit decimals] sort-key :sort-by reverse? :reverse} loaded]
+(defn- compute [algo {:keys [label notes limit decimals raw] sort-key :sort-by reverse? :reverse} loaded]
   (let [{:keys [equities with-bars secs-load]} loaded
         t-calc (System/nanoTime)
         hits (parallel! (map #(calc-task algo %) with-bars) (cpu-parallel))
         secs-calculate (secs-since t-calc)
         scored (->> hits (remove nil?) (sort-by (sort-key-fn sort-key reverse?)))
         shown (if limit (take (long limit) scored) scored)
-        rows (mapv #(present-row % decimals) shown)]
+        rows (if raw
+               (vec shown)
+               (mapv #(present-row % decimals) shown))]
     {:rows rows
      :n-equities (count equities)
      :n-bars (count with-bars)
@@ -202,6 +205,7 @@
              the lowest first.
   :limit     keep only this many rows after sorting
   :decimals  map of column key to decimal places (default 2)
+  :raw       true leaves numbers as numbers. false formats them
 
   The bar load is shared across algos until the equity list or the bar
   catalog changes. Each algo's rows are cached on the stamp and the
@@ -228,7 +232,8 @@
   from the shared load cache. This does not use the result cache. The
   screen runner stores the rows, and its cache key is the screen id,
   the resolved parameters (including :reverse), and the input stamp.
-  Recalculate always runs `algo` again."
+  Recalculate always runs `algo` again. `:raw` true leaves numbers
+  unformatted."
   [items algo opts]
   (let [opts (screen-opts opts)
         loaded (load-with-bars)]

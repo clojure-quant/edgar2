@@ -150,15 +150,16 @@
    {:id :debt
     :label "Debt"
     :data [[:us-gaap :LongTermDebtNoncurrent]
-           [:ifrs-full :LongtermBorrowings]
            [:us-gaap :LongTermDebtCurrent]
-           [:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]
-           [:ifrs-full :ShorttermBorrowings]
            [:us-gaap :LongTermDebt]
-           [:ifrs-full :Borrowings]
            [:us-gaap :CommercialPaper]
            [:us-gaap :ShortTermBorrowings]
-           [:us-gaap :OtherShortTermBorrowings]]}
+           [:us-gaap :OtherShortTermBorrowings]
+           [:ifrs-full :LongtermBorrowings]
+           [:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]
+           [:ifrs-full :ShorttermBorrowings]
+           [:ifrs-full :Borrowings]
+           ]}
 
    {:id :common-shares-outstanding
     :label "Common Shares Outstanding"
@@ -178,10 +179,23 @@
    {:id :depreciation
     :label "Depreciation"
     :data [[:ifrs-full :DepreciationAndAmortisationExpense]
-           [:us-gaap :DepreciationExpense]
+           [:us-gaap :DepreciationDepletionAndAmortization]
            [:us-gaap :DepreciationAndAmortization]
+           [:us-gaap :DepreciationExpense]
            [:us-gaap :Depreciation]
-           [:us-gaap :DepreciationDepletionAndAmortization]]}
+           [:ifrs-full :AdjustmentsForDepreciationAndAmortisationExpense]
+           [:ifrs-full :DepreciationPropertyPlantAndEquipment]
+           [:us-gaap :DepreciationNonproduction]]}
+
+   {:id :amortization
+    :label "Amortization"
+    :data [[:us-gaap :AmortizationOfIntangibleAssets]
+           [:us-gaap :FiniteLivedIntangibleAssetsAmortizationExpense]
+           [:us-gaap :AmortizationOfDeferredCharges]
+           [:us-gaap :OtherAmortizationOfDeferredCharges]
+           [:us-gaap :AdjustmentForAmortization]
+           [:ifrs-full :AmortisationIntangibleAssetsOtherThanGoodwill]
+           [:ifrs-full :AmortisationExpense]]}
 
    {:id :ifrs-income-by-label
     :label "IFRS income supplements by statement line"
