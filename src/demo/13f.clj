@@ -1,35 +1,43 @@
 (ns demo.13f
   "13F share counts for CUSIP 03748R747.
 
-  Shares come from data/holdings.edn. Columns are the report periods
-  where this CUSIP is held, oldest first, then a change column for each
-  period after the first. Change is shares in that period minus shares
-  in the prior period.
+  Shares come from data/holdings.nippy. Columns are the report periods
+  where this CUSIP is held, from 2025-12-31 onward, oldest first, then a
+  change column for each period after the first. Change is shares in
+  that period minus shares in the prior period.
 
   A filer who filed a period and did not list the CUSIP holds 0.
   A filer with no filing for a period is blank for that period.
+  Change is calculated only when both periods have a number. If either
+  is blank, the change is blank. Blank cells print as an empty string.
 
-  A filer is kept on its own row only when every reported share count
-  is at least 200,000 and every reported change has an absolute value
-  of at least 200,000. Everyone else who reported a holding is summed
-  into OTHER-INSTITUTIONS. Rows are sorted by shares in the latest
-  report period, largest first.
+  A filer is kept on its own row when the largest reported position is
+  at least 500,000 shares, or any period-to-period change has an
+  absolute value of at least 200,000. Everyone else who reported a
+  holding is summed into OTHER-INSTITUTIONS. Rows are sorted by shares
+  in the latest report period, largest first.
 
   Usage:
-    clj -M -e \"(require 'demo.13f) (demo.13f/run)\""
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clojure.pprint :as pprint]
-            [edgar2.institutional :as institutional]))
+    clj -M:13F"
+  (:require [clojure.pprint :as pprint]
+            [edgar2.db.holdings :as holdings]))
 
 (def cusip "03748R747")
 
-(def ^:private threshold 200000)
+(def ^:private first-period "2025-12-31")
+
+(def ^:private min-position 500000)
+
+(def ^:private min-move 200000)
+
+(defn- kept-period?
+  "True for 2025-12-31 and every later report period."
+  [period]
+  (not (neg? (compare period first-period))))
 
 (defn- load-filers
   []
-  (with-open [r (io/reader institutional/holdings-path)]
-    (:filers (edn/read (java.io.PushbackReader. r)))))
+  (holdings/load))
 
 (defn- later-filing
   "The filing with the later :filing-date. Ties keep `b`."
@@ -77,7 +85,8 @@
               (let [before (get row (share-key prev))
                     after (get row (share-key cur))]
                 (assoc row (change-key cur)
-                       (when (and before after) (- after before)))))
+                       (when (and (some? before) (some? after))
+                         (- after before)))))
             shares
             (partition 2 1 periods))))
 
@@ -85,16 +94,17 @@
   [row share-cols]
   (boolean (some #(and % (pos? %)) (map row share-cols))))
 
-(defn- under-threshold?
-  [n]
-  (and (some? n) (< (abs n) threshold)))
-
-(defn- aggregate?
-  "Roll into OTHER-INSTITUTIONS when any reported share count is under
-  200,000, or any period's share change is under 200,000 shares."
+(defn- own-row?
+  "Keep a filer on its own row when its largest reported position is at
+  least 500,000 shares, or any period-to-period change is at least
+  200,000 shares."
   [row share-cols change-cols]
-  (boolean (or (some under-threshold? (map row share-cols))
-               (some under-threshold? (map row change-cols)))))
+  (let [positions (keep row share-cols)]
+    (boolean (or (when (seq positions)
+                   (>= (apply max positions) min-position))
+                 (some (fn [n]
+                         (and (some? n) (>= (abs n) min-move)))
+                       (map row change-cols))))))
 
 (defn- sum-col
   [rows k]
@@ -127,7 +137,9 @@
   (let [wanted (set cusips)
         latest (latest-filings filers)
         by-filer (group-by :filer latest)
-        held (filter #(pos? (qty % wanted)) latest)
+        held (->> latest
+                  (filter #(and (kept-period? (:report-period %))
+                                (pos? (qty % wanted)))))
         periods (->> held (map :report-period) distinct sort vec)
         share-cols (mapv share-key periods)
         change-cols (mapv change-key (rest periods))
@@ -139,7 +151,7 @@
                                name (:filer-name (reduce later-filing holding-filings))]
                            (shares-row wanted periods by-period name))))
                   (filter #(reported-holding? % share-cols)))
-        {roll true keep false} (group-by #(aggregate? % share-cols change-cols) rows)
+        {keep true roll false} (group-by #(own-row? % share-cols change-cols) rows)
         shown (by-latest (concat keep
                                  (when (seq roll)
                                    [(other-row roll value-cols)]))
@@ -149,6 +161,7 @@
      :rows shown}))
 
 (defn- cell
+  "Blank for nil. Zero and every other number print with thousands separators."
   [n]
   (if (nil? n) "" (format "%,d" (long n))))
 

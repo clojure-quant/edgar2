@@ -42,3 +42,5 @@ NPORT-P’s public report is the fund’s fiscal quarter-end. The 13F is the cal
 The fund files N-PORT even when the adviser is under the $100 million 13(f) threshold. Under that threshold there is no 13F at all.
 A sub-adviser that has the discretion reports the position. The other manager files a 13F-NT instead of repeating the table, so the holding is not listed twice.
 A 13F can omit a position under a confidential-treatment request while the same position is already public on NPORT-P.
+
+"13F-HR/A"
