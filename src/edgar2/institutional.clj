@@ -295,12 +295,13 @@
                      (count skipped)))
     (flush)
     (->> present
-         (mapcat (fn [day]
-                   (let [rows (get by-day day)
-                         archive (day/archive-file day)]
-                     (println (format "  %s  %d filings" (.getName archive) (count rows)))
-                     (flush)
-                     (load-day archive rows))))
+         (pmap (fn [day]
+                 (let [rows (get by-day day)
+                       archive (day/archive-file day)]
+                   (println (format "  %s  %d filings" (.getName archive) (count rows)))
+                   (flush)
+                   (vec (load-day archive rows)))))
+         (mapcat identity)
          (sort-by (juxt :filing-date :filer))
          vec)))
 

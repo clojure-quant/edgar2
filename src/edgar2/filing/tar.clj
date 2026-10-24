@@ -11,8 +11,6 @@
             [clojure.string :as str])
   (:import [java.util.zip GZIPInputStream]))
 
-(def ^:private discard-buf (byte-array (* 1024 1024)))
-
 (defn open-tar-file
   "Handle for `filename` (path string or File)."
   [filename]
@@ -32,10 +30,12 @@
       (when (= got n) buf))))
 
 (defn- discard
-  [^java.io.InputStream in n]
+  "Skip `n` bytes. `buf` is this scan's scratch buffer; scans run in
+  parallel and must not share it."
+  [^java.io.InputStream in ^bytes buf n]
   (loop [left n]
     (when (pos? left)
-      (let [got (.read in discard-buf 0 (int (min left (alength discard-buf))))]
+      (let [got (.read in buf 0 (int (min left (alength buf))))]
         (if (neg? got)
           (throw (ex-info "Unexpected end of tar archive" {}))
           (recur (- left got)))))))
@@ -83,8 +83,9 @@
   "One pass. `wanted` is a set of member names, or nil to collect every
   regular-file name. Returns {name text} or a vector of names."
   [tar-reader wanted]
-  (with-open [in (GZIPInputStream. (io/input-stream (archive tar-reader)))]
-    (loop [long-name nil found {} names []]
+  (let [skip-buf (byte-array (* 1024 1024))]
+    (with-open [in (GZIPInputStream. (io/input-stream (archive tar-reader)))]
+      (loop [long-name nil found {} names []]
       (if (and wanted (= (count found) (count wanted)))
         found
         (if-let [header (read-fully in 512)]
@@ -96,23 +97,23 @@
               (cond
                 (= flag \L)
                 (let [raw (read-fully in size)]
-                  (discard in (pad-512 size))
+                  (discard in skip-buf (pad-512 size))
                   (recur (some-> raw bytes->string str/trim) found names))
 
                 (contains? #{\0 \u0000} flag)
                 (let [take? (and wanted (contains? wanted name))
                       body (when take? (read-fully in size))]
-                  (when-not take? (discard in size))
-                  (discard in (pad-512 size))
+                  (when-not take? (discard in skip-buf size))
+                  (discard in skip-buf (pad-512 size))
                   (recur nil
                          (cond-> found body (assoc name (bytes->string body)))
                          (cond-> names (nil? wanted) (conj name))))
 
                 :else
-                (do (discard in size)
-                    (discard in (pad-512 size))
+                (do (discard in skip-buf size)
+                    (discard in skip-buf (pad-512 size))
                     (recur nil found names)))))
-          (if wanted found names))))))
+          (if wanted found names)))))))
 
 (defn get-file-info
   "Regular-file member names, in archive order."
