@@ -1,14 +1,14 @@
 (ns edgar2.institutional
   "13F holdings from the local EDGAR index and daily feeds.
 
-  edgar2.filing.quarterly-index reads each master.zip. Those rows are
-  reduced to data/13f-index.edn, the list of 13F-HR and 13F-HR/A filings
-  to process.
+  edgar2.filing.quarterly-index reads each master.zip for one year. Those
+  rows are reduced to data/13f-index-<year>.edn, the list of 13F-HR and
+  13F-HR/A filings to process.
 
   Each filing is then read from the daily archive via edgar2.filing.day.
   edgar2.filing.complete reads that submission once. A day that is not
   downloaded is skipped. Stage 1 writes
-  data/holdings-raw.nippy, one submission per record. Share lines
+  data/holdings-raw-<year>.nippy, one submission per record. Share lines
   (sshPrnamtType SH, no put or call) keep their column-7 manager numbers.
   Lines that share a CUSIP, discretion, and those numbers are summed.
   :total-value is the sum of those values, in dollars (filings before
@@ -16,11 +16,11 @@
 
   Stage 2 reads the raw file, drops a column-7 share count when the named
   manager's own filing for that quarter lists the same CUSIP, and writes
-  data/holdings.nippy.
+  data/holdings-<year>.nippy.
 
   Usage:
-    (print-filers)
-    clj -X:institutional"
+    (print-filers {:year 2026})
+    clj -X:institutional :year 2026"
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
@@ -33,7 +33,16 @@
            [java.time LocalTime]
            [java.time.format DateTimeFormatter]))
 
-(def index-path "data/13f-index.edn")
+(defn- require-year
+  [year]
+  (if (pos-int? year)
+    (long year)
+    (throw (ex-info "year is required" {:year year}))))
+
+(defn index-path
+  "13F filing index for `year`, data/13f-index-<year>.edn."
+  [year]
+  (str "data/13f-index-" year ".edn"))
 
 (def holdings-forms #{"13F-HR" })
 
@@ -322,14 +331,16 @@
      :accession acc}))
 
 (defn write-index!
-  "Write data/13f-index.edn from every quarterly master.zip on disk.
+  "Write data/13f-index-<year>.edn from the quarterly master.zip files for `year`.
 
   {:filings [{:cik :name :form :filing-date :accession} ...]}"
-  []
-  (let [quarters (qi/on-disk)]
+  [year]
+  (let [year (require-year year)
+        quarters (qi/on-disk {:year year})
+        path (index-path year)]
     (when (empty? quarters)
-      (throw (ex-info "No quarterly master.zip under data/full-index"
-                      {:dir qi/*index-dir*})))
+      (throw (ex-info (str "No quarterly master.zip for " year " under " qi/*index-dir*)
+                      {:dir qi/*index-dir* :year year})))
     (let [filings (->> quarters
                        (mapcat (fn [quarter]
                                  (println (format "  index %d QTR%d"
@@ -343,8 +354,8 @@
                        (sort-by (juxt :filing-date :accession))
                        vec)
           data {:filings filings}]
-      (write-edn! index-path data)
-      (println (format "Wrote %s  (%d filings)" index-path (count filings)))
+      (write-edn! path data)
+      (println (format "Wrote %s  (%d filings)" path (count filings)))
       (flush)
       data)))
 
@@ -597,14 +608,16 @@
      :value-removed (reduce + 0 (keep :gone cuts))}))
 
 (defn write-holdings!
-  [filers]
-  (println "writing holdings-raw.nippy ..")
-  (flush)
-  (holdings/write-raw filers)
-  (println "writing holdings-raw.nippy .. done!")
-  (println (format "Wrote %s  (%d filings)" holdings/raw-path (count filers)))
-  (flush)
-  filers)
+  [year filers]
+  (let [year (require-year year)
+        path (holdings/raw-path year)]
+    (println (format "writing %s .." path))
+    (flush)
+    (holdings/write-raw year filers)
+    (println (format "writing %s .. done!" path))
+    (println (format "Wrote %s  (%d filings)" path (count filers)))
+    (flush)
+    filers))
 
 (defn- money
   [n]
@@ -635,28 +648,31 @@
   (flush))
 
 (defn prune-filers
-  "Read data/holdings-raw.nippy, drop duplicate column-7 shares, and write
-  data/holdings.nippy. Prints how many filings name another manager, how
-  many CUSIPs lost shares, and the value of the shares removed."
-  ([] (prune-filers nil))
-  ([_]
-   (let [result (prune-holdings (holdings/load-raw))]
-     (report-prune result)
-     (println "writing holdings.nippy ..")
-     (flush)
-     (holdings/write (:filers result))
-     (println "writing holdings.nippy .. done!")
-     (println (format "Wrote %s  (%d filers)" holdings/path (count (:filers result))))
-     (flush)
-     (:filers result))))
+  "Read data/holdings-raw-<year>.nippy, drop duplicate column-7 shares, and
+  write data/holdings-<year>.nippy. Prints how many filings name another
+  manager, how many CUSIPs lost shares, and the value of the shares removed."
+  [year]
+  (let [year (require-year year)
+        result (prune-holdings (holdings/load-raw year))
+        path (holdings/path year)]
+    (report-prune result)
+    (println (format "writing %s .." path))
+    (flush)
+    (holdings/write year (:filers result))
+    (println (format "writing %s .. done!" path))
+    (println (format "Wrote %s  (%d filers)" path (count (:filers result))))
+    (flush)
+    (:filers result)))
 
 (defn print-filers
-  "Build data/13f-index.edn, write data/holdings-raw.nippy from the daily
-  archives that are already downloaded, prune duplicates into
-  data/holdings.nippy, then print the filer table."
-  ([] (print-filers nil))
-  ([_]
-   (let [index (write-index!)
-         filers (load-holdings (:filings index))]
-     (write-holdings! filers)
-     (print-table (prune-filers)))))
+  "Build data/13f-index-<year>.edn, write data/holdings-raw-<year>.nippy from
+  the daily archives that are already downloaded, prune duplicates into
+  data/holdings-<year>.nippy, then print the filer table.
+
+  `opts` is {:year 2026}."
+  [{:keys [year]}]
+  (let [year (require-year year)
+        index (write-index! year)
+        filers (load-holdings (:filings index))]
+    (write-holdings! year filers)
+    (print-table (prune-filers year))))

@@ -51,7 +51,8 @@
   :eodhd-screen {:exec-fn edgar2.screen.core/run
                  :exec-args {:name :lt-breakout}}
   :calculate-price-change {:exec-fn edgar2.report.price-change/run}
-  :institutional {:exec-fn edgar2.institutional/print-filers}
+  :institutional {:exec-fn edgar2.institutional/print-filers
+                  :exec-args {:year 2026}}
   :13F {:main-opts ["-m" "demo.13f"]}
   ;; quanta-eodhd brings quanta-calendar 0.6.29, which has no aligned-ds-map.
   :nearness {:extra-deps {io.github.clojure-quant/quanta-calendar {:mvn/version "0.6.33"}

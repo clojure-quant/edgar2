@@ -19,14 +19,30 @@
     (.write out (.getBytes master-idx "UTF-8"))
     (.closeEntry out)))
 
+(defn- delete-recursively
+  [f]
+  (when (.exists f)
+    (when (.isDirectory f)
+      (doseq [child (.listFiles f)]
+        (delete-recursively child)))
+    (.delete f)))
+
 (deftest queries-master-idx
   (let [root (io/file (System/getProperty "java.io.tmpdir") "edgar2-qidx-test")
         zip (io/file root "2026" "QTR1" "master.zip")
+        older (io/file root "2025" "QTR4" "master.zip")
         quarter {:year 2026 :quarter 1}]
+    (delete-recursively root)
     (.mkdirs (.getParentFile zip))
+    (.mkdirs (.getParentFile older))
     (write-zip! zip)
+    (write-zip! older)
     (binding [qi/*index-dir* (str root)]
-      (is (= [{:year 2026 :quarter 1}] (qi/on-disk)))
+      (is (= [{:year 2025 :quarter 4}
+              {:year 2026 :quarter 1}]
+             (qi/on-disk {})))
+      (is (= [{:year 2026 :quarter 1}] (qi/on-disk {:year 2026})))
+      (is (= [{:year 2025 :quarter 4}] (qi/on-disk {:year 2025})))
       (is (= 3 (count (qi/all quarter))))
       (is (= ["13F-HR"] (map :form (qi/query-form quarter "13F-HR"))))
       (is (= ["13F-HR" "13F-HR/A"]

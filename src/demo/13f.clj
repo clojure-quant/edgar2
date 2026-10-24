@@ -1,7 +1,7 @@
 (ns demo.13f
   "13F share counts for CUSIP 03748R747.
 
-  Shares come from data/holdings.nippy. Columns are the report periods
+  Shares come from data/holdings-<year>.nippy. Columns are the report periods
   where this CUSIP is held, from 2025-12-31 onward, oldest first, then a
   change column for each period after the first. Change is shares in
   that period minus shares in the prior period.
@@ -18,7 +18,7 @@
   in the latest report period, largest first.
 
   Usage:
-    clj -M:13F"
+    clj -M:13F 2026"
   (:require [clojure.pprint :as pprint]
             [edgar2.db.holdings :as holdings]))
 
@@ -36,8 +36,8 @@
   (not (neg? (compare period first-period))))
 
 (defn- load-filers
-  []
-  (holdings/load))
+  [year]
+  (holdings/load year))
 
 (defn- later-filing
   "The filing with the later :filing-date. Ties keep `b`."
@@ -170,10 +170,10 @@
   (reduce (fn [row k] (update row k cell)) row cols))
 
 (defn run
-  "Load holdings, build the table for `cusip`, print it, and return the rows."
-  ([] (run cusip))
-  ([cusip]
-   (let [{:keys [periods rows]} (table (load-filers) [cusip])
+  "Load holdings for `year`, build the table for `cusip`, print it, and return the rows."
+  ([year] (run year cusip))
+  ([year cusip]
+   (let [{:keys [periods rows]} (table (load-filers year) [cusip])
          cols (columns periods)]
      (println (format "cusip %s  %d report periods  %d rows"
                       cusip
@@ -184,5 +184,8 @@
      rows)))
 
 (defn -main
-  [& _]
-  (run))
+  [& [year]]
+  (let [year (parse-long year)]
+    (when-not year
+      (throw (ex-info "year is required" {})))
+    (run year)))

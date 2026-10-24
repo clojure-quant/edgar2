@@ -43,4 +43,14 @@ The fund files N-PORT even when the adviser is under the $100 million 13(f) thre
 A sub-adviser that has the discretion reports the position. The other manager files a 13F-NT instead of repeating the table, so the holding is not listed twice.
 A 13F can omit a position under a confidential-treatment request while the same position is already public on NPORT-P.
 
-"13F-HR/A"
+## Duplicate holdings
+
+The same shares can sit in two information tables. Form 13F tells the managers to prevent that. When two managers who each have to file both exercise investment discretion over the same securities, only one of them includes those securities. The filer who includes them lists the other manager on the summary page, List of Other Included Managers, and puts that manager’s sequence number in column 7 of the row. Discretion on that row is shared-defined (`DFND`) or shared-other (`OTR`). The other manager is supposed to leave the shares out of its own table and file a 13F notice, or a combination report that names the filer who reported them.
+
+A duplicate is the case where that second manager also lists the CUSIP in its own information table for the same quarter. Two filers can also both report the same shares for one included manager. A row whose column 7 names several managers is one share count, shared with every name on the line.
+
+A row with an empty column 7 stays on the filer who reported it. That includes every `SOLE` line. Two managers can both mark the same CUSIP `SOLE` and name nobody. Nothing on the form ties those rows together, so both counts remain.
+
+Stage 1 writes `data/holdings-raw-<year>.nippy`, one submission per record, with column 7 still on each line. Lines are summed only when the CUSIP, the discretion, and the column-7 numbers all match. A sole line and a column-7 line of the same CUSIP stay separate.
+
+Stage 2 reads that file and writes `data/holdings-<year>.nippy`. Within one quarter, a later restatement replaces that manager’s earlier book, and a `NEW HOLDINGS` amendment adds rows to it. Then each column-7 line is read as a claim for the included manager with the lowest sequence number. When several filings claim the same manager and CUSIP, the largest claim is kept and the others drop those rows. The kept claim is reduced by the shares that manager’s own filing already lists for the CUSIP. The named manager’s count is left as filed. When that manager has no such CUSIP, the claim stays, which is the case where the other manager left the shares out. The value removed follows the shares removed. The pruned book has one row per CUSIP.

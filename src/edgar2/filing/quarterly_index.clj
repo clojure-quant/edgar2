@@ -55,16 +55,19 @@
   (filterv #(= form (:form %)) (all quarter)))
 
 (defn on-disk
-  "Quarters that have a master.zip, oldest first."
-  []
+  "Quarters that have a master.zip, oldest first.
+  When opts has :year, only that year."
+  [{:keys [year]}]
   (->> (file-seq (io/file *index-dir*))
        (filter #(and (.isFile %) (= "master.zip" (.getName %))))
        (keep (fn [f]
                (let [q (.getName (.getParentFile f))
-                     y (.getName (.getParentFile (.getParentFile f)))]
+                     y (.getName (.getParentFile (.getParentFile f)))
+                     year-n (parse-long y)]
                  (when (and (re-matches #"QTR[1-4]" q)
-                            (re-matches #"\d{4}" y))
-                   {:year (parse-long y)
+                            (re-matches #"\d{4}" y)
+                            (or (nil? year) (= (long year) year-n)))
+                   {:year year-n
                     :quarter (parse-long (subs q 3))}))))
        (sort-by (juxt :year :quarter))
        vec))
