@@ -4,6 +4,7 @@
   must not hide a filing the issuer path can serve."
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is]]
+            [edgar.core]
             [edgar.filing :as ef]
             [edgar2.filing :as filing]
             [edgar2.web.filing :as web]))
@@ -79,6 +80,41 @@
 (deftest both-indexes-missing-returns-nil
   (with-redefs [ef/filing-index (fn [_] (throw (http-ex 404)))]
     (is (nil? (#'web/load-filing aiv-cik aiv-accession)))))
+
+(deftest xml-viewer-label-is-not-the-primary
+  (is (= "primary_doc.xml"
+         (#'web/primary-name
+          {:files [{:sequence "1" :name "primary_doc.html"}
+                   {:sequence "1" :name "primary_doc.xml"}]})))
+  (is (= "wk-form4_1789644210.xml"
+         (#'web/primary-name
+          {:files [{:sequence "1" :name "wk-form4_1789644210.html"}
+                   {:sequence "1" :name "wk-form4_1789644210.xml"}]}))))
+
+(deftest single-sequence-document-stays-primary
+  (is (= "xom-20251231.htm"
+         (#'web/primary-name (index-for "10-K" "xom-20251231.htm"))))
+  (is (= "d70995d8k.htm"
+         (#'web/primary-name (index-for "8-K" "d70995d8k.htm")))))
+
+(deftest cached-primary-downloads-the-named-file
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "edgar2-filing-" (System/nanoTime)))
+        urls (atom [])]
+    (try
+      (with-redefs [filing/filing-dir (.getPath dir)
+                    edgar.core/edgar-get (fn [url & _]
+                                           (swap! urls conj url)
+                                           "<xml/>")]
+        (let [file (web/cached-primary {:form "144"
+                                        :cik "0001988894"
+                                        :accessionNumber "0001973379-26-000338"
+                                        :primaryDocument "primary_doc.xml"})]
+          (is (.isFile file))
+          (is (= "primary_doc.xml" (.getName file)))
+          (is (= ["https://www.sec.gov/Archives/edgar/data/1988894/000197337926000338/primary_doc.xml"]
+                 @urls))))
+      (finally (rm-r dir)))))
 
 (deftest same-cik-looks-up-once
   (let [calls (atom 0)]

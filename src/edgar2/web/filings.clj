@@ -144,9 +144,10 @@
         [:td (or (:filingDate f) "")]
         [:td
          (when (:accessionNumber f)
-           [:a {:href (str "/filing/" cik "/" (:accessionNumber f)
-                           (when-let [doc (:primaryDocument f)]
-                             (str "/" doc)))
+           ;; Accession only. XML forms put a stylesheet directory in
+           ;; primaryDocument (xsl144X01/primary_doc.xml), which is not a file.
+           ;; The filing page resolves sequence 1.
+           [:a {:href (str "/filing/" cik "/" (:accessionNumber f))
                 :target "_blank"
                 :rel "noopener noreferrer"}
             "OPEN"])]])]]])

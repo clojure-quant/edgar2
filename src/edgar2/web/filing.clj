@@ -159,23 +159,6 @@
       (catch Throwable e
         (text-response 502 (or (ex-message e) (str e)))))))
 
-(defn cached-primary
-  "Path of a filing's primary document.
-  Downloads it into data/filings when it is not already there."
-  [f]
-  (let [primary (:primaryDocument f)
-        path (when (and primary (:form f) (:cik f) (:accessionNumber f))
-               (io/file filing/filing-dir
-                        (str (:form f))
-                        (str (:cik f))
-                        (str (:accessionNumber f))
-                        (str primary)))]
-    (cond
-      (nil? path) nil
-      (.isFile path) path
-      :else (when-let [saved (ef/filing-save! f filing/filing-dir)]
-              (io/file saved)))))
-
 (defn- padded-cik
   [cik]
   (when-let [s (some-> cik str str/trim not-empty)]
@@ -228,18 +211,45 @@
                         names)))
               (.listFiles root))))))
 
+(defn- name-stem
+  "Basename without `ext` (`html`, `xml`), or nil when the suffix differs."
+  [name ext]
+  (let [lower (str/lower-case (str name))
+        suffix (str "." ext)]
+    (when (str/ends-with? lower suffix)
+      (subs lower 0 (- (count lower) (count suffix))))))
+
+(defn- primary-name
+  "Sequence-1 filename.
+
+  XML forms list two sequence-1 rows. The first is a viewer label
+  (`primary_doc.html`) whose archive link is `xsl…/primary_doc.xml`.
+  That .html file is not in the accession. The .xml next to it is.
+  A 10-K or 8-K has one sequence 1, so this returns that filename."
+  [index]
+  (let [names (->> (:files index)
+                   (filter #(= "1" (str (:sequence %))))
+                   (map :name)
+                   (remove str/blank?)
+                   vec)
+        html-stems (set (keep #(name-stem % "html") names))]
+    (or (some (fn [n]
+                (when-let [stem (name-stem n "xml")]
+                  (when (html-stems stem) n)))
+              names)
+        (first names))))
+
 (defn- index-filing
   "Filing map from the archives index stored under `cik`."
   [cik accession]
   (let [cik (padded-cik cik)
         stub {:cik cik :accessionNumber accession}
         idx (ef/filing-index stub)
-        primary (ef/primary-doc idx)
         form (:formType idx)]
     (if form
       (assoc stub
              :form form
-             :primaryDocument (:name primary)
+             :primaryDocument (primary-name idx)
              :filingDate (:filingDate idx))
       (throw (ex-info "Could not determine form type from filing index"
                       {:type :edgar.filing/not-found
@@ -275,14 +285,6 @@
             hard (throw hard)
             :else (throw err)))))))
 
-(defn- try-primary
-  "Download `f`, or nil when SEC has no document at that CIK."
-  [f]
-  (try
-    (cached-primary f)
-    (catch clojure.lang.ExceptionInfo e
-      (if (http-404? e) nil (throw e)))))
-
 (def ^:private binary-extensions
   #{".pdf" ".gif" ".jpg" ".jpeg" ".png" ".zip" ".xls" ".xlsx" ".doc" ".docx"})
 
@@ -317,6 +319,26 @@
           (.write out ^bytes bytes)))
       (spit path (ec/edgar-get url :raw? true))))
   path)
+
+(defn cached-primary
+  "Path of the primary document named on `f`.
+  Downloads it into data/filings when it is not already there.
+  Uses `:primaryDocument` rather than `filing-save!`, which would ask the
+  index again and pick the XML viewer label."
+  [f]
+  (when-let [doc (:primaryDocument f)]
+    (when-let [path (cache-file f doc)]
+      (if (.isFile path)
+        path
+        (download-doc! f doc path)))))
+
+(defn- try-primary
+  "Download `f`, or nil when SEC has no document at that CIK."
+  [f]
+  (try
+    (cached-primary f)
+    (catch clojure.lang.ExceptionInfo e
+      (if (http-404? e) nil (throw e)))))
 
 (defn- absolute-sec-url
   "Turn an Archives-relative href into an absolute https://www.sec.gov URL."
