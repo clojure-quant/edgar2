@@ -23,10 +23,10 @@
   ([rows k] (cheap-growth-on rows k (constantly true)))
   ([rows k keep?]
    (let [with-k (filter #(and (number? (k %)) (pos? (double (k %))) (keep? %)) rows)
-         with-g (filter #(number? (:sales-growth-yoy %)) rows)
+         with-g (filter #(number? (:sales-growth-avg-yoy %)) rows)
          with-roa (filter #(number? (:return-on-assets %)) rows)
          k-cut (when (seq with-k) (cutoff/cutoff-max-bottom (cutoff/numeric k with-k) 0.30))
-         g-cut (when (seq with-g) (cutoff/cutoff-min-top (cutoff/numeric :sales-growth-yoy with-g) 0.30))
+         g-cut (when (seq with-g) (cutoff/cutoff-min-top (cutoff/numeric :sales-growth-avg-yoy with-g) 0.30))
          roa-cut (when (seq with-roa) (cutoff/cutoff-min-top (cutoff/numeric :return-on-assets with-roa) 0.50))
          hits (if (and k-cut g-cut roa-cut)
                 (->> rows
@@ -34,12 +34,12 @@
                                (and (number? (k r))
                                     (pos? (double (k r)))
                                     (keep? r)
-                                    (number? (:sales-growth-yoy r))
+                                    (number? (:sales-growth-avg-yoy r))
                                     (number? (:return-on-assets r))
                                     (<= (double (k r)) k-cut)
-                                    (>= (double (:sales-growth-yoy r)) g-cut)
+                                    (>= (double (:sales-growth-avg-yoy r)) g-cut)
                                     (>= (double (:return-on-assets r)) roa-cut))))
-                     (sort-by (juxt k (comp - :sales-growth-yoy))))
+                     (sort-by (juxt k (comp - :sales-growth-avg-yoy))))
                 [])]
      {:cut k-cut
       :growth-cut g-cut

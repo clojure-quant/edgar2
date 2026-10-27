@@ -23,6 +23,17 @@
     (* 100.0 (/ (- (double cur) (double prev))
                 (Math/abs (double prev))))))
 
+(defn- change-q-on-y
+  "Newest numeric percent change of `concept` vs the value 4 rows later.
+
+  `ds-quarterly` is a quarterly report-table. Uses |prior| in the
+  denominator so a shrinking loss stays positive."
+  [ds-quarterly concept]
+  (let [xs (facts-ds/calc-concept ds-quarterly concept)
+        prior (shift-4 xs)]
+    (->> (map abs-change-pct prior xs)
+         (some #(when (number? %) %)))))
+
 (defn net-income-change-q-on-y
   "Most recent quarter net income vs net income 4 quarters earlier (%).
 
@@ -32,7 +43,11 @@
   the newest pair where both sides are numeric. Uses |prior| in the
   denominator so negative earnings keep the right sign."
   [ds-quarterly]
-  (let [ni (facts-ds/calc-concept ds-quarterly :net-income)
-        prior (shift-4 ni)]
-    (->> (map abs-change-pct prior ni)
-         (some #(when (number? %) %)))))
+  (change-q-on-y ds-quarterly :net-income))
+
+(defn sales-change-q-on-y
+  "Most recent quarter revenue vs revenue 4 quarters earlier (%).
+
+  Same comparison as `net-income-change-q-on-y`, on `:revenue`."
+  [ds-quarterly]
+  (change-q-on-y ds-quarterly :revenue))

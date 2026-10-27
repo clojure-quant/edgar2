@@ -10,6 +10,7 @@
     edgar2.algo.cheap-consistent/screen
     edgar2.algo.cheap-consistent-margin/screen
     edgar2.algo.high-revenue-growth/screen
+    edgar2.algo.growth/screen
     edgar2.algo.dividend-yield/screen
     edgar2.algo.lt-breakout/screen
     edgar2.algo.ltfsr/screen])

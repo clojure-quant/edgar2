@@ -32,7 +32,8 @@
 (def amortization-tags (concept-data :amortization))
 
 (def sales-growth-window
-  "Number of trailing YoY revenue changes averaged into :sales-growth-yoy."
+  "Trailing years averaged into :sales-growth-avg-yoy, :earnings-avg,
+  and :earnings-growth-avg-yoy."
   7)
 
 (def profit-margin-window
@@ -87,16 +88,42 @@
     (when (seq steps)
       (* 100.0 (/ (double (reduce + steps)) (count steps))))))
 
+(defn- avg-trailing-change
+  "Mean of the last `n` period-over-period changes.
+
+  `vals` is oldest-first. `change` is a fn of [prev cur] returning a number
+  or nil. Returns {:avg :years}, or nil when no changes remain."
+  [vals n change]
+  (let [growths (vec (keep identity (map change vals (rest vals))))
+        window (take-last n growths)]
+    (when (seq window)
+      {:avg (avg window)
+       :years (count window)})))
+
 (defn avg-sales-growth
   "Mean of the last `n` year-over-year revenue changes (%).
 
   `vals` is oldest-first revenue numbers."
   [vals n]
-  (let [growths (vec (keep identity (map yoy-pct vals (rest vals))))
-        window (take-last n growths)]
-    (when (seq window)
-      {:sales-growth-yoy (avg window)
-       :sales-growth-years (count window)})))
+  (when-let [{:keys [avg years]} (avg-trailing-change vals n yoy-pct)]
+    {:sales-growth-avg-yoy avg
+     :sales-growth-years years}))
+
+(defn avg-earnings
+  "Mean of the last `n` annual earnings.
+
+  `vals` is oldest-first net income. Returns nil when no numbers remain."
+  [vals n]
+  (avg (take-last n (filterv number? vals))))
+
+(defn avg-earnings-growth
+  "Mean of the last `n` year-over-year earnings changes (%).
+
+  `vals` is oldest-first net income. Each step uses |prior| as the
+  denominator, so a shrinking loss counts as growth. Returns the average,
+  or nil."
+  [vals n]
+  (:avg (avg-trailing-change vals n calc-q/abs-change-pct)))
 
 (defn chron-nums
   "Oldest-first numbers from a newest-first `calc-concept` vector."
@@ -243,9 +270,14 @@
         ebitda (most-recent ebitda-v)
         debt-v-div-ebitda (ratio debt-v ebitda-v)
         debt2ebitda (most-recent debt-v-div-ebitda)
+        ni-chron (chron-nums ni)
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
+        earn-growth (avg-earnings-growth ni-chron sales-growth-window)
+        earn-avg (avg-earnings ni-chron sales-growth-window)
         ni-qoy (calc-q/net-income-change-q-on-y
                 (facts-ds/report-table dss :q net-income-tags))
+        rev-qoy (calc-q/sales-change-q-on-y
+                 (facts-ds/report-table dss :q revenue-tags))
         margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score (chron-nums rev))
         oi-score (direction-score (chron-nums oi))
@@ -260,10 +292,13 @@
              (or (first rows) current)
              (or (first concept-rows) {}))]
     (cond-> (merge {:annual-count annual-count} div)
-      (:sales-growth-yoy growth)
-      (assoc :sales-growth-yoy (:sales-growth-yoy growth)
+      (:sales-growth-avg-yoy growth)
+      (assoc :sales-growth-avg-yoy (:sales-growth-avg-yoy growth)
              :sales-growth-years (:sales-growth-years growth))
+      (number? earn-growth) (assoc :earnings-growth-avg-yoy earn-growth)
+      (number? earn-avg) (assoc :earnings-avg earn-avg)
       (number? ni-qoy) (assoc :net-income-change-q-on-y ni-qoy)
+      (number? rev-qoy) (assoc :sales-change-q-on-y rev-qoy)
       (number? rev-score) (assoc :revenue-score rev-score)
       (number? oi-score) (assoc :operating-income-score oi-score)
       (number? margin)

@@ -5,27 +5,12 @@
             [hyper.core :as h]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats :as stats]
+            [edgar2.report.stats-category :as stats-cat]
             [edgar2.web.nav :refer [nav]]))
 
 (def groups
-  [{:title "SEGMENT"
-    :metrics [{:key :marketcap :label "marketcap ($M)" :fmt :millions}
-              {:key :annual-count :label "annual-report-count" :fmt :integer}]}
-   {:title "QUALITY"
-    :metrics [{:key :return-on-capital :label "return-on-capital (%)" :fmt :percent}
-              {:key :revenue-score :label "revenue-score" :fmt :number}
-              {:key :operating-income-score :label "operating-income-score" :fmt :number}
-              {:key :avg-profit-margin :label "avg-profit-margin (%)" :fmt :percent}
-              {:key :debt2ebitda :label "debt2ebitda" :fmt :number}]}
-   {:title "GROWTH"
-    :metrics [{:key :sales-growth-yoy :label "sales-growth-yoy (%)" :fmt :number}
-              {:key :net-income-change-q-on-y :label "net-income-change-q-on-y (%)" :fmt :number}]}
-   {:title "VALUATION"
-    :metrics [{:key :ev-ebit :label "ev-ebit" :fmt :number}
-              {:key :price-earnings :label "pe" :fmt :number}
-              {:key :price-sales :label "price-sales" :fmt :number}
-              {:key :dividend-yield :label "dividend-yield (%)" :fmt :number}
-              {:key :buyback-yield :label "buyback-yield (%)" :fmt :number}]}])
+  "Percentile rows. Text items such as reporting currency are omitted."
+  (stats-cat/groups (comp str/upper-case name)))
 
 (def percentile-count
   "Number of equal-sized bands on the overview / segment pages."
@@ -76,11 +61,7 @@
 
 (defn- format-value
   [fmt x]
-  (case fmt
-    :millions (str (long (Math/round (/ (double x) 1.0e6))))
-    :percent (format "%.1f" (* 100.0 (double x)))
-    :integer (str (long (Math/round (double x))))
-    :number (format "%.1f" (double x))))
+  (or (stats-cat/format-value fmt x) ""))
 
 (defn load-rows
   []

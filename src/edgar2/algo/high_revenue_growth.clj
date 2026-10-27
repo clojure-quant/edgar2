@@ -16,8 +16,8 @@
 (defn calculate
   [items _params]
   (let [hits (->> (mapv :row items)
-                  (filter #(number? (:sales-growth-yoy %)))
-                  (sort-by :sales-growth-yoy >)
+                  (filter #(number? (:sales-growth-avg-yoy %)))
+                  (sort-by :sales-growth-avg-yoy >)
                   (take n)
                   vec)]
     {:rows (mapv report/table-row hits)

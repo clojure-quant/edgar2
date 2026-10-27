@@ -4,6 +4,7 @@
             [hyper.effects :as effects]
             [edgar2.filing :as filing]
             [edgar2.report.screen :as screen]
+            [edgar2.report.stats-category :as stats-cat]
             [edgar2.web.fsds :as fsds]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
@@ -100,48 +101,19 @@
         {}))))
 
 (def ratio-groups
-  "Ratio columns, grouped. `:pe` is price-earnings.
-  Market cap and enterprise value are millions of dollars.
-  Shares are millions of shares."
-  [{:label "Price"
-    :fields [{:key :price :digits 2}
-             {:key :shares :millions? true :label "shares (M)"}
-             {:key :adr-ratio :digits 2 :label "adr-ratio"}
-             {:key :marketcap :millions? true}
-             {:key :enterprise-value :millions? true}
-             {:key :revenue-unit :label "reporting-cur"}]}
-   {:label "Quality"
-    :fields [{:key :return-on-assets :digits 4}
-             {:key :return-on-capital :digits 4}
-             {:key :revenue-score :digits 1}
-             {:key :operating-income-score :digits 1}
-             {:key :profit-margin :digits 4}
-             {:key :avg-profit-margin :digits 4}
-             {:key :debt2ebitda :digits 2}]}
-   {:label "Growth"
-    :fields [{:key :sales-growth-yoy :digits 1}
-             {:key :net-income-change-q-on-y :digits 1}]}
-   {:label "Valuation"
-    :fields [{:key :ev-ebit :digits 1}
-             {:key :pe :source :price-earnings :digits 1}
-             {:key :price-sales :digits 2}
-             {:key :dividend-yield :digits 1}
-             {:key :buyback-yield :digits 1}
-             {:key :dividend-coverage :digits 1}]}])
-
-(defn- ratio-label
-  [{:keys [key label millions?]}]
-  (or label
-      (if millions? (str (name key) " ($M)") (name key))))
+  "Ratio columns, grouped from `stats-category/categories`."
+  (mapv (fn [cat]
+          {:label (str/capitalize (name cat))
+           :fields (mapv (fn [entry]
+                           {:key (first entry)
+                            :fmt (second entry)
+                            :label (stats-cat/item-label entry)})
+                         (get stats-cat/categories cat))})
+        stats-cat/category-order))
 
 (defn- ratio-cell
-  [row {:keys [key source digits millions?]}]
-  (let [v (get row (or source key))]
-    (cond
-      (nil? v) ""
-      (not (number? v)) (str v)
-      millions? (str (Math/round (/ (double v) 1.0e6)))
-      :else (format (str "%." digits "f") (double v)))))
+  [row {:keys [key fmt]}]
+  (or (stats-cat/format-value fmt (get row key)) ""))
 
 (defn- ratios-table
   [ticker]
@@ -154,8 +126,8 @@
           [:div.fin-ratio-group-label label]
           [:div.fin-ratio-group-fields
            (for [field fields]
-             [:div.fin-ratio {:key (ratio-label field)}
-              [:div.fin-ratio-label (ratio-label field)]
+             [:div.fin-ratio {:key (:label field)}
+              [:div.fin-ratio-label (:label field)]
               [:div.fin-ratio-value (ratio-cell row field)]])]])])))
 
 (defn- col-heading

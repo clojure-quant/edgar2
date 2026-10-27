@@ -49,21 +49,29 @@
    :shares :adr-ratio :marketcap :market-cap-adjusted :annual-count
    :revenue :revenue-unit
    :net-profit
+   :earnings-avg
    :eps
    :assets
    :return-on-assets
    :equity
    :return-on-capital
-   :sales-growth-yoy
+   :sales-growth-avg-yoy
+   :earnings-growth-avg-yoy
+   :sales-change-q-on-y
    :net-income-change-q-on-y
    :revenue-score
    :operating-income-score
    :price-earnings
+   :earnings-yield
+   :earnings-avg-yield
+   :earnings-plus-growth-avg-yield
    :dividends-paid
    :dividend-yield
    :dividend-coverage
    :stock-repurchase
    :buyback-yield
+   :dividend-buyback-yield
+   :dividend-buyback-coverage
    :enterprise-value
    :ev-ebit
    :ebit
@@ -138,9 +146,11 @@
 
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
-  with 7-year mean YoY sales growth (%),
-  :net-income-change-q-on-y (latest quarter NI vs NI 4 quarters earlier, %,
-  |prior| denominator), profit margin, 10-year mean
+  with 7-year mean YoY sales growth (:sales-growth-avg-yoy, %),
+  7-year mean earnings (:earnings-avg) and YoY earnings growth
+  (:earnings-growth-avg-yoy, %, |prior| denominator),
+  :net-income-change-q-on-y and :sales-change-q-on-y (latest quarter vs
+  4 quarters earlier, %, |prior| denominator), profit margin, 10-year mean
   profit margin (Net Income / revenue), return on assets (Net Income / assets),
   return on capital (Net Income / total equity), plus :shares (most recent 10-Q
   when that quarter is at least as recent as the annual report; otherwise
@@ -149,9 +159,14 @@
   (close / closeN - 1 from data/price-change.edn, when that ticker is there),
   :marketcap, :price-sales,
   :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
+  :earnings-yield (100 * Net Income / market cap),
+  :earnings-avg-yield (100 * :earnings-avg / market cap),
+  :earnings-plus-growth-avg-yield (:earnings-avg-yield + :earnings-growth-avg-yoy),
   :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),
   :buyback-yield (USD stock repurchase / USD market cap),
+  :dividend-buyback-yield (dividend yield + buyback yield),
+  :dividend-buyback-coverage (net income / dividends paid + stock repurchase),
   :enterprise-value (USD market cap + debt + preferred + NCI − cash),
   :ev-ebit, :ebitda (EBIT + depreciation + amortization),
   :debt2ebitda (debt / EBITDA), :revenue-score, and :operating-income-score
@@ -206,7 +221,7 @@
                (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roc=%s"
                                 i' total
                                 (or (:ticker st) (:cik st))
-                                (fmt-growth (:sales-growth-yoy st))
+                                (fmt-growth (:sales-growth-avg-yoy st))
                                 (some-> (:profit-margin st) (* 100) (#(format "%.1f" %)))
                                 (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
                                 (some-> (:return-on-capital st) (* 100) (#(format "%.1f" %)))))
@@ -217,11 +232,11 @@
              (println)
              (pprint/print-table
               [:ticker :price :marketcap :price-sales :price-earnings
-               :sales-growth-yoy :profit-margin :return-on-assets :return-on-capital]
+               :sales-growth-avg-yoy :profit-margin :return-on-assets :return-on-capital]
               (take 25
                     (map (fn [r]
                            (-> r
-                               (update :sales-growth-yoy round1)
+                               (update :sales-growth-avg-yoy round1)
                                (update :profit-margin round4)
                                (update :return-on-assets round4)
                                (update :return-on-capital round4)
@@ -231,7 +246,7 @@
              (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  chg50=%d  chg200=%d  chg400=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
                               stats-path
                               (count out)
-                              (count (filter :sales-growth-yoy out))
+                              (count (filter :sales-growth-avg-yoy out))
                               (count (filter :profit-margin out))
                               (count (filter :avg-profit-margin out))
                               (count (filter :return-on-assets out))

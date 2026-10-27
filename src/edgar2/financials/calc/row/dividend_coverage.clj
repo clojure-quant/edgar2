@@ -37,15 +37,24 @@
   row (`:dividends-paid` / `:stock-repurchase` already absolute when present).
   Returns a map with only the keys that can be calculated:
   `:dividends-paid`, `:stock-repurchase`, `:dividend-coverage`
-  (net income / dividends paid)."
+  (net income / dividends paid), and `:dividend-buyback-coverage`
+  (net income / dividends paid + stock repurchase). A missing cash leg
+  counts as zero when the other is positive."
   [ds-row concept-row]
   (let [paid (positive-amount (:dividends-paid concept-row))
         repurchase (positive-amount (:stock-repurchase concept-row))
         ni (net-income ds-row concept-row)
         coverage (when (and (number? paid) (number? ni)
                             (not (zero? (double paid))))
-                   (/ (double ni) (double paid)))]
+                   (/ (double ni) (double paid)))
+        returned (when (or (number? paid) (number? repurchase))
+                   (+ (double (or paid 0)) (double (or repurchase 0))))
+        bb-coverage (when (and (number? returned)
+                               (pos? (double returned))
+                               (number? ni))
+                      (/ (double ni) (double returned)))]
     (cond-> {}
       (number? paid) (assoc :dividends-paid paid)
       (number? repurchase) (assoc :stock-repurchase repurchase)
-      (number? coverage) (assoc :dividend-coverage coverage))))
+      (number? coverage) (assoc :dividend-coverage coverage)
+      (number? bb-coverage) (assoc :dividend-buyback-coverage bb-coverage))))

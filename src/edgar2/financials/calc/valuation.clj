@@ -67,26 +67,43 @@
   "Valuation ratios from `stats-map` and `market-cap` (vmcap).
 
   Returns a map of keys to merge onto the stats row: `:price-sales`,
-  `:price-earnings`, `:dividend-yield`, `:buyback-yield`,
-  `:enterprise-value`, and `:ev-ebit` when computable.
+  `:price-earnings`, `:earnings-yield`, `:earnings-avg-yield`,
+  `:earnings-plus-growth-avg-yield`, `:dividend-yield`, `:buyback-yield`,
+  `:dividend-buyback-yield`, `:enterprise-value`, and `:ev-ebit` when
+  computable.
 
-  PE is market cap / Net Income; dividend yield is dividends paid / market
-  cap. Missing debt / preferred / NCI / cash legs count as 0 in EV."
+  PE is market cap / Net Income. Earnings yield is 100 * Net Income / market
+  cap (100 / PE). Earnings-average yield uses `:earnings-avg` the same way.
+  `:earnings-plus-growth-avg-yield` adds that yield to
+  `:earnings-growth-avg-yoy`. Dividend yield is dividends paid / market cap.
+  Dividend-buyback yield adds buyback yield, treating a missing side as 0.
+  Missing debt / preferred / NCI / cash legs count as 0 in EV."
   [stats-map market-cap]
   (let [vmcap (when (number? market-cap) market-cap)
         rev (when (number? (:revenue stats-map)) (:revenue stats-map))
         ni (when (number? (:net-profit stats-map)) (:net-profit stats-map))
+        eavg (when (number? (:earnings-avg stats-map)) (:earnings-avg stats-map))
+        egrowth (when (number? (:earnings-growth-avg-yoy stats-map))
+                  (:earnings-growth-avg-yoy stats-map))
         paid (when (number? (:dividends-paid stats-map)) (:dividends-paid stats-map))
         repurchase (when (number? (:stock-repurchase stats-map))
                      (:stock-repurchase stats-map))
         ebit (when (number? (:ebit stats-map)) (:ebit stats-map))
+        pos-cap? (and vmcap (pos? (double vmcap)))
         pe (when (and vmcap (number? ni) (not (zero? (double ni))))
              (/ (double vmcap) (double ni)))
-        dy (when (and vmcap (pos? (double vmcap)) (number? paid) (pos? (double paid)))
+        ey (when (and pos-cap? (number? ni) (not (zero? (double ni))))
+             (* 100.0 (/ (double ni) (double vmcap))))
+        eay (when (and pos-cap? (number? eavg) (not (zero? (double eavg))))
+              (* 100.0 (/ (double eavg) (double vmcap))))
+        plus (when (and (number? eay) (number? egrowth))
+               (+ (double eay) (double egrowth)))
+        dy (when (and pos-cap? (number? paid) (pos? (double paid)))
              (* 100.0 (/ (double paid) (double vmcap))))
-        by (when (and vmcap (pos? (double vmcap))
-                      (number? repurchase) (pos? (double repurchase)))
+        by (when (and pos-cap? (number? repurchase) (pos? (double repurchase)))
              (* 100.0 (/ (double repurchase) (double vmcap))))
+        dby (when (or dy by)
+              (+ (double (or dy 0)) (double (or by 0))))
         ev (when vmcap
              (+ (double vmcap)
                 (double (or (:debt stats-map) 0))
@@ -97,8 +114,12 @@
       (and vmcap rev (not (zero? (double rev))))
       (assoc :price-sales (/ (double vmcap) (double rev)))
       pe (assoc :price-earnings pe)
+      ey (assoc :earnings-yield ey)
+      eay (assoc :earnings-avg-yield eay)
+      plus (assoc :earnings-plus-growth-avg-yield plus)
       dy (assoc :dividend-yield dy)
       by (assoc :buyback-yield by)
+      dby (assoc :dividend-buyback-yield dby)
       ev (assoc :enterprise-value ev)
       (and ev (number? ebit) (not (zero? (double ebit))))
       (assoc :ev-ebit (/ ev (double ebit))))))
