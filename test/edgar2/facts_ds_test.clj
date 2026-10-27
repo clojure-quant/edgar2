@@ -142,3 +142,19 @@
         (testing "CostOfGoodsAndServicesSold continues after CostOfGoodsSold ends"
           (is (seq services))
           (is (neg? (compare (last sold) (last services)))))))))
+
+(deftest report-table-ignores-proxy-net-income-jakk
+  "JAKK's 2026-04-22 DEF 14A repeats 2023–2025 NetIncomeLoss at 1000× the
+  10-K (thousands tagged as dollars). The annual table keeps the 10-K."
+  (when (zip-available?)
+    (e/init! dl/identity-header)
+    (with-open [zf (ZipFile. companyfacts-zip)]
+      (let [table (facts-ds/report-table (load-facts zf "0001009829")
+                                         :y
+                                         [[:us-gaap :NetIncomeLoss]])
+            by-end (into {} (map (fn [r] [(str (:end r)) (get r "NetIncomeLoss")])
+                                 (ds/rows table {:nil-missing? true})))]
+        (is (= 91413000.0 (double (get by-end "2022-12-31"))))
+        (is (= 38406000.0 (double (get by-end "2023-12-31"))))
+        (is (= 33920000.0 (double (get by-end "2024-12-31"))))
+        (is (= 9871000.0 (double (get by-end "2025-12-31"))))))))

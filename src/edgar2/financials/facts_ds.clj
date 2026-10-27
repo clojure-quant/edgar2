@@ -206,8 +206,10 @@
 (defn- matching-period
   "Period for one fact.
 
-  Duration: same `:accn`+`:start`+`:end`, else the period with the same
-  `:start`+`:end` (comparative year restated on a later 10-K).
+  Duration: same `:accn`+`:start`+`:end`, else an annual form
+  (10-K / 20-F / 40-F) with the same `:start`+`:end` (comparative year
+  restated on a later annual report). A proxy or other form is not
+  attached this way: DEF 14A often repeats the year in thousands.
   Instant (blank `:start`): annual filings only; `:accn`+`:end`, else same
   `:end`, else (cover-page DEI) the filing's period when `:end` matches none."
   [fact periods-by-accn-end periods-by-end periods-by-accn]
@@ -222,7 +224,8 @@
               (first (get periods-by-accn accn)))))
       (or (some #(when (= start (str (:start %))) %)
                 (get periods-by-accn-end [accn end]))
-          (when (annual-duration? fact)
+          (when (and (annual-duration? fact)
+                     (annual-forms (str (:form fact))))
             (some #(when (= start (str (:start %))) %)
                   (get periods-by-end end)))))))
 

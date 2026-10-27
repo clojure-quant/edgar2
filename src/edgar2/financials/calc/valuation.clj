@@ -73,8 +73,8 @@
   computable.
 
   PE is market cap / Net Income. Earnings yield is 100 * Net Income / market
-  cap (100 / PE). Earnings-average yield uses `:earnings-avg` the same way.
-  `:earnings-plus-growth-avg-yield` adds that yield to
+  cap (100 / PE). Earnings-average yield is 100 * `:earnings-stabilized` /
+  market cap. `:earnings-plus-growth-avg-yield` adds that yield to
   `:earnings-growth-avg-yoy`. Dividend yield is dividends paid / market cap.
   Dividend-buyback yield adds buyback yield, treating a missing side as 0.
   Missing debt / preferred / NCI / cash legs count as 0 in EV."
@@ -82,7 +82,8 @@
   (let [vmcap (when (number? market-cap) market-cap)
         rev (when (number? (:revenue stats-map)) (:revenue stats-map))
         ni (when (number? (:net-profit stats-map)) (:net-profit stats-map))
-        eavg (when (number? (:earnings-avg stats-map)) (:earnings-avg stats-map))
+        eavg (when (number? (:earnings-stabilized stats-map))
+               (:earnings-stabilized stats-map))
         egrowth (when (number? (:earnings-growth-avg-yoy stats-map))
                   (:earnings-growth-avg-yoy stats-map))
         paid (when (number? (:dividends-paid stats-map)) (:dividends-paid stats-map))

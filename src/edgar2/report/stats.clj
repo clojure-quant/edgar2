@@ -49,7 +49,7 @@
    :shares :adr-ratio :marketcap :market-cap-adjusted :annual-count
    :revenue :revenue-unit
    :net-profit
-   :earnings-avg
+   :earnings-stabilized
    :eps
    :assets
    :return-on-assets
@@ -147,8 +147,10 @@
 (defn stats
   "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
   with 7-year mean YoY sales growth (:sales-growth-avg-yoy, %),
-  7-year mean earnings (:earnings-avg) and YoY earnings growth
-  (:earnings-growth-avg-yoy, %, |prior| denominator),
+  earnings regression over the last 7 annual net-income slots
+  (:earnings-stabilized is fitted earnings of the latest year,
+  :earnings-growth-avg-yoy is 100 * g from E(n) = E(0) * (1 + g)^n;
+  non-positive years are left out of the fit but still count as a year),
   :net-income-change-q-on-y and :sales-change-q-on-y (latest quarter vs
   4 quarters earlier, %, |prior| denominator), profit margin, 10-year mean
   profit margin (Net Income / revenue), return on assets (Net Income / assets),
@@ -160,7 +162,7 @@
   :marketcap, :price-sales,
   :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
   :earnings-yield (100 * Net Income / market cap),
-  :earnings-avg-yield (100 * :earnings-avg / market cap),
+  :earnings-avg-yield (100 * :earnings-stabilized / market cap),
   :earnings-plus-growth-avg-yield (:earnings-avg-yield + :earnings-growth-avg-yoy),
   :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),

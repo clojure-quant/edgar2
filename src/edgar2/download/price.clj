@@ -199,10 +199,17 @@
   [rows]
   (->> rows (keep :date) sort last))
 
+(defn sec-class-ticker
+  "MarketParquet class shares use a dot (BRK.B, JPM.C). SEC listings use a hyphen (BRK-B, JPM-C).
+  A trailing dot plus one letter is rewritten. Longer suffixes such as .PRN are left as-is."
+  [ticker]
+  (str/replace (str ticker) #"\.([A-Z])$" "-$1"))
+
 (defn save-prices!
-  "Write data/prices.edn. :download-date is the newest session in `rows`."
+  "Write data/prices.edn. :download-date is the newest session in `rows`.
+  Single-letter class symbols are stored in SEC form (`BRK.B` → `BRK-B`)."
   [rows]
-  (let [rows (vec rows)]
+  (let [rows (mapv #(update % :ticker sec-class-ticker) rows)]
     (dataset/write-dataset! prices-path
                             {:download-date (latest-session-in rows)}
                             rows)))
@@ -241,7 +248,7 @@
        (download-file! url tmp (if (str/starts-with? url api-base)
                                  (auth-headers)
                                  {}))
-       (let [rows (close-rows tmp)
+       (let [rows (mapv #(update % :ticker sec-class-ticker) (close-rows tmp))
              session (some :date rows)]
          (save-prices! rows)
          (println (format "US closes: %d symbols  session %s" (count rows) session))

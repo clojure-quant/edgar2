@@ -5,6 +5,7 @@
             [edgar2.financials.derived :as derived]
             [edgar2.financials.calc.concept :as calc-concept]
             [edgar2.financials.calc.quarterly :as calc-q]
+            [edgar2.financials.calc.regression :as regression]
             [edgar2.financials.calc.row.dividend-coverage :as div-cov]
             [edgar2.financials.facts-ds :as facts-ds]))
 
@@ -32,8 +33,8 @@
 (def amortization-tags (concept-data :amortization))
 
 (def sales-growth-window
-  "Trailing years averaged into :sales-growth-avg-yoy, :earnings-avg,
-  and :earnings-growth-avg-yoy."
+  "Trailing years averaged into :sales-growth-avg-yoy. The same count of
+  annual net-income slots, oldest first, is passed to the earnings regression."
   7)
 
 (def profit-margin-window
@@ -108,22 +109,6 @@
   (when-let [{:keys [avg years]} (avg-trailing-change vals n yoy-pct)]
     {:sales-growth-avg-yoy avg
      :sales-growth-years years}))
-
-(defn avg-earnings
-  "Mean of the last `n` annual earnings.
-
-  `vals` is oldest-first net income. Returns nil when no numbers remain."
-  [vals n]
-  (avg (take-last n (filterv number? vals))))
-
-(defn avg-earnings-growth
-  "Mean of the last `n` year-over-year earnings changes (%).
-
-  `vals` is oldest-first net income. Each step uses |prior| as the
-  denominator, so a shrinking loss counts as growth. Returns the average,
-  or nil."
-  [vals n]
-  (:avg (avg-trailing-change vals n calc-q/abs-change-pct)))
 
 (defn chron-nums
   "Oldest-first numbers from a newest-first `calc-concept` vector."
@@ -270,10 +255,9 @@
         ebitda (most-recent ebitda-v)
         debt-v-div-ebitda (ratio debt-v ebitda-v)
         debt2ebitda (most-recent debt-v-div-ebitda)
-        ni-chron (chron-nums ni)
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
-        earn-growth (avg-earnings-growth ni-chron sales-growth-window)
-        earn-avg (avg-earnings ni-chron sales-growth-window)
+        earn (regression/earnings-regression
+              (take-last sales-growth-window (reverse ni)))
         ni-qoy (calc-q/net-income-change-q-on-y
                 (facts-ds/report-table dss :q net-income-tags))
         rev-qoy (calc-q/sales-change-q-on-y
@@ -295,8 +279,7 @@
       (:sales-growth-avg-yoy growth)
       (assoc :sales-growth-avg-yoy (:sales-growth-avg-yoy growth)
              :sales-growth-years (:sales-growth-years growth))
-      (number? earn-growth) (assoc :earnings-growth-avg-yoy earn-growth)
-      (number? earn-avg) (assoc :earnings-avg earn-avg)
+      earn (merge earn)
       (number? ni-qoy) (assoc :net-income-change-q-on-y ni-qoy)
       (number? rev-qoy) (assoc :sales-change-q-on-y rev-qoy)
       (number? rev-score) (assoc :revenue-score rev-score)
