@@ -16,9 +16,13 @@
   Their slots still advance n, so a dropped year counts as a year. Needs
   two positive values at different positions, otherwise nil.
 
-  `:earnings-growth-avg-yoy` is 100 * g, with g = exp(slope) - 1.
+  `:earnings-stabilized-yoy` is 100 * g, with g = exp(slope) - 1.
   `:earnings-stabilized` is the fitted earnings at the last index, the
-  most recent year in the vector."
+  most recent year in the vector.
+  `:earnings-variation` is the residual standard error as a percent:
+  100 * (exp(s) - 1), with s = sqrt(SSE / (k - 2)) on the log residuals
+  of the positive years. An exact line (fewer than 3 points, or SSE of 0)
+  is 0. A value of 20 means a typical year sits about 20% off the path."
   [vals]
   (let [vals (vec vals)
         points (vec (keep-indexed (fn [i v]
@@ -40,6 +44,16 @@
                                         ns ys))
                          ss-n)
                 intercept (- y-bar (* slope n-bar))
-                n-last (double (dec (count vals)))]
-            {:earnings-growth-avg-yoy (* 100.0 (- (Math/exp slope) 1.0))
-             :earnings-stabilized (Math/exp (+ intercept (* slope n-last)))}))))))
+                n-last (double (dec (count vals)))
+                k (count ys)
+                sse (reduce + (map (fn [n y]
+                                     (let [d (- y (+ intercept (* slope n)))]
+                                       (* d d)))
+                                   ns ys))
+                variation (if (or (< k 3) (zero? (double sse)))
+                            0.0
+                            (let [s (Math/sqrt (/ sse (- k 2)))]
+                              (* 100.0 (- (Math/exp s) 1.0))))]
+            {:earnings-stabilized-yoy (* 100.0 (- (Math/exp slope) 1.0))
+             :earnings-stabilized (Math/exp (+ intercept (* slope n-last)))
+             :earnings-variation variation}))))))

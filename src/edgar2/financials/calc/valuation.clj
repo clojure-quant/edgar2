@@ -67,15 +67,15 @@
   "Valuation ratios from `stats-map` and `market-cap` (vmcap).
 
   Returns a map of keys to merge onto the stats row: `:price-sales`,
-  `:price-earnings`, `:earnings-yield`, `:earnings-avg-yield`,
-  `:earnings-plus-growth-avg-yield`, `:dividend-yield`, `:buyback-yield`,
+  `:price-earnings`, `:earnings-yield`, `:earnings-stabilized-yield`,
+  `:earnings-plus-growth-yield`, `:dividend-yield`, `:buyback-yield`,
   `:dividend-buyback-yield`, `:enterprise-value`, and `:ev-ebit` when
   computable.
 
   PE is market cap / Net Income. Earnings yield is 100 * Net Income / market
-  cap (100 / PE). Earnings-average yield is 100 * `:earnings-stabilized` /
-  market cap. `:earnings-plus-growth-avg-yield` adds that yield to
-  `:earnings-growth-avg-yoy`. Dividend yield is dividends paid / market cap.
+  cap (100 / PE). Stabilized earnings yield is 100 * `:earnings-stabilized` /
+  market cap. `:earnings-plus-growth-yield` adds that yield to
+  `:earnings-stabilized-yoy`. Dividend yield is dividends paid / market cap.
   Dividend-buyback yield adds buyback yield, treating a missing side as 0.
   Missing debt / preferred / NCI / cash legs count as 0 in EV."
   [stats-map market-cap]
@@ -84,8 +84,8 @@
         ni (when (number? (:net-profit stats-map)) (:net-profit stats-map))
         eavg (when (number? (:earnings-stabilized stats-map))
                (:earnings-stabilized stats-map))
-        egrowth (when (number? (:earnings-growth-avg-yoy stats-map))
-                  (:earnings-growth-avg-yoy stats-map))
+        egrowth (when (number? (:earnings-stabilized-yoy stats-map))
+                  (:earnings-stabilized-yoy stats-map))
         paid (when (number? (:dividends-paid stats-map)) (:dividends-paid stats-map))
         repurchase (when (number? (:stock-repurchase stats-map))
                      (:stock-repurchase stats-map))
@@ -116,8 +116,8 @@
       (assoc :price-sales (/ (double vmcap) (double rev)))
       pe (assoc :price-earnings pe)
       ey (assoc :earnings-yield ey)
-      eay (assoc :earnings-avg-yield eay)
-      plus (assoc :earnings-plus-growth-avg-yield plus)
+      eay (assoc :earnings-stabilized-yield eay)
+      plus (assoc :earnings-plus-growth-yield plus)
       dy (assoc :dividend-yield dy)
       by (assoc :buyback-yield by)
       dby (assoc :dividend-buyback-yield dby)

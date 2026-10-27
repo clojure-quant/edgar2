@@ -56,15 +56,16 @@
    :equity
    :return-on-capital
    :sales-growth-avg-yoy
-   :earnings-growth-avg-yoy
+   :earnings-stabilized-yoy
+   :earnings-variation
    :sales-change-q-on-y
    :net-income-change-q-on-y
    :revenue-score
    :operating-income-score
    :price-earnings
    :earnings-yield
-   :earnings-avg-yield
-   :earnings-plus-growth-avg-yield
+   :earnings-stabilized-yield
+   :earnings-plus-growth-yield
    :dividends-paid
    :dividend-yield
    :dividend-coverage
@@ -149,7 +150,9 @@
   with 7-year mean YoY sales growth (:sales-growth-avg-yoy, %),
   earnings regression over the last 7 annual net-income slots
   (:earnings-stabilized is fitted earnings of the latest year,
-  :earnings-growth-avg-yoy is 100 * g from E(n) = E(0) * (1 + g)^n;
+  :earnings-stabilized-yoy is 100 * g from E(n) = E(0) * (1 + g)^n,
+  :earnings-variation is the residual standard error as a percent,
+  100 * (exp(s) - 1);
   non-positive years are left out of the fit but still count as a year),
   :net-income-change-q-on-y and :sales-change-q-on-y (latest quarter vs
   4 quarters earlier, %, |prior| denominator), profit margin, 10-year mean
@@ -162,8 +165,8 @@
   :marketcap, :price-sales,
   :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
   :earnings-yield (100 * Net Income / market cap),
-  :earnings-avg-yield (100 * :earnings-stabilized / market cap),
-  :earnings-plus-growth-avg-yield (:earnings-avg-yield + :earnings-growth-avg-yoy),
+  :earnings-stabilized-yield (100 * :earnings-stabilized / market cap),
+  :earnings-plus-growth-yield (:earnings-stabilized-yield + :earnings-stabilized-yoy),
   :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),
   :buyback-yield (USD stock repurchase / USD market cap),

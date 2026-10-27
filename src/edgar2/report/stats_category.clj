@@ -5,7 +5,7 @@
   already stored ×100. `:fraction` values are stored as ratios and shown ×100.")
 
 (def category-order
-  [:price :quality :growth :valuation])
+  [:price :quality :growth :valuation :dividend])
 
 (def categories
   {:price [[:price :dec2]
@@ -23,20 +23,21 @@
              [:avg-profit-margin :fraction]
              [:debt2ebitda :dec2]]
    :growth [[:sales-growth-avg-yoy :percent]
-            [:earnings-growth-avg-yoy :percent]
+            [:earnings-stabilized-yoy :percent]
+            [:earnings-variation :percent]
             [:sales-change-q-on-y :percent]
             [:net-income-change-q-on-y :percent]]
    :valuation [[:ev-ebit :dec1]
                [:price-earnings :dec1 "pe"]
                [:earnings-yield :percent]
-               [:earnings-avg-yield :percent]
-               [:earnings-plus-growth-avg-yield :percent]
-               [:price-sales :dec2]
-               [:dividend-yield :percent]
-               [:buyback-yield :percent]
-               [:dividend-buyback-yield :percent]
-               [:dividend-coverage :dec1]
-               [:dividend-buyback-coverage :dec1]]})
+               [:earnings-stabilized-yield :percent]
+               [:earnings-plus-growth-yield :percent]
+               [:price-sales :dec2]]
+   :dividend [[:dividend-yield :percent]
+              [:buyback-yield :percent]
+              [:dividend-buyback-yield :percent]
+              [:dividend-coverage :dec1]
+              [:dividend-buyback-coverage :dec1]]})
 
 (defn item-label
   "Heading for a category entry. A third element is used as-is.
