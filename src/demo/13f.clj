@@ -185,7 +185,7 @@
 
 (defn -main
   [& [year]]
-  (let [year (parse-long year)]
+  (let [year (when (string? year) (parse-long year))]
     (when-not year
-      (throw (ex-info "year is required" {})))
+      (throw (ex-info "year is required: clj -M:13F 2026" {})))
     (run year)))
