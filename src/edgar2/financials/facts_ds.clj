@@ -89,6 +89,17 @@
   [row]
   (assoc row :period (period-label row)))
 
+(defn- with-annual-period
+  "`:period` is `fy-FY`, except a comparative whose `:fy` is the later
+  filing's year. That row is labeled from its own `:end` year (2022-FY)."
+  [row]
+  (let [end-year (some-> (parse-date (:end row)) .getYear str)
+        fy (str (:fy row))
+        year (if (and (seq end-year) (not= end-year fy))
+               end-year
+               fy)]
+    (assoc row :period (str year "-FY"))))
+
 (defn- synthesize-q4
   "Q4 period for an annual filing when companyfacts omit the quarterly footnote.
 
@@ -117,6 +128,32 @@
   [row]
   (not (pos? (compare (str (:end row)) (str (:filed row))))))
 
+(defn- annual-window-rows
+  "FY facts with a ~12-month window that ended on or before the filing date."
+  [facts]
+  (->> (ds/rows facts {:nil-missing? true})
+       (filter #(and (= "FY" (str (:fp %)))
+                     (annual-duration? %)
+                     (period-ended-by-filing? %)))
+       (map #(select-keys % period-cols))))
+
+(defn- own-period-by-filing
+  "The annual window each filing actually reports: latest `:start` on that
+  `:filed` date. Earlier windows on the same date are comparatives."
+  [rows]
+  (->> rows
+       (group-by #(str (:filed %)))
+       vals
+       (map (fn [rs] (last (sort-by #(str (:start %)) rs))))))
+
+(defn- own-end-by-accn
+  "Accession → period-end of the year that filing reports.
+  A later 10-K's comparative column is not this end."
+  [rows]
+  (into {}
+        (map (fn [row] [(str (:accn row)) (str (:end row))]))
+        (own-period-by-filing rows)))
+
 (defn annual-periods
   "Reduce an `e/facts` dataset to one annual period row per fiscal year-end.
 
@@ -125,30 +162,34 @@
   Year-to-date or prior-year windows tagged Q2/Q3 on a 10-Q are excluded.
   Windows whose `:end` is after `:filed` are dropped (forward stubs).
 
-  When one filing date carries several FY windows (current year plus
-  comparatives), only the row with the latest `:start` is kept. Remaining
-  rows are then uniqued by `:end` (latest `:filed` wins) so a restatement
-  on a later 10-K replaces the earlier filing’s period.
+  Each filing date contributes the window with the latest `:start`: that is
+  the year the annual report is for. A later filing of the same year
+  (a 10-K/A, or another 10-K with that year as its own period) replaces it.
+
+  Earlier windows on the same filing are comparatives. A comparative year is
+  kept when no annual report has that year as its own period. The earliest
+  filing that carries the year supplies it, so the next 10-K's copy of the
+  same year does not replace it. Smurfit Westrock's 2024 10-K therefore
+  supplies 2022, 2023, and 2024, and the 2025 10-K supplies only 2025.
 
   Returns a dataset of `:accn :filed :form :fy :fp :start :end :frame :period`
-  (`:period` is `fy-fp`, e.g. 2025-FY)."
+  (`:period` is `fy-FY`, e.g. 2025-FY; a comparative uses its `:end` year)."
   [facts]
-  (let [rows (->> (ds/rows facts {:nil-missing? true})
-                  (filter #(and (= "FY" (str (:fp %)))
-                                (annual-duration? %)
-                                (period-ended-by-filing? %)))
-                  (map #(select-keys % period-cols)))
-        per-filing (->> rows
-                        (group-by #(str (:filed %)))
-                        vals
-                        (map (fn [rs]
-                               (last (sort-by #(str (:start %)) rs)))))
-        best (->> per-filing
-                  (group-by #(str (:end %)))
-                  vals
-                  (map (fn [rs] (last (sort-by #(str (:filed %)) rs))))
+  (let [rows (annual-window-rows facts)
+        owns (vec (own-period-by-filing rows))
+        own-ends (set (map #(str (:end %)) owns))
+        own-best (->> owns
+                      (group-by #(str (:end %)))
+                      vals
+                      (map (fn [rs] (last (sort-by #(str (:filed %)) rs)))))
+        comparative-best (->> rows
+                              (remove #(contains? own-ends (str (:end %))))
+                              (group-by #(str (:end %)))
+                              vals
+                              (map (fn [rs] (first (sort-by #(str (:filed %)) rs)))))
+        best (->> (concat own-best comparative-best)
                   (sort-by #(str (:end %)))
-                  (mapv with-period))]
+                  (mapv with-annual-period))]
     (when (empty? best)
       (throw (ex-info "no annual reports available" {})))
     (ds/->dataset best {:dataset-name "annual-filing-periods"})))
@@ -207,24 +248,37 @@
   "Period for one fact.
 
   Duration: same `:accn`+`:start`+`:end`, else an annual form
-  (10-K / 20-F / 40-F) with the same `:start`+`:end` (comparative year
-  restated on a later annual report). A proxy or other form is not
-  attached this way: DEF 14A often repeats the year in thousands.
+  (10-K / 20-F / 40-F) with the same `:start`+`:end` when that filing's
+  own year is this period (a 10-K/A of the same year). A later 10-K that
+  only repeats the year as a comparative does not attach, and neither does
+  a proxy: DEF 14A often repeats the year in thousands.
   Instant (blank `:start`): annual filings only; `:accn`+`:end`, else same
-  `:end`, else (cover-page DEI) the filing's period when `:end` matches none."
-  [fact periods-by-accn-end periods-by-end periods-by-accn]
+  `:end` when this filing reports that year, else (cover-page DEI) the
+  filing's own period when `:end` matches none.
+
+  `own-end-by-accn` is accession → the period-end that filing reports.
+  Nil keeps the looser match used for quarterly periods."
+  [fact periods-by-accn-end periods-by-end periods-by-accn own-end-by-accn]
   (let [accn (str (:accn fact))
         end (str (:end fact))
-        start (str (:start fact))]
+        start (str (:start fact))
+        own-end (when own-end-by-accn (get own-end-by-accn accn))
+        files-this-year? (or (nil? own-end-by-accn) (= end own-end))]
     (if (blank-start? fact)
       (when (annual-stock-fact? fact)
         (or (first (get periods-by-accn-end [accn end]))
-            (first (get periods-by-end end))
+            (when files-this-year?
+              (first (get periods-by-end end)))
             (when-not (contains? periods-by-end end)
-              (first (get periods-by-accn accn)))))
+              (if own-end
+                (or (some #(when (= own-end (str (:end %))) %)
+                          (get periods-by-accn accn))
+                    (first (get periods-by-end own-end)))
+                (first (get periods-by-accn accn))))))
       (or (some #(when (= start (str (:start %))) %)
                 (get periods-by-accn-end [accn end]))
-          (when (and (annual-duration? fact)
+          (when (and files-this-year?
+                     (annual-duration? fact)
                      (annual-forms (str (:form fact))))
             (some #(when (= start (str (:start %))) %)
                   (get periods-by-end end)))))))
@@ -249,6 +303,8 @@
         by-accn-end (group-by (juxt #(str (:accn %)) #(str (:end %))) period-rows)
         by-end (group-by #(str (:end %)) period-rows)
         by-accn (group-by #(str (:accn %)) period-rows)
+        own-ends (when (= q-or-y :y)
+                   (own-end-by-accn (annual-window-rows dss)))
         wanted (set (map field-pair fields))
         out-cols (into report-period-cols [:taxonomy :concept :label :unit :val])
         rows (->> (ds/rows dss {:nil-missing? true})
@@ -256,7 +312,7 @@
                           (when (contains? wanted
                                            [(str (:taxonomy fact))
                                             (str (:concept fact))])
-                            (when-let [period (matching-period fact by-accn-end by-end by-accn)]
+                            (when-let [period (matching-period fact by-accn-end by-end by-accn own-ends)]
                               (-> fact
                                   (merge (select-keys period report-period-cols))
                                   ;; keep the fact's own :filed for restatement preference
