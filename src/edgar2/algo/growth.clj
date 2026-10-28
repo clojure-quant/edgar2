@@ -1,17 +1,21 @@
 (ns edgar2.algo.growth
-  "Top names by stabilized earnings yield compounded three years at stabilized
-  earnings growth. Requires at least 7 annual reports, earnings growth
-  between 20% and 50%, sales growth of at least 20%, and revenue-score
-  and operating-income-score of at least 70."
+  "Names sorted by stabilized earnings yield compounded three years at
+  stabilized earnings growth. Keeps at least 7 annual reports, earnings
+  growth between 12% and 65%, sales growth of at least 15%, revenue-score
+  of at least 65, and operating-income-score of at least 70."
   (:require [edgar2.report.screen :as report]
-            [edgar2.screen.universe :as uni]))
+            [edgar2.screen.universe :as uni]
+            [edgar2.screen.util :as util]))
 
-(def n 750)
-(def min-score 70)
 (def min-annual-years 7)
-(def min-earnings-growth 20)
-(def max-earnings-growth 50)
-(def min-sales-growth 20)
+(def min-earnings-growth 12)
+(def max-earnings-growth 65)
+(def min-sales-growth 15)
+(def min-revenue-score 65)
+(def min-operating-income-score 70)
+
+(def sort-line
+  "take this list and sort by earnings-future-3-yield")
 
 (def columns
   [{:key :ticker :label "Ticker"}
@@ -25,44 +29,38 @@
    {:key :sales-growth-avg-yoy :label "sales-growth-avg-yoy" :num? true :decimals 1}
    {:key :net-income-change-q-on-y :label "net-income-change-q-on-y" :num? true :decimals 1}])
 
-(defn- at-least?
-  [row k minimum]
-  (and (number? (get row k))
-       (>= (double (get row k)) (double minimum))))
+(def filter-ands
+  [{:label (format "annual-count >= %d" min-annual-years)
+    :pred (util/at-least :annual-count min-annual-years)}
+   {:label (format "earnings-stabilized-yoy between %d and %d"
+                   min-earnings-growth max-earnings-growth)
+    :pred (util/between :earnings-stabilized-yoy
+                        min-earnings-growth max-earnings-growth)}
+   {:label (format "sales-growth-avg-yoy >= %d" min-sales-growth)
+    :pred (util/at-least :sales-growth-avg-yoy min-sales-growth)}
+   {:label (format "revenue-score >= %d" min-revenue-score)
+    :pred (util/at-least :revenue-score min-revenue-score)}
+   {:label (format "operating-income-score >= %d" min-operating-income-score)
+    :pred (util/at-least :operating-income-score min-operating-income-score)}])
 
-(defn- between?
-  [row k lo hi]
-  (and (number? (get row k))
-       (<= (double lo) (double (get row k)) (double hi))))
+(defn- future-yield
+  [row]
+  (let [y (:earnings-future-3-yield row)]
+    (when (number? y) (double y))))
 
 (defn calculate
   [items _params]
-  (let [hits (->> (mapv :row items)
-                  (filter #(and (number? (:earnings-future-3-yield %))
-                                (at-least? % :annual-count min-annual-years)
-                                (between? % :earnings-stabilized-yoy
-                                          min-earnings-growth
-                                          max-earnings-growth)
-                                (at-least? % :sales-growth-avg-yoy min-sales-growth)
-                                (at-least? % :revenue-score min-score)
-                                (at-least? % :operating-income-score min-score)))
-                  (sort-by :earnings-future-3-yield >)
-                  (take n)
-                  vec)]
+  (let [result (util/apply-and-pipeline (mapv :row items) filter-ands)
+        hits (vec (sort-by #(or (future-yield %) Double/NEGATIVE_INFINITY)
+                           >
+                           (:tickers result)))]
     {:rows (mapv report/table-row hits)
-     :lines [(format "  annual-count >= %d" min-annual-years)
-             (format "  earnings-stabilized-yoy between %d and %d"
-                     min-earnings-growth max-earnings-growth)
-             (format "  sales-growth-avg-yoy >= %d" min-sales-growth)
-             (format "  revenue-score >= %d" min-score)
-             (format "  operating-income-score >= %d" min-score)
-             (format "  top %d by earnings-future-3-yield" n)
-             (format "  %d names" (count hits))]}))
+     :lines (conj (util/report-pipeline-info result) sort-line)}))
 
 (def screen
   {:id :growth-
    :title "Growth"
-   :description ["750 names with the highest stabilized earnings yield compounded three years at stabilized earnings growth, at least 7 annual reports, earnings growth between 20% and 50%, sales-growth-avg-yoy at least 20%, revenue-score at least 70, and operating-income-score at least 70."]
+   :description ["At least 7 annual reports, stabilized earnings growth between 12% and 65%, sales-growth-avg-yoy at least 15%, revenue-score at least 65, and operating-income-score at least 70, sorted by earnings-future-3-yield."]
    :params [uni/min-mc]
    :columns columns
    :universe uni/stats
