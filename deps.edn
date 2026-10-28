@@ -29,6 +29,7 @@
   :download-fx {:exec-fn edgar2.download.fx/download-fx}
   :download-eodhd-mapping {:exec-fn edgar2.download.eodhd-mapping/download-eodhd-mapping}
   :download-eodhd-exchange {:exec-fn edgar2.download.eodhd-exchange/download-eodhd-exchange}
+  :massive {:exec-fn edgar2.download.massive/download}
   :filing-daily-zip {:exec-fn edgar2.download.filing-daily-zip/download
                      :exec-args {:year 2026
                                  :dest "/run/media/florian/26ad683d-44f4-42d8-bbd9-0a5d0b792fe0/sec"}}
