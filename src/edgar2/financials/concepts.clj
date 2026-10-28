@@ -122,6 +122,16 @@
     :data [[:us-gaap :Assets]
            [:ifrs-full :Assets]]}
 
+   {:id :assets-current
+    :label "Current Assets"
+    :data [[:us-gaap :AssetsCurrent]
+           [:ifrs-full :CurrentAssets]]}
+
+   {:id :liabilities-current
+    :label "Current Liabilities"
+    :data [[:us-gaap :LiabilitiesCurrent]
+           [:ifrs-full :CurrentLiabilities]]}
+
    {:id :total-equity
     :label "Total Equity"
     :data [[:us-gaap :StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest]

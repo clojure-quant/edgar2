@@ -19,6 +19,8 @@
 (def dividends-paid-tags (concept-data :dividends-paid))
 (def stock-repurchase-tags (concept-data :stock-repurchase))
 (def asset-tags (concept-data :assets))
+(def assets-current-tags (concept-data :assets-current))
+(def liabilities-current-tags (concept-data :liabilities-current))
 (def total-equity-tags (concept-data :total-equity))
 (def parent-equity-tags (concept-data :parent-equity))
 (def nci-tags (concept-data :nci))
@@ -51,6 +53,8 @@
                 dividends-paid-tags
                 stock-repurchase-tags
                 asset-tags
+                assets-current-tags
+                liabilities-current-tags
                 total-equity-tags
                 parent-equity-tags
                 nci-tags
@@ -132,6 +136,17 @@
   denominator is zero."
   [nums dens]
   (mapv ratio-row nums dens))
+
+(defn- capital-employed
+  "Per-period assets minus current liabilities.
+
+  Nil where either side is missing. A missing current-liabilities figure
+  is not treated as zero."
+  [assets liabilities]
+  (mapv (fn [a l]
+          (when (and (number? a) (number? l))
+            (- (double a) (double l))))
+        assets liabilities))
 
 (defn most-recent
   "First numeric value in a newest-first vector."
@@ -233,6 +248,7 @@
         rev (col-vec concepts :revenue)
         ni (col-vec concepts :net-income)
         assets (col-vec concepts :assets)
+        liabilities-current (col-vec concepts :liabilities-current)
         oi (col-vec concepts :operating-income)
         equity (col-vec concepts :total-equity)
         debt-v (col-vec concepts :debt)
@@ -267,7 +283,7 @@
         oi-score (direction-score (chron-nums oi))
         margin (most-recent (ratio ni rev))
         roa (most-recent (ratio ni assets))
-        roc (most-recent (ratio ni equity))
+        roce (most-recent (ratio ebit-v (capital-employed assets liabilities-current)))
         net-profit (most-recent ni)
         revenue (most-recent rev)
         assets-val (most-recent assets)
@@ -294,9 +310,8 @@
       (number? roa)
       (assoc :return-on-assets roa
              :assets assets-val)
-      (number? roc)
-      (assoc :return-on-capital roc
-             :equity equity-val)
+      (number? equity-val) (assoc :equity equity-val)
+      (number? roce) (assoc :return-on-capital-employed roce)
       (number? eps) (assoc :eps eps)
       (number? dps) (assoc :dps dps)
       (number? debt) (assoc :debt debt)

@@ -67,12 +67,15 @@
   "Valuation ratios from `stats-map` and `market-cap` (vmcap).
 
   Returns a map of keys to merge onto the stats row: `:price-sales`,
-  `:price-earnings`, `:earnings-yield`, `:earnings-stabilized-yield`,
+  `:price-earnings`, `:peg`, `:earnings-yield`, `:earnings-stabilized-yield`,
   `:earnings-future-3-yield`, `:dividend-yield`, `:buyback-yield`,
   `:dividend-buyback-yield`, `:enterprise-value`, and `:ev-ebit` when
   computable.
 
-  PE is market cap / Net Income. Earnings yield is 100 * Net Income / market
+  PE is market cap / Net Income. `:peg` is PE / `:earnings-stabilized-yoy`
+  (a PE of 100 and growth of 100 is 1.0). Omitted when either is negative
+  or growth is 0.
+  Earnings yield is 100 * Net Income / market
   cap (100 / PE). Stabilized earnings yield is 100 * `:earnings-stabilized` /
   market cap. `:earnings-future-3-yield` is `:earnings-stabilized-yield`
   times (1 + g)^3, where g is `:earnings-stabilized-yoy` / 100. Dividend yield is
@@ -98,6 +101,9 @@
              (* 100.0 (/ (double ni) (double vmcap))))
         eay (when (and pos-cap? (number? eavg) (not (zero? (double eavg))))
               (* 100.0 (/ (double eavg) (double vmcap))))
+        peg (when (and (number? pe) (not (neg? (double pe)))
+                       (number? egrowth) (pos? (double egrowth)))
+              (/ (double pe) (double egrowth)))
         future (when (and (number? eay) (number? egrowth))
                  (let [g (+ 1.0 (/ (double egrowth) 100.0))]
                    (* (double eay) g g g)))
@@ -117,6 +123,7 @@
       (and vmcap rev (not (zero? (double rev))))
       (assoc :price-sales (/ (double vmcap) (double rev)))
       pe (assoc :price-earnings pe)
+      peg (assoc :peg peg)
       ey (assoc :earnings-yield ey)
       eay (assoc :earnings-stabilized-yield eay)
       future (assoc :earnings-future-3-yield future)

@@ -54,7 +54,7 @@
    :assets
    :return-on-assets
    :equity
-   :return-on-capital
+   :return-on-capital-employed
    :sales-growth-avg-yoy
    :earnings-stabilized-yoy
    :earnings-variation
@@ -63,6 +63,7 @@
    :revenue-score
    :operating-income-score
    :price-earnings
+   :peg
    :earnings-yield
    :earnings-stabilized-yield
    :earnings-future-3-yield
@@ -157,13 +158,15 @@
   :net-income-change-q-on-y and :sales-change-q-on-y (latest quarter vs
   4 quarters earlier, %, |prior| denominator), profit margin, 10-year mean
   profit margin (Net Income / revenue), return on assets (Net Income / assets),
-  return on capital (Net Income / total equity), plus :shares (most recent 10-Q
+  return on capital employed (EBIT / (assets − current liabilities)), plus :shares (most recent 10-Q
   when that quarter is at least as recent as the annual report; otherwise
   the annual report), :annual-count (distinct annual periods in companyfacts),
   :price, :change50, :change200, :change400
   (close / closeN - 1 from data/price-change.edn, when that ticker is there),
   :marketcap, :price-sales,
   :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
+  :peg (:price-earnings / :earnings-stabilized-yoy; PE 100 and growth 100 is 1.0;
+  omitted when either is negative or growth is 0),
   :earnings-yield (100 * Net Income / market cap),
   :earnings-stabilized-yield (100 * :earnings-stabilized / market cap),
   :earnings-future-3-yield (:earnings-stabilized-yield * (1 + :earnings-stabilized-yoy / 100) ^ 3),
@@ -223,13 +226,13 @@
                                 :data data})
                  i' (inc i)]
              (when (or (zero? (mod i' 250)) (= i' total))
-               (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roc=%s"
+               (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roce=%s"
                                 i' total
                                 (or (:ticker st) (:cik st))
                                 (fmt-growth (:sales-growth-avg-yoy st))
                                 (some-> (:profit-margin st) (* 100) (#(format "%.1f" %)))
                                 (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
-                                (some-> (:return-on-capital st) (* 100) (#(format "%.1f" %)))))
+                                (some-> (:return-on-capital-employed st) (* 100) (#(format "%.1f" %)))))
                (flush))
              (recur i' (conj! acc st) (next rows)))
            (let [out (vec (persistent! acc))]
@@ -237,25 +240,25 @@
              (println)
              (pprint/print-table
               [:ticker :price :marketcap :price-sales :price-earnings
-               :sales-growth-avg-yoy :profit-margin :return-on-assets :return-on-capital]
+               :sales-growth-avg-yoy :profit-margin :return-on-assets :return-on-capital-employed]
               (take 25
                     (map (fn [r]
                            (-> r
                                (update :sales-growth-avg-yoy round1)
                                (update :profit-margin round4)
                                (update :return-on-assets round4)
-                               (update :return-on-capital round4)
+                               (update :return-on-capital-employed round4)
                                (update :price-sales round4)
                                (update :price-earnings round4)))
                          out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roc=%d  price=%d  chg50=%d  chg200=%d  chg400=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roce=%d  price=%d  chg50=%d  chg200=%d  chg400=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
                               stats-path
                               (count out)
                               (count (filter :sales-growth-avg-yoy out))
                               (count (filter :profit-margin out))
                               (count (filter :avg-profit-margin out))
                               (count (filter :return-on-assets out))
-                              (count (filter :return-on-capital out))
+                              (count (filter :return-on-capital-employed out))
                               (count (filter :price out))
                               (count (filter :change50 out))
                               (count (filter :change200 out))

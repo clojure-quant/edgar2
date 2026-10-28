@@ -14,7 +14,7 @@
    {:key :ev-ebit :label "EV/EBIT" :num? true :decimals 1}
    {:key :s-yoy :label "Sales YoY" :num? true :decimals 1}
    {:key :roa :label "ROA" :num? true}
-   {:key :roc :label "ROC" :num? true}
+   {:key :roce :label "ROCE" :num? true}
    {:key :dyld :label "Yield" :num? true}])
 
 (defn cheap-growth-on
