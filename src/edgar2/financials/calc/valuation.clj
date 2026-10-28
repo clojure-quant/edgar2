@@ -68,14 +68,15 @@
 
   Returns a map of keys to merge onto the stats row: `:price-sales`,
   `:price-earnings`, `:earnings-yield`, `:earnings-stabilized-yield`,
-  `:earnings-plus-growth-yield`, `:dividend-yield`, `:buyback-yield`,
+  `:earnings-future-3-yield`, `:dividend-yield`, `:buyback-yield`,
   `:dividend-buyback-yield`, `:enterprise-value`, and `:ev-ebit` when
   computable.
 
   PE is market cap / Net Income. Earnings yield is 100 * Net Income / market
   cap (100 / PE). Stabilized earnings yield is 100 * `:earnings-stabilized` /
-  market cap. `:earnings-plus-growth-yield` adds that yield to
-  `:earnings-stabilized-yoy`. Dividend yield is dividends paid / market cap.
+  market cap. `:earnings-future-3-yield` is `:earnings-stabilized-yield`
+  times (1 + g)^3, where g is `:earnings-stabilized-yoy` / 100. Dividend yield is
+  dividends paid / market cap.
   Dividend-buyback yield adds buyback yield, treating a missing side as 0.
   Missing debt / preferred / NCI / cash legs count as 0 in EV."
   [stats-map market-cap]
@@ -97,8 +98,9 @@
              (* 100.0 (/ (double ni) (double vmcap))))
         eay (when (and pos-cap? (number? eavg) (not (zero? (double eavg))))
               (* 100.0 (/ (double eavg) (double vmcap))))
-        plus (when (and (number? eay) (number? egrowth))
-               (+ (double eay) (double egrowth)))
+        future (when (and (number? eay) (number? egrowth))
+                 (let [g (+ 1.0 (/ (double egrowth) 100.0))]
+                   (* (double eay) g g g)))
         dy (when (and pos-cap? (number? paid) (pos? (double paid)))
              (* 100.0 (/ (double paid) (double vmcap))))
         by (when (and pos-cap? (number? repurchase) (pos? (double repurchase)))
@@ -117,7 +119,7 @@
       pe (assoc :price-earnings pe)
       ey (assoc :earnings-yield ey)
       eay (assoc :earnings-stabilized-yield eay)
-      plus (assoc :earnings-plus-growth-yield plus)
+      future (assoc :earnings-future-3-yield future)
       dy (assoc :dividend-yield dy)
       by (assoc :buyback-yield by)
       dby (assoc :dividend-buyback-yield dby)

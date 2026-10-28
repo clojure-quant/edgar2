@@ -57,6 +57,8 @@
            :entityName (cap-name (:entityName r))}
     (number? (:price r))
     (assoc :price (->> (:price r) double (format "%.2f") Double/parseDouble))
+    (number? (:annual-count r))
+    (assoc :annual-count (long (:annual-count r)))
     (number? (:marketcap r))
     (assoc :mc (millions (:marketcap r))
            :market-cap (millions (:marketcap r)))
@@ -72,9 +74,9 @@
     (assoc :earnings-stabilized-yield (stats/round1 (:earnings-stabilized-yield r)))
     (number? (:earnings-stabilized-yoy r))
     (assoc :earnings-stabilized-yoy (stats/round1 (:earnings-stabilized-yoy r)))
-    (number? (:earnings-plus-growth-yield r))
-    (assoc :earnings-plus-growth-yield
-           (stats/round1 (:earnings-plus-growth-yield r)))
+    (number? (:earnings-future-3-yield r))
+    (assoc :earnings-future-3-yield
+           (stats/round1 (:earnings-future-3-yield r)))
     (number? (:sales-change-q-on-y r))
     (assoc :sales-change-q-on-y (stats/round1 (:sales-change-q-on-y r)))
     (number? (:net-income-change-q-on-y r))

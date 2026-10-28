@@ -31,7 +31,7 @@
                [:price-earnings :dec1 "pe"]
                [:earnings-yield :percent]
                [:earnings-stabilized-yield :percent]
-               [:earnings-plus-growth-yield :percent]
+               [:earnings-future-3-yield :percent]
                [:price-sales :dec2]]
    :dividend [[:dividend-yield :percent]
               [:buyback-yield :percent]

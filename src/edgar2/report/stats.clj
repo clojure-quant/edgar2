@@ -65,7 +65,7 @@
    :price-earnings
    :earnings-yield
    :earnings-stabilized-yield
-   :earnings-plus-growth-yield
+   :earnings-future-3-yield
    :dividends-paid
    :dividend-yield
    :dividend-coverage
@@ -166,7 +166,7 @@
   :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
   :earnings-yield (100 * Net Income / market cap),
   :earnings-stabilized-yield (100 * :earnings-stabilized / market cap),
-  :earnings-plus-growth-yield (:earnings-stabilized-yield + :earnings-stabilized-yoy),
+  :earnings-future-3-yield (:earnings-stabilized-yield * (1 + :earnings-stabilized-yoy / 100) ^ 3),
   :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
   :dividend-coverage (net income / dividends paid; omitted when none was paid),
   :buyback-yield (USD stock repurchase / USD market cap),
