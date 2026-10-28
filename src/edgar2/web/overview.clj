@@ -148,9 +148,9 @@
             groups)]]))
 
 (defn reporting-cur
-  "Reporting currency from `:revenue-unit`, or nil for USD / blank."
+  "Reporting currency from `:report-currency`, or nil for USD / blank."
   [row]
-  (when-let [u (some-> (:revenue-unit row) str str/trim not-empty)]
+  (when-let [u (some-> (:report-currency row) str str/trim not-empty)]
     (let [code (or (second (re-matches #"(?i)([A-Za-z]{3})(?:/.*)?" u)) u)]
       (when-not (= "USD" (str/upper-case code))
         (str/upper-case code)))))

@@ -13,7 +13,7 @@
            [:adr-ratio :dec2]
            [:marketcap :millions]
            [:enterprise-value :millions]
-           [:revenue-unit :text "reporting-cur"]
+           [:report-currency :text "reporting-cur"]
            [:annual-count :integer "annual-report-count"]]
    :quality [[:return-on-assets :fraction]
              [:return-on-capital :fraction]

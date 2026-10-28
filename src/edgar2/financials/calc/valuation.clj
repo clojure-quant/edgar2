@@ -19,11 +19,11 @@
   financials. Non-USD units use the latest `from-usd` rate. Nil when market
   cap is missing or FX is unknown for a foreign unit."
   ([row]
-   (market-cap-adjusted (:marketcap row) (:revenue-unit row) (:adr-ratio row)))
-  ([marketcap revenue-unit adr-ratio]
+   (market-cap-adjusted (:marketcap row) (:report-currency row) (:adr-ratio row)))
+  ([marketcap report-currency adr-ratio]
    (when (number? marketcap)
-     (let [usd? (usd-unit? revenue-unit)
-           rate (if usd? 1.0 (fx/from-usd revenue-unit))
+     (let [usd? (usd-unit? report-currency)
+           rate (if usd? 1.0 (fx/from-usd report-currency))
            ratio (let [r (when (number? adr-ratio) (double adr-ratio))]
                    (if (and r (pos? r)) r 1.0))]
        (when rate
@@ -32,28 +32,28 @@
 (defn needs-mcap-adjust?
   "True when valuation must use `:market-cap-adjusted` (foreign report or
   ADR ratio other than 1)."
-  [revenue-unit adr-ratio]
-  (or (not (usd-unit? revenue-unit))
+  [report-currency adr-ratio]
+  (or (not (usd-unit? report-currency))
       (and (number? adr-ratio)
            (not= 1.0 (double adr-ratio)))))
 
 (defn calculate-marketcap
   "Listing price × shares, plus adjusted / valuation market cap.
 
-  `universe-row` supplies `:ticker` and `:revenue-unit`. Looks up
+  `universe-row` supplies `:ticker` and `:report-currency`. Looks up
   `:adr-ratio` from `data/adr-list.edn` when known. Returns a map with present
   keys among `:adr-ratio`, `:shares`, `:price`, `:marketcap`,
   `:market-cap-adjusted`, and `:vmcap` (the cap later passed to
   `calculate-valuation` — adjusted when `needs-mcap-adjust?`)."
   [price-by-ticker shares universe-row]
   (let [ticker (:ticker universe-row)
-        revenue-unit (:revenue-unit universe-row)
+        report-currency (:report-currency universe-row)
         price (get price-by-ticker (str/upper-case (str ticker)))
         mcap (when (and price (number? shares))
                (* (double price) (double shares)))
         ratio (adr/get-ratio ticker)
-        mcap-adj (market-cap-adjusted mcap revenue-unit ratio)
-        need-adj? (needs-mcap-adjust? revenue-unit ratio)
+        mcap-adj (market-cap-adjusted mcap report-currency ratio)
+        need-adj? (needs-mcap-adjust? report-currency ratio)
         vmcap (if need-adj? mcap-adj mcap)]
     (cond-> {}
       ratio (assoc :adr-ratio ratio)

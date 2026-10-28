@@ -1155,64 +1155,6 @@
                      {:dataset-name (str ticker " P&L fields " latest-end)
                       :column-order [:line :tag :value :unit]})))))
 
-(def business-start-re
-  #"(?i)items?\s+1(?:\s+and\s+2)?[\s.:,—-]+business")
-
-(def business-end-re
-  #"(?i)item\s+1a[\s.:,—-]+risk factors")
-
-(defn last-re-start
-  [re s]
-  (loop [m (re-matcher re s) idx nil]
-    (if (.find m)
-      (recur m (.start m))
-      idx)))
-
-(defn extract-business-text
-  "Item 1 Business from the latest 10-K.
-
-  e/item \"1\" often binds to Item 1C (Cybersecurity). Many E&P filers
-  also title the section ITEMS 1 AND 2. BUSINESS AND PROPERTIES."
-  [filing]
-  (let [text (e/text filing)
-        start (last-re-start business-start-re text)]
-    (when start
-      (let [tail (subs text start)
-            end-m (re-matcher business-end-re tail)
-            body (if (.find end-m)
-                   (subs tail 0 (.start end-m))
-                   tail)]
-        {:title "Item 1. Business"
-         :text (str/trim body)
-         :method :item-1-heading}))))
-
-(defn business
-  "Print Item 1 (Business) from the latest 10-K.
-
-  Usage: clj -X:business :ticker OXY"
-  ([] (business {}))
-  ([m]
-   (let [{:keys [ticker]} (opts m)]
-     (ensure-identity!)
-     (let [cik (resolve-filer ticker)
-           meta (e/company-metadata cik)
-           f (e/filing cik :form "10-K")
-           item (extract-business-text f)]
-       (println (format "%s  ticker=%s  CIK=%s"
-                        (:name meta) ticker cik))
-       (println (format "10-K  period=%s  filed=%s  accession=%s"
-                        (:reportDate f) (:filingDate f) (:accessionNumber f)))
-       (when-let [url (:url f)]
-         (println url))
-       (println)
-       (if item
-         (do
-           (println (:title item))
-           (println)
-           (println (:text item)))
-         (println "Could not extract Item 1 (Business) from this 10-K."))
-       item))))
-
 (defn -main
   [& _]
   (download)

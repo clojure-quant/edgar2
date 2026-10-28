@@ -13,14 +13,8 @@
 
 (def universe-path "data/universe-facts.edn")
 
-(def common-share-tags
-  (:data (concepts/get-concept-id :common-shares-outstanding)))
-
-(def ifrs-share-tags
-  (:data (concepts/get-concept-id :ifrs-shares-outstanding)))
-
-(def weighted-average-share-tags
-  (:data (concepts/get-concept-id :weighted-average-shares)))
+(def share-tags
+  (:data (concepts/get-concept-id :shares-outstanding)))
 
 (def revenue-tags
   (:data (concepts/get-concept-id :revenue)))
@@ -95,33 +89,42 @@
    (:val (share-obs facts tag-pairs forms))))
 
 (defn- shares-obs-on
-  "Common-share observation on `forms`, else weighted-average, else IFRS."
+  "First `:shares-outstanding` tag, in concept order, with an observation
+  on `forms`. Common shares, then weighted-average, then IFRS."
   [facts forms]
-  (or (share-obs facts common-share-tags forms)
-      (some #(share-obs facts [%] forms) weighted-average-share-tags)
-      (share-obs facts ifrs-share-tags forms)))
+  (some #(share-obs facts [%] forms) share-tags))
 
-(defn shares-outstanding
-  "Common shares from the most recent 10-Q.
+(defn shares-outstanding-obs
+  "Observation `shares-outstanding` uses.
 
-  The annual report (10-K, 20-F, 40-F) is used when its period-end is
-  later than the 10-Q, or when no 10-Q reports a share count. A 10-Q
-  from an older year does not replace a later annual report. Any other
+  The most recent 10-Q wins, unless an annual report (10-K, 20-F, 40-F)
+  has a later period-end, or no 10-Q reports a share count. Any other
   form is used only when neither a 10-Q nor an annual report has a count.
-
-  dei or us-gaap common shares win over a weighted-average count. IFRS
-  shares outstanding are last. Cover-page public float is a dollar amount,
-  not a share count, so it is not used."
+  The map includes `:form`, `:end`, `:filed`, and `:val`."
   [facts]
   (let [quarterly (shares-obs-on facts quarterly-share-forms)
         annual (shares-obs-on facts annual-share-forms)
         annual-later? (and annual quarterly
                            (pos? (compare (str (:end annual))
                                           (str (:end quarterly)))))]
-    (:val (cond
-            (and quarterly (not annual-later?)) quarterly
-            annual annual
-            :else (shares-obs-on facts nil)))))
+    (cond
+      (and quarterly (not annual-later?)) quarterly
+      annual annual
+      :else (shares-obs-on facts nil))))
+
+(defn shares-outstanding
+  "Shares outstanding from the most recent 10-Q.
+
+  The annual report (10-K, 20-F, 40-F) is used when its period-end is
+  later than the 10-Q, or when no 10-Q reports a share count. A 10-Q
+  from an older year does not replace a later annual report. Any other
+  form is used only when neither a 10-Q nor an annual report has a count.
+
+  Tags follow `:shares-outstanding` priority: common shares, then
+  weighted-average shares, then IFRS. Cover-page public float is a
+  dollar amount, not a share count, so it is not used."
+  [facts]
+  (:val (shares-outstanding-obs facts)))
 
 (defn reporting-standard
   "us-gaap, ifrs-full, and/or ffd (filing-fee disclosure)."
@@ -141,7 +144,7 @@
              :shares-outstanding (shares-outstanding facts)
              :revenue (:val rev)
              :reporting-standard (reporting-standard facts)}
-      (:unit rev) (assoc :revenue-unit (:unit rev))
+      (:unit rev) (assoc :report-currency (:unit rev))
       (:form rev) (assoc :revenue-form (:form rev))
       (:fp rev) (assoc :revenue-fp (:fp rev))
       (contains? facts :ffd) (assoc :note "filing-fee disclosure"))))
@@ -243,15 +246,15 @@
          unlisted (- (count kept) (count listed))
          with-shares (count (filter :shares-outstanding listed))
          with-rev (count (filter :revenue listed))
-         by-unit (frequencies (keep :revenue-unit listed))
+         by-unit (frequencies (keep :report-currency listed))
          by-form (frequencies (keep :revenue-form listed))]
      (save-universe! listed)
      (println)
      (pprint/print-table
-      [:ticker :exchange :cik :entityName :revenue :revenue-unit :revenue-form]
+      [:ticker :exchange :cik :entityName :revenue :report-currency :revenue-form]
       (take 12 listed))
      (println (format "Wrote %s  (%d listed; dropped %d empty/ETF/filing-fee, %d unlisted; shares=%d  revenue=%d)"
                       universe-path (count listed) dropped unlisted with-shares with-rev))
-     (println "revenue-unit" (sort-by val > by-unit))
+     (println "report-currency" (sort-by val > by-unit))
      (println "revenue-form" (sort-by val > by-form))
      listed)))

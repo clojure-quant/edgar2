@@ -18,8 +18,6 @@
                :exec-args {:ticker "XOM" :n 5}}
   :pl-fields {:exec-fn edgar2.filing/pl-fields
               :exec-args {:ticker "XOM"}}
-  :business {:exec-fn edgar2.filing/business
-             :exec-args {:ticker "XOM"}}
   :description {:exec-fn edgar2.description/description
                 :exec-args {:ticker "MSFT"}}
   ; download

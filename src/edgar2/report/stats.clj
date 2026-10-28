@@ -25,7 +25,7 @@
 (defn universe-data
   "Identity / reporting-currency fields from a universe-facts `row`."
   [row]
-  (select-keys row [:ticker :exchange :cik :entityName :revenue-unit]))
+  (select-keys row [:ticker :exchange :cik :entityName :report-currency]))
 
 (defn load-price-by-ticker
   "ticker → close from data/prices.edn."
@@ -47,7 +47,7 @@
   [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
    :change50 :change200 :change400
    :shares :adr-ratio :marketcap :market-cap-adjusted :annual-count
-   :revenue :revenue-unit
+   :revenue :report-currency
    :net-profit
    :earnings-stabilized
    :eps

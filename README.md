@@ -20,7 +20,6 @@ clj -X:download  ; Download the last five XOM 10-Ks (default ticker and year cou
 clj -X:report :ticker AAPL :years 3  ; Print Apple’s last three years of annual income-statement figures
 clj -X:financials :ticker IMPP :n 20 ; Print P&L and main balance-sheet lines (last 20 fiscal years; 10-K, 20-F, or 40-F)
 clj -X:pl-fields :ticker OXY     ; Print last year’s income-statement lines with XBRL tags
-clj -X:business :ticker OXY    ; Print the latest 10-K Item 1 business description
 ```
 
 
@@ -44,10 +43,10 @@ clj -X:universe-facts
 clj -X:universe-facts :force true
 ```
 
-Download the nightly `companyfacts.zip` (progress printed), join listed `:ticker` / `:exchange` from `data/ticker-exchange.edn` by CIK, and write `data/universe-facts.edn` (unlisted CIKs omitted; ETF / ETF Trust / Trust ETF names with no revenue are omitted). Each revenue row keeps `:revenue-unit` (USD, JPY, COP, …), `:revenue-form` (10-K, 20-F, 40-F, 10-Q, …), and `:revenue-fp` (FY, Q1, …) from the same observation as `:revenue`.
+Download the nightly `companyfacts.zip` (progress printed), join listed `:ticker` / `:exchange` from `data/ticker-exchange.edn` by CIK, and write `data/universe-facts.edn` (unlisted CIKs omitted; ETF / ETF Trust / Trust ETF names with no revenue are omitted). Each revenue row keeps `:report-currency` (USD, JPY, COP, …), `:revenue-form` (10-K, 20-F, 40-F, 10-Q, …), and `:revenue-fp` (FY, Q1, …) from the same observation as `:revenue`.
 
 Wrote data/universe-facts.edn  (6227 listed; dropped 3701 empty/ETF/filing-fee, 10467 unlisted; shares=6002  revenue=5528)
-revenue-unit ([USD 5119] [CNY 132] [CAD 82] [EUR 54] [BRL 21] [JPY 19] [GBP 17] [MXN 12] [AUD 9] [KRW 8] [ARS 8] [CHF 8] [TWD 6] [ZAR 5] [ILS 5] [CLP 4] [HKD 3] [PEN 3] [SGD 2] [TRY 2] [COP 2] [INR 2] [MYR 1] [PHP 1] [KZT 1] [SEK 1] [DKK 1])
+report-currency ([USD 5119] [CNY 132] [CAD 82] [EUR 54] [BRL 21] [JPY 19] [GBP 17] [MXN 12] [AUD 9] [KRW 8] [ARS 8] [CHF 8] [TWD 6] [ZAR 5] [ILS 5] [CLP 4] [HKD 3] [PEN 3] [SGD 2] [TRY 2] [COP 2] [INR 2] [MYR 1] [PHP 1] [KZT 1] [SEK 1] [DKK 1])
 revenue-form ([10-Q 3947] [20-F 824] [10-K 376] [6-K 111] [40-F 105] [20-F/A 32] [10-Q/A 28] [S-1 18] [10-K/A 15] [S-1/A 13] [F-1/A 13] [POS AM 9] [6-K/A 9] [40-F/A 5] [S-4/A 5] [F-1 5] [S-4 4] [F-4/A 2] [8-K 2] [10-KT 2] [F-3 1] [S-11 1] [DEF 14A 1])
 
 

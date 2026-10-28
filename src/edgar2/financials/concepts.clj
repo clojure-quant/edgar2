@@ -82,10 +82,10 @@
 
    {:id :eps
     :label "Earnings Per Share"
-    :data [[:us-gaap :EarningsPerShareDiluted]
-           [:us-gaap :EarningsPerShareBasic]
-           [:ifrs-full :DilutedEarningsLossPerShare]
+    :data [[:us-gaap :EarningsPerShareBasic]
+           [:us-gaap :EarningsPerShareDiluted] 
            [:ifrs-full :BasicEarningsLossPerShare]
+           [:ifrs-full :DilutedEarningsLossPerShare]
            [:ifrs-full :BasicAndDilutedEarningsLossPerShare]]}
 
    {:id :income-tax
@@ -161,20 +161,15 @@
            [:ifrs-full :Borrowings]
            ]}
 
-   {:id :common-shares-outstanding
-    :label "Common Shares Outstanding"
+   {:id :shares-outstanding
+    :label "Shares Outstanding"
     :data [[:dei :EntityCommonStockSharesOutstanding]
-           [:us-gaap :CommonStockSharesOutstanding]]}
-
-   {:id :ifrs-shares-outstanding
-    :label "IFRS Shares Outstanding"
-    :data [[:ifrs-full :NumberOfSharesOutstanding]]}
-
-   {:id :weighted-average-shares
-    :label "Weighted Average Shares"
-    :data [[:us-gaap :WeightedAverageNumberOfSharesOutstandingBasic]
+           [:us-gaap :CommonStockSharesOutstanding]
+           [:us-gaap :WeightedAverageNumberOfSharesOutstandingBasic]
            [:us-gaap :WeightedAverageNumberOfSharesOutstandingBasicAndDiluted]
-           [:us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding]]}
+           [:us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding]
+           [:ifrs-full :WeightedAverageShares]
+           [:ifrs-full :NumberOfSharesOutstanding]]}
 
    {:id :depreciation
     :label "Depreciation"
