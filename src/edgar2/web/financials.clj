@@ -3,6 +3,7 @@
             [hyper.core :as h]
             [hyper.effects :as effects]
             [edgar2.filing :as filing]
+            [edgar2.financials.facts-ui :as facts-ui]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats-category :as stats-cat]
             [edgar2.web.fsds :as fsds]
@@ -44,33 +45,6 @@
        (when (and code desc) " ")
        desc])))
 
-(def result-fields
-  "Subtotals drawn with a light green row."
-  #{"Gross Profit" "Operating Income" "Net Income"
-    "Dividends Paid" "Stock Repurchase"})
-
-(def asset-fields
-  "Cash and equivalents through total assets."
-  #{"Cash and Equivalents"
-    "Accounts Receivable"
-    "Inventory"
-    "Current Assets"
-    "PP&E Net"
-    "Total Assets"})
-
-(def passive-fields
-  "Accounts payable through total liabilities and equity."
-  #{"Accounts Payable"
-    "Current Debt"
-    "Current Portion of Long-Term Debt"
-    "Short-Term Borrowings"
-    "Current Liabilities"
-    "Long-Term Debt"
-    "Total Liabilities"
-    "Stockholders Equity"
-    "Total Equity"
-    "Total Liabilities and Equity"})
-
 (def sum-line
   "Last addend → the total drawn under the double rule.
   Gross profit closes revenue minus cost of revenue. Operating expenses
@@ -79,15 +53,17 @@
    "Depreciation" "Operating Expenses"})
 
 (defn- row-class
-  [field rule? below?]
-  (cond
-    rule? "fin-above-rule"
-    (and (= field "Gross Profit") below?) "fin-result fin-gross"
-    (= field "Gross Profit") "fin-result"
-    (and below? (= field "Operating Expenses")) "fin-below-rule"
-    (result-fields field) "fin-result"
-    (asset-fields field) "fin-asset"
-    (passive-fields field) "fin-passive"))
+  "Background from the field `:format`, plus the double-rule borders."
+  [field format rule? below?]
+  (let [classes (cond-> []
+                  rule? (conj "fin-above-rule")
+                  (and below? (= field "Gross Profit")) (conj "fin-gross")
+                  (and below? (= field "Operating Expenses")) (conj "fin-below-rule")
+                  (= format :background-pl-green) (conj "fin-result")
+                  (= format :background-balance-active) (conj "fin-asset")
+                  (= format :background-balance-passive) (conj "fin-passive"))]
+    (when (seq classes)
+      (str/join " " classes))))
 
 (def stats-by-ticker
   "ticker → row from data/stats.edn. Empty when that file is missing."
@@ -155,11 +131,13 @@
               prev-field (:field (nth rows (dec i) nil))
               next-field (:field (nth rows (inc i) nil))
               ;; Two rules between the last addend and its total.
-              rule? (= (get sum-line field) next-field)
+              ;; No next row makes both sides nil, which must not draw a rule.
+              rule? (and (some? next-field)
+                         (= (get sum-line field) next-field))
               below? (= (get sum-line prev-field) field)
               class (if (#{"year-end" "filing-date"} field)
                       "fin-year-end"
-                      (row-class field rule? below?))]
+                      (row-class field (:format row) rule? below?))]
           (cond-> [[:tr (cond-> {:key i}
                           class (assoc :class class))
                     (for [col columns]
@@ -178,37 +156,57 @@
   [req]
   (filing/parse-period (get-in req [:hyper/route :path-params :period])))
 
+(defn- view-param
+  "Path segment wins. `?view=` still works on a full page load."
+  [req]
+  (let [p (get-in req [:hyper/route :path-params])
+        q (get-in req [:hyper/route :query-params])]
+    (facts-ui/parse-view (or (:view p) (get p "view")
+                             (:view q) (get q "view")))))
+
 (defn- go-financials!
-  "Open financials for the tab's ticker, count, and period. The path includes
-  the count and period so a new choice remounts the page and refetches.
-  Annual omits the period segment. `:n` is years when annual and quarters
-  when quarterly. The ticker stays in tab state."
-  [n period]
+  "Open financials for the tab's ticker, count, period, and field view.
+
+  Count, period, and view are path segments so a new choice remounts the
+  page and refetches. Hyper does not remount on a query-param change.
+  Annual with the current field list omits the period and view segments.
+  `:n` is years when annual and quarters when quarterly. The ticker stays
+  in the query."
+  [n period view]
   (let [ticker (ticker/current)
         n (parse-n n)
         period (name (filing/parse-period period))
+        view (facts-ui/parse-view view)
         q (when ticker {:ticker ticker})]
     (when (and ticker n)
-      (if (= period "quarterly")
+      (cond
+        (not= view :current)
+        (effects/navigate! :company-financials-view
+                           {:n (str n)
+                            :period period
+                            :view (name view)}
+                           q)
+        (= period "quarterly")
         (effects/navigate! :company-financials-period
                            {:n (str n)
                             :period "quarterly"}
                            q)
+        :else
         (effects/navigate! :company-financials-n
                            {:n (str n)}
                            q)))))
 
 (defn- period-form
-  [n period]
+  [n period view]
   [:form.ticker-form
    {:data-on:submit__prevent
     (h/action
-     (go-financials! (:n $form-data) (:period $form-data)))}
+     (go-financials! (:n $form-data) (:period $form-data) (:view $form-data)))}
    [:label "n "
     [:select {:name "n"
               :data-on:change
               (h/action
-               (go-financials! (:n $form-data) (:period $form-data)))}
+               (go-financials! (:n $form-data) (:period $form-data) (:view $form-data)))}
      (for [choice n-choices]
        [:option (cond-> {:key choice :value (str choice)}
                   (= choice n) (assoc :selected true))
@@ -217,17 +215,27 @@
     [:select {:name "period"
               :data-on:change
               (h/action
-               (go-financials! (:n $form-data) (:period $form-data)))}
+               (go-financials! (:n $form-data) (:period $form-data) (:view $form-data)))}
      (for [[value label] period-choices]
        [:option (cond-> {:key value :value value}
                   (= value (name period)) (assoc :selected true))
+        label])]]
+   [:label "Fields "
+    [:select {:name "view"
+              :data-on:change
+              (h/action
+               (go-financials! (:n $form-data) (:period $form-data) (:view $form-data)))}
+     (for [[value label] facts-ui/view-choices]
+       [:option (cond-> {:key value :value (name value)}
+                  (= value view) (assoc :selected true))
         label])]]
    [:button {:type "submit"} "Show"]])
 
 (defn financials-page
   [req]
   (let [n (n-param req)
-        period (period-param req)]
+        period (period-param req)
+        view (view-param req)]
     (h/view
       {:mount (fn []
                 (ticker/seed! req)
@@ -235,14 +243,18 @@
                   (fn [t]
                     (filing/financials-data {:ticker t
                                              :n n
-                                             :period period}))))
+                                             :period period
+                                             :view view
+                                             :inline-xbrl? true}))))
        :render (fn [{:keys [result*]} req]
                  (let [{:keys [status data message ticker]} @result*]
                    [:div.page
                     (nav req)
-                    (period-form n period)
+                    (period-form n period view)
                     (case status
-                      :loading [:p (str "Loading " ticker " (n=" n ", " (name period) ")…")]
+                      :loading [:p (str "Loading " ticker " (n=" n ", "
+                                        (name period) ", "
+                                        (facts-ui/view-label view) ")…")]
                       :error [:p.error message]
                       :ready [:div
                               [:p.fin-header

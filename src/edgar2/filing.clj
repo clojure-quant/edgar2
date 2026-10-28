@@ -4,6 +4,8 @@
             [edgar.download :as dl]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.derived :as derived]
+            [edgar2.financials.facts-ds :as facts-ds]
+            [edgar2.financials.facts-ui :as facts-ui]
             [edgar2.financials.ixbrl :as ixbrl]
             [clojure.pprint :as pprint]
             [tech.v3.dataset :as ds])
@@ -508,47 +510,12 @@
        ds))))
 
 (def pl-column-order
-  ["Total Revenue"
-   "Revenue"
-   "Cost of Revenue"
-   "Gross Profit"
-   "SG&A Expense"
-   "Selling and Marketing Expense"
-   "General and Administrative Expense"
-   "R&D Expense"
-   "Depreciation"
-   "Operating Expenses"
-   "Operating Income"
-   "Interest Expense"
-   "Non-Operating Income"
-   "Pre-Tax Income"
-   "Income Tax Expense"
-   "Net Income"
-   "EPS Basic"
-   "EPS Diluted"
-   "Shares Basic"
-   "Shares Diluted"
-   "Dividends Paid"
-   "Stock Repurchase"])
+  "Income-statement row order. Defined in facts-ui."
+  facts-ui/pl-column-order)
 
 (def bs-column-order
-  "Main balance-sheet lines only."
-  ["Cash and Equivalents"
-   "Accounts Receivable"
-   "Inventory"
-   "Current Assets"
-   "PP&E Net"
-   "Total Assets"
-   "Accounts Payable"
-   "Current Debt"
-   "Current Portion of Long-Term Debt"
-   "Short-Term Borrowings"
-   "Current Liabilities"
-   "Long-Term Debt"
-   "Total Liabilities"
-   "Stockholders Equity"
-   "Total Equity"
-   "Total Liabilities and Equity"])
+  "Main balance-sheet lines only. Defined in facts-ui."
+  facts-ui/bs-column-order)
 
 (defn pl-scale
   "USD and share counts → millions. EPS stays in dollars."
@@ -974,51 +941,153 @@
     by-pl
     (merge by-pl (class-weighted-shares cik form))))
 
+(defn- with-pending-ixbrl
+  "Companyfacts plus 6-K inline XBRL that companyfacts has not ingested.
+  A failure leaves the companyfacts dataset unchanged."
+  [dss cik]
+  (try
+    (let [extra (pending-6k-facts cik (ds/rows dss {:nil-missing? true}))]
+      (if (seq extra)
+        (ds/->dataset (concat (ds/rows dss {:nil-missing? true}) extra)
+                      {:dataset-name "facts-with-ixbrl"})
+        dss))
+    (catch Exception _
+      dss)))
+
+(defn- quarterly-form-label
+  [facts]
+  (try
+    (interim-form-label (ds/rows (facts-ds/quarterly-periods facts) {:nil-missing? true}))
+    (catch Exception _
+      "10-Q")))
+
+(defn- display-num
+  "USD and share counts → millions. Per-share amounts stay in dollars."
+  [label val]
+  (when (number? val)
+    (if (re-find #"(?i)eps|per\s*share" (str label))
+      (double val)
+      (long (/ (double val) 1.0e6)))))
+
+(defn- shares-missing?
+  [lines]
+  (let [share-lines (filter #(#{"Shares Basic" "Shares Diluted"} (:label %)) lines)]
+    (not-any? #(some number? (:vals %)) share-lines)))
+
+(defn- merge-share-lines
+  "Fill Shares Basic / Shares Diluted from `shares` ({label {end val}}).
+  Inserts a missing line ahead of the balance sheet."
+  [lines periods shares]
+  (if-not (seq shares)
+    lines
+    (let [ends (mapv #(str (:end %)) periods)
+          lines (mapv (fn [line]
+                        (if-let [by-end (get shares (:label line))]
+                          (assoc line :vals
+                                 (mapv (fn [end v]
+                                         (if (number? v) v (get by-end end)))
+                                       ends
+                                       (:vals line)))
+                          line))
+                      lines)
+          have (set (map :label lines))
+          extra (mapv (fn [[label by-end]]
+                        {:label label
+                         :section :income
+                         :vals (mapv #(get by-end %) ends)})
+                      (remove #(have (key %)) shares))
+          idx (or (first (keep-indexed
+                          (fn [i line]
+                            (when (= :balance (:section line)) i))
+                          lines))
+                  (count lines))]
+      (vec (concat (take idx lines) extra (drop idx lines))))))
+
+(defn- align-vals
+  "Oldest-first slice of a newest-first value vector."
+  [vals n]
+  (vec (reverse (take n vals))))
+
+(defn- table-from-lines
+  "Year-end, filing date, then statement lines. Columns are the `n` newest
+  periods, oldest first. A blank row separates the balance sheet."
+  [lines periods n period fye filing-dates]
+  (let [shown (vec (reverse (take n periods)))
+        ends (mapv #(str (:end %)) shown)
+        labels (column-labels ends period (fye-month fye))
+        columns (into [:field] labels)
+        year-end (into {:field "year-end"}
+                       (map (fn [end label] [label (str end)]) ends labels))
+        filing-date (into {:field "filing-date"}
+                          (map (fn [end label]
+                                 [label (get filing-dates (str end))])
+                               ends labels))
+        blank (into {:field ""} (map (fn [label] [label nil]) labels))
+        body (:rows
+              (reduce (fn [{:keys [rows saw? blanked?]} line]
+                        (let [vs (align-vals (:vals line) n)]
+                          (if-not (some number? vs)
+                            {:rows rows :saw? saw? :blanked? blanked?}
+                            (let [need-blank? (and saw?
+                                                   (not blanked?)
+                                                   (= :balance (:section line)))
+                                  row (cond-> (into {:field (:label line)}
+                                                    (map (fn [label v]
+                                                           [label (display-num (:label line) v)])
+                                                         labels vs))
+                                        (:format line) (assoc :format (:format line)))]
+                              {:rows (cond-> rows
+                                       need-blank? (conj blank)
+                                       true (conj row))
+                               :saw? true
+                               :blanked? (or blanked? need-blank?)}))))
+                      {:rows [] :saw? false :blanked? false}
+                      lines))]
+    {:columns columns
+     :rows (vec (concat [year-end filing-date] body))}))
+
 (defn financials-data
-  "Standardized P&L and main balance-sheet lines.
+  "P&L and balance-sheet lines from `facts-ds`.
 
   `:n` is how many columns to keep: fiscal years when annual, quarters
   when quarterly. `:period` is annual (default) or quarterly.
+  `:view` is `:current` (default), `:all`, `:insurance`, `:bank`, or `:reit`.
+  `:inline-xbrl?` true appends 6-K inline XBRL that companyfacts lacks,
+  and fills dual-class share counts from the annual filing. stats.edn
+  does not set it.
 
-  Returns `{:ticker :name :cik :form :period :columns :rows}`."
+  Returns `{:ticker :name :cik :form :period :view :columns :rows}`."
   [m]
-  (let [{:keys [ticker n period]} (opts m)]
+  (let [{:keys [ticker n period]} (opts m)
+        view (facts-ui/parse-view (:view m))
+        inline? (boolean (:inline-xbrl? m))]
     (ensure-identity!)
     (let [cik (resolve-filer ticker)
           meta (e/company-metadata cik)
           form (annual-form cik)
           fye (:fiscal-year-end meta)
           quarterly? (= period :quarterly)
-          source (if quarterly?
-                   (quarterly-statements cik fye form)
-                   (let [annual (annual-statement-rows cik fye form)
-                         bs (annual-balance-rows cik fye form)
-                         cash (annual-cashflow-rows cik fye form cashflow-extra-concepts)
-                         items (vec (distinct (map :line-item annual)))]
-                     {:income-values (into {} (for [item items]
-                                                [item (annual-line-values annual item)]))
-                      :balance-values (into {} (for [item (distinct (map :line-item bs))]
-                                                 [item (annual-line-values bs item)]))
-                      :dividends (annual-line-values cash dividends-paid-label)
-                      :repurchases (annual-line-values cash stock-repurchase-label)}))
-          by-pl* (cond-> (:income-values source)
-                   (not quarterly?) (with-class-shares cik form))
-          by-bs (:balance-values source)
-          ends (period-ends (get by-pl* "Revenue")
-                            (get by-bs "Total Assets")
-                            n)
-          labels (column-labels ends period (fye-month fye))
-          ;; Quarterly columns include Q4 from the annual report.
-          ;; Interim dates come from 10-Q or 6-K; the year-end column from `form`.
+          facts (cond-> (e/facts cik)
+                  inline? (with-pending-ixbrl cik))
+          industry (income-industry (:sic meta))
+          {:keys [periods lines]} (facts-ui/statement facts
+                                                      (if quarterly? :q :y)
+                                                      view
+                                                      industry)
+          shares (when (and inline?
+                            (not= view :all)
+                            (shares-missing? lines))
+                   (class-weighted-shares cik form))
+          lines (merge-share-lines lines periods shares)
           filing-forms (if quarterly? (conj interim-forms form) [form])
           filing-dates (filing-dates-by-end cik filing-forms)
-          table (statement-rows by-pl* by-bs (:dividends source) (:repurchases source)
-                                ends labels filing-dates)]
+          table (table-from-lines lines periods n period fye filing-dates)]
       (merge {:ticker ticker
               :name (:name meta)
               :cik cik
-              :form (if quarterly? (:form source) form)
-              :period period}
+              :form (if quarterly? (quarterly-form-label facts) form)
+              :period period
+              :view view}
              table))))
 
 (defn financials

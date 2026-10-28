@@ -105,6 +105,24 @@
     (is (every? #(= "Q4" (str (:fp %))) ends-2024-q4))
     (is (empty? bad-q3-as-q4))))
 
+(deftest select-data-nil-fields-keeps-every-concept
+  "Nil fields is no concept filter. A supplied list still drops the others."
+  (let [dss (load-facts "AAPL")
+        concepts (fn [fields]
+                   (set (map #(str (:concept %))
+                             (ds/rows (facts-ds/select-data dss :y fields)
+                                      {:nil-missing? true}))))
+        all (concepts nil)
+        limited (concepts demo-fields)
+        table (facts-ds/report-table dss :y nil)]
+    (is (contains? all "NetIncomeLoss"))
+    (is (not (contains? limited "NetIncomeLoss")))
+    (is (set/subset? limited all))
+    (is (> (count all) (count limited)))
+    (is (contains? (set (map name (ds/column-names table))) "NetIncomeLoss"))
+    (is (= (ds/row-count (facts-ds/annual-periods dss))
+           (ds/row-count table)))))
+
 (deftest report-table-sparse-cost-columns-abt
   "Abbott: CostOfGoodsSold has early annual values then stops; later years
   only carry CostOfGoodsAndServicesSold. report-table keeps both columns

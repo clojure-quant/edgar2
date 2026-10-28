@@ -75,10 +75,14 @@
             scaled (.movePointRight ^BigDecimal v (long (or scale 0)))]
         (double scaled)))))
 
-(defn- local-name
+(defn- split-qname
+  "Taxonomy prefix and local name from an inline XBRL `name`."
   [qname]
-  (let [s (str qname)]
-    (subs s (inc (or (str/last-index-of s ":") -1)))))
+  (let [s (str qname)
+        i (str/last-index-of s ":")]
+    (if (and i (pos? i))
+      [(subs s 0 i) (subs s (inc i))]
+      [nil s])))
 
 (defn fact-seq
   "Undimensioned ix:nonFraction facts whose context id is in `contexts`."
@@ -86,13 +90,14 @@
   (keep (fn [[_ attrs text]]
           (let [cref (ix-attr attrs "contextRef")
                 ctx (get contexts cref)
-                concept (local-name (ix-attr attrs "name"))
+                [taxonomy concept] (split-qname (ix-attr attrs "name"))
                 scale (try (parse-long (or (ix-attr attrs "scale") "0"))
                            (catch Exception _ nil))
-                val (when (and ctx scale concept)
+                val (when (and ctx scale (not (str/blank? concept)))
                       (ix-number text scale (ix-attr attrs "sign")))]
             (when val
-              {:concept concept
+              {:taxonomy taxonomy
+               :concept concept
                :start (:start ctx)
                :end (:end ctx)
                :unit (some-> (ix-attr attrs "unitRef") str/upper-case)
@@ -158,7 +163,7 @@
 (defn filing-facts
   "Undimensioned facts from a 6-K's inline XBRL.
 
-  Each map is {:concept :start :end :unit :val :accn :form :filed}.
+  Each map is {:taxonomy :concept :start :end :unit :val :accn :form :filed}.
   A later _d2 exhibit replaces the same fact from the cover."
   [filing]
   (let [names (or (seq (cached-html-names filing))

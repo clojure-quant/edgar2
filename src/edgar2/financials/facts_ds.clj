@@ -289,6 +289,7 @@
   `fields` is a seq of `[taxonomy concept]` pairs, e.g.
   `[[:dei :EntityCommonStockSharesOutstanding]
     [:us-gaap :CostOfRevenue]]`.
+  Nil `fields` keeps every concept that attaches to one of those periods.
 
   Returns a long-format dataset with period columns `:filed :period :end`,
   plus `:taxonomy :concept :unit :val` (and `:label` when present). Instant
@@ -305,13 +306,14 @@
         by-accn (group-by #(str (:accn %)) period-rows)
         own-ends (when (= q-or-y :y)
                    (own-end-by-accn (annual-window-rows dss)))
-        wanted (set (map field-pair fields))
+        wanted (when (some? fields) (set (map field-pair fields)))
         out-cols (into report-period-cols [:taxonomy :concept :label :unit :val])
         rows (->> (ds/rows dss {:nil-missing? true})
                   (keep (fn [fact]
-                          (when (contains? wanted
-                                           [(str (:taxonomy fact))
-                                            (str (:concept fact))])
+                          (when (or (nil? wanted)
+                                    (contains? wanted
+                                               [(str (:taxonomy fact))
+                                                (str (:concept fact))]))
                             (when-let [period (matching-period fact by-accn-end by-end by-accn own-ends)]
                               (-> fact
                                   (merge (select-keys period report-period-cols))
@@ -326,7 +328,7 @@
 
 (defn- field-rank
   [fields]
-  (into {} (map-indexed (fn [i pair] [(field-pair pair) i]) fields)))
+  (into {} (map-indexed (fn [i pair] [(field-pair pair) i]) (or fields []))))
 
 (defn- better-fact?
   "Prefer a later `:filed`, then earlier `fields` order."
@@ -368,7 +370,8 @@
   "Wide report for `fields` over annual (`:y`) or quarterly (`:q`) periods.
 
   `select-data`, then pivot to one row per period (newest `:end` first) with
-  period columns `:filed :period :end` and one column per concept."
+  period columns `:filed :period :end` and one column per concept.
+  Nil `fields` keeps every concept; later `:filed` breaks ties."
   [dss q-or-y fields]
   (pivot-keeping-periods (select-data dss q-or-y fields) fields))
 

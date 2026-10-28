@@ -7,6 +7,7 @@
   #{:company-financials
     :company-financials-n
     :company-financials-period
+    :company-financials-view
     :company-google
     :company-filings
     :company-annual
@@ -19,7 +20,8 @@
   "Second row, shown only on company pages. The value is the route names
   that count as that item."
   [["financials" :company-financials
-    #{:company-financials :company-financials-n :company-financials-period}]
+    #{:company-financials :company-financials-n :company-financials-period
+      :company-financials-view}]
    ["google-finance" :company-google #{:company-google}]
    ["filings" :company-filings #{:company-filings}]
    ["current-annual" :company-annual #{:company-annual}]
@@ -64,7 +66,8 @@
         ;; when that item is already showing.
         link (cond
                (and (= route-name :company-financials)
-                    (#{:company-financials-n :company-financials-period} here))
+                    (#{:company-financials-n :company-financials-period
+                       :company-financials-view} here))
                (h/navigate here (get-in req [:hyper/route :path-params]) q)
 
                (and (= route-name :company-chart-nearby)

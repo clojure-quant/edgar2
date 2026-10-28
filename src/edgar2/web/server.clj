@@ -77,6 +77,9 @@
    ["/company/financials/:n/:period" {:name :company-financials-period
                                       :title "Financials"
                                       :get #'financials-page}]
+   ["/company/financials/:n/:period/:view" {:name :company-financials-view
+                                            :title "Financials"
+                                            :get #'financials-page}]
    ["/company/google-finance" {:name :company-google
                                :title "Google Finance"
                                :get #'google-page}]
