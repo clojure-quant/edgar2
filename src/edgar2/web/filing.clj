@@ -96,13 +96,57 @@
     (str (subs html 0 idx) ix-highlight-snippet (subs html idx))
     (str ix-highlight-snippet html)))
 
+(defn- html-escape
+  [s]
+  (-> (str s)
+      (str/replace "&" "&amp;")
+      (str/replace "<" "&lt;")
+      (str/replace ">" "&gt;")
+      (str/replace "\"" "&quot;")))
+
+(defn- index-href
+  "Index URL for a cached file at …/{cik}/{accession}/{doc}."
+  [file]
+  (let [accession (.getParentFile file)
+        cik (when accession (.getParentFile accession))
+        cik-name (some-> cik .getName not-empty)
+        acc-name (some-> accession .getName not-empty)]
+    (when (and cik-name acc-name)
+      (str "/filing/" cik-name "/" acc-name "/index"))))
+
+(defn- index-link-snippet
+  [href]
+  (str "<a id=\"edgar2-index\" href=\"" (html-escape href) "\" "
+       "style=\"position:fixed;top:8px;left:8px;z-index:2147483647;"
+       "background:#111;color:#fff;padding:4px 8px;"
+       "font:12px/1.3 sans-serif;text-decoration:none\">"
+       "Filing index</a>"))
+
+(defn- inject-index-link
+  "Insert the index link just after the opening body tag.
+  An absolute href stays on this server when the filing sets a base URL."
+  [html href]
+  (let [snippet (index-link-snippet href)
+        replaced (str/replace-first html #"(?i)<body\b[^>]*>"
+                                    #(str % snippet))]
+    (if (= replaced html)
+      (str snippet html)
+      replaced)))
+
+(defn- inject-filing-chrome
+  [html file]
+  (let [html (inject-ix-highlight html)]
+    (if-let [href (index-href file)]
+      (inject-index-link html href)
+      html)))
+
 (defn- file-response
   [file]
   (cond
     (html-file? file)
     {:status 200
      :headers {"Content-Type" "text/html; charset=utf-8"}
-     :body (inject-ix-highlight (slurp file :encoding "UTF-8"))}
+     :body (inject-filing-chrome (slurp file :encoding "UTF-8") file)}
 
     (pdf-file? file)
     {:status 200
@@ -462,18 +506,81 @@
   [cik accession filename]
   (str "/filing/" (or (padded-cik cik) cik) "/" accession "/" filename))
 
+(defn- index-row
+  [cik accession {:keys [sequence description name type size]}]
+  (let [href (when (safe-doc-name name)
+               (filing-url cik accession name))
+        label (html-escape name)]
+    (str "<tr><td>" (html-escape sequence) "</td>"
+         "<td>" (html-escape description) "</td>"
+         "<td>" (html-escape type) "</td>"
+         "<td>" (html-escape size) "</td>"
+         "<td>" (if href
+                  (str "<a href=\"" (html-escape href) "\">" label "</a>")
+                  label)
+         "</td></tr>")))
+
+(defn- index-page-html
+  [cik accession filing idx]
+  (str "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>"
+       "<title>" (html-escape (or (:form filing) "Filing"))
+       " " (html-escape accession) "</title>"
+       "<style>"
+       "body{font:14px/1.4 sans-serif;margin:24px}"
+       "table{border-collapse:collapse}"
+       "td,th{border:1px solid #ccc;padding:4px 8px;text-align:left}"
+       "th{background:#f4f4f4}"
+       "</style></head><body>"
+       "<h1>" (html-escape (or (:formType idx) (:form filing) "Filing"))
+       " " (html-escape (or (:filingDate idx) "")) "</h1>"
+       "<p>" (html-escape accession) "</p>"
+       "<table><thead><tr>"
+       "<th>Seq</th><th>Description</th><th>Type</th><th>Size</th><th>Document</th>"
+       "</tr></thead><tbody>"
+       (str/join (map #(index-row cik accession %) (:files idx)))
+       "</tbody></table></body></html>"))
+
+(defn filing-index-page
+  "Hyper handler. Lists every document on the SEC filing index.
+  Each filename links to the document route, including the XBRL instance."
+  [req]
+  (let [cik (get-in req [:hyper/route :path-params :cik])
+        accession (some-> (get-in req [:hyper/route :path-params :accession])
+                          str str/trim not-empty)]
+    (try
+      (filing/ensure-identity!)
+      (if-let [f (and accession (load-filing cik accession))]
+        {:status 200
+         :headers {"Content-Type" "text/html; charset=utf-8"}
+         :body (index-page-html cik accession f (ef/filing-index f))}
+        (text-response 404 (str "No filing for " accession)))
+      (catch clojure.lang.ExceptionInfo e
+        (if (= :edgar.filing/not-found (:type (ex-data e)))
+          (text-response 404 (or (ex-message e) "Filing not found"))
+          (text-response 502 (or (ex-message e) (str e)))))
+      (catch Throwable e
+        (text-response 502 (or (ex-message e) (str e)))))))
+
 (defn raw-filing-page
   "Hyper handler. Returns one filing document as a raw response.
   A request with no filename redirects to the primary document so relative
   image links in the HTML resolve next to it.
+  The document name \"index\" is the filing index page.
   Paper stubs redirect to scanned.pdf when EDGAR lists a scan."
   [req]
   (let [cik (get-in req [:hyper/route :path-params :cik])
         accession (some-> (get-in req [:hyper/route :path-params :accession])
                           str str/trim not-empty)
-        doc (safe-doc-name (get-in req [:hyper/route :path-params :doc]))]
+        doc-name (some-> (get-in req [:hyper/route :path-params :doc])
+                         str str/trim not-empty)
+        doc (safe-doc-name doc-name)]
     (try
       (cond
+        ;; A literal /index route conflicts with :doc in reitit. No SEC
+        ;; document is named "index"; the archives index is {accession}-index.html.
+        (and accession (= "index" doc-name))
+        (filing-index-page req)
+
         (and accession doc)
         (if-let [file (filing-doc-file cik accession doc)]
           (if (not= (str/lower-case doc) (str/lower-case (.getName file)))

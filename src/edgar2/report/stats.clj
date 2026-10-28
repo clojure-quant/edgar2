@@ -5,6 +5,7 @@
             [clojure.string :as str]
             [edgar.xbrl :as xbrl]
             [jsonista.core :as json]
+            [tech.v3.dataset :as ds]
             [edgar.api :as e]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
@@ -13,7 +14,8 @@
             [edgar2.db.sic :as db-sic]
             [edgar2.db.universe :as db-universe]
             [edgar2.financials.calc.annual :as annual]
-            [edgar2.financials.calc.valuation :as valuation])
+            [edgar2.financials.calc.valuation :as valuation]
+            [edgar2.financials.facts-ds-converter :as facts-nippy])
   (:import [java.util.zip ZipFile]))
 
 (def stats-path "data/stats.edn")
@@ -119,11 +121,12 @@
   Runs `annual/calculate-annual` (when `dss` is present), market valuation
   (including ADR ratio), SIC enrichment, and the cached price changes
   for the ticker. Looks up the universe row by `cik` unless `:row` is
-  passed. Optional opts for the batch path: `:row`, `:prices`, `:sic-db`,
-  `:shares`, `:data` (raw companyfacts map for shares-outstanding)."
+  passed.   Optional opts for the batch path: `:row`, `:prices`, `:sic-db`,
+  `:shares`, `:data` (raw companyfacts map for shares-outstanding).
+  When `:annual-map` is passed, it is used instead of `calculate-annual`."
   ([dss cik]
    (stats-one dss cik {}))
-  ([dss cik {:keys [row prices sic-db shares data]}]
+  ([dss cik {:keys [row prices sic-db shares data annual-map] :as opts}]
    (let [row (or row (db-universe/universe-row-by-cik cik) {:cik (str cik)})
          prices (or prices (load-price-by-ticker))
          sic-db (or sic-db (db-sic/load-sic-index))
@@ -132,7 +135,9 @@
                     (:shares-outstanding row))
          changes (db-price-change/get-change (:ticker row))]
      (try
-       (let [annual-map (if dss (annual/calculate-annual dss) {})
+       (let [annual-map (if (contains? opts :annual-map)
+                          (or annual-map {})
+                          (if dss (annual/calculate-annual dss) {}))
              mc-map (valuation/calculate-marketcap prices shares row)
              valuation-map (valuation/calculate-valuation annual-map (:vmcap mc-map))]
          (merge annual-map
@@ -202,19 +207,26 @@
                       total (count all) zip-path))
      (flush)
      (with-open [zf (ZipFile. (str zip-path))]
+       (let [t-start (System/nanoTime)]
        (loop [i 0
               acc (transient [])
-              rows filers]
+              rows filers
+              json-ns 0
+              dataset-ns 0
+              calc-ns 0]
          (if-let [row (first rows)]
-           (let [data (try (read-cik-json zf (:cik row))
+           (let [t0 (System/nanoTime)
+                 data (try (read-cik-json zf (:cik row))
                            (catch Exception ex
                              (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
                              nil))
+                 t1 (System/nanoTime)
                  dss (when data
                        (try (xbrl/facts->dataset data)
                             (catch Exception ex
                               (println (format "  facts-ds %s (%s)" (:cik row) (.getMessage ex)))
                               nil)))
+                 t2 (System/nanoTime)
                  shares (or (when data
                               (universe/shares-outstanding (:facts data)))
                             (:shares-outstanding row))
@@ -224,6 +236,7 @@
                                 :sic-db sic-db
                                 :shares shares
                                 :data data})
+                 t3 (System/nanoTime)
                  i' (inc i)]
              (when (or (zero? (mod i' 250)) (= i' total))
                (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roce=%s"
@@ -234,8 +247,16 @@
                                 (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
                                 (some-> (:return-on-capital-employed st) (* 100) (#(format "%.1f" %)))))
                (flush))
-             (recur i' (conj! acc st) (next rows)))
-           (let [out (vec (persistent! acc))]
+             (recur i' (conj! acc st) (next rows)
+                    (+ json-ns (- t1 t0))
+                    (+ dataset-ns (- t2 t1))
+                    (+ calc-ns (- t3 t2))))
+           (let [out (vec (persistent! acc))
+                 mins #(/ (double %) 6.0e10)
+                 loop-ns (- (System/nanoTime) t-start)]
+             (println (format "time  json=%.1fm  dataset=%.1fm  calc=%.1fm  loop=%.1fm"
+                              (mins json-ns) (mins dataset-ns) (mins calc-ns) (mins loop-ns)))
+             (flush)
              (save-stats! out)
              (println)
              (pprint/print-table
@@ -273,4 +294,111 @@
                               (count (filter :revenue-score out))
                               (count (filter :operating-income-score out))
                               (count (filter :sic out))))
+             out))))))))
+
+(defn- latest-share
+  "Latest positive share observation on a select-data dataset.
+
+  Walks `:shares-outstanding` tags in priority order and keeps the first
+  tag that has a positive `shares` value."
+  [selected]
+  (when (and selected (pos? (ds/row-count selected)))
+    (let [rows (ds/rows selected {:nil-missing? true})]
+      (some (fn [[_ concept]]
+              (let [n (name concept)]
+                (->> rows
+                     (filter (fn [row]
+                               (and (= n (str (:concept row)))
+                                    (= "shares" (str (:unit row)))
+                                    (number? (:val row))
+                                    (pos? (double (:val row))))))
+                     (sort-by #(str (:end %) "|" (:filed %)))
+                     last)))
+            universe/share-tags))))
+
+(defn- shares-from-reports
+  "Share count from quarterly select-data, unless the annual period-end
+  is later. Nil when neither dataset has a share count."
+  [{:keys [y q]}]
+  (let [qy (latest-share q)
+        ay (latest-share y)]
+    (cond
+      (and qy ay (pos? (compare (str (:end ay)) (str (:end qy))))) (:val ay)
+      qy (:val qy)
+      ay (:val ay))))
+
+(defn- ticker-key
+  [row]
+  (let [t (some-> (:ticker row) str str/trim str/upper-case)]
+    (when (and t (not (str/blank? t)))
+      t)))
+
+(defn stats-nippy
+  "Write data/stats.edn from data/facts.nippy.gz.
+
+  Same calculation as `stats`, reading the frozen annual and quarterly
+  select-data datasets instead of companyfacts.zip. Shares come from
+  those datasets, then the universe row. A ticker missing from the nippy
+  file is still written, without fundamentals.
+
+  Usage: clj -X:stats-nippy"
+  ([] (stats-nippy {}))
+  ([_]
+   (let [t0 (System/nanoTime)
+         facts (facts-nippy/load-facts)
+         load-ns (- (System/nanoTime) t0)
+         all (db-universe/load-universe)
+         prices (load-price-by-ticker)
+         sic-db (db-sic/load-sic-index)
+         filers (vec all)
+         total (count filers)
+         mins #(/ (double %) 6.0e10)]
+     (println (format "stats-nippy  %d universe  %d in %s  load=%.1fm"
+                      total (count facts) facts-nippy/facts-path (mins load-ns)))
+     (flush)
+     (let [t1 (System/nanoTime)]
+       (loop [i 0
+              acc (transient [])
+              rows filers]
+         (if-let [row (first rows)]
+           (let [ticker (ticker-key row)
+                 reports (get facts ticker)
+                 annual-map (when reports
+                              (try (annual/calculate-selected reports)
+                                   (catch Exception ex
+                                     (println (format "  stats-fail %s (%s)"
+                                                      ticker (.getMessage ex)))
+                                     nil)))
+                 shares (or (when reports (shares-from-reports reports))
+                            (:shares-outstanding row))
+                 st (stats-one nil (:cik row)
+                               {:row row
+                                :prices prices
+                                :sic-db sic-db
+                                :shares shares
+                                :annual-map annual-map})
+                 i' (inc i)]
+             (when (or (zero? (mod i' 250)) (= i' total))
+               (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roce=%s"
+                                i' total
+                                (or (:ticker st) ticker)
+                                (fmt-growth (:sales-growth-avg-yoy st))
+                                (some-> (:profit-margin st) (* 100) (#(format "%.1f" %)))
+                                (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
+                                (some-> (:return-on-capital-employed st) (* 100) (#(format "%.1f" %)))))
+               (flush))
+             (recur i' (conj! acc st) (next rows)))
+           (let [out (vec (persistent! acc))
+                 calc-ns (- (System/nanoTime) t1)]
+             (save-stats! out)
+             (println (format "time  load=%.1fm  calc=%.1fm"
+                              (mins load-ns) (mins calc-ns)))
+             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roa=%d  roce=%d)"
+                              stats-path
+                              (count out)
+                              (count (filter :sales-growth-avg-yoy out))
+                              (count (filter :profit-margin out))
+                              (count (filter :return-on-assets out))
+                              (count (filter :return-on-capital-employed out))))
+             (flush)
              out)))))))

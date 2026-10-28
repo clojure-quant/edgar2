@@ -3,6 +3,7 @@
   prefix is the submitter (0001193125 is Donnelley). A 503 on that index
   must not hide a filing the issuer path can serve."
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is]]
             [edgar.core]
             [edgar.filing :as ef]
@@ -124,6 +125,54 @@
                     (index-for "10-K" "a.htm"))]
       (#'web/load-filing "0000320193" "0000320193-23-000106")
       (is (= 1 @calls)))))
+
+(deftest html-filing-links-to-index
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "edgar2-filing-" (System/nanoTime)))
+        file (io/file dir "10-K" aiv-cik aiv-accession "doc.htm")]
+    (.mkdirs (.getParentFile file))
+    (spit file "<html><head></head><body><p>x</p></body></html>")
+    (try
+      (let [body (:body (#'web/file-response file))]
+        (is (str/includes? body (str "/filing/" aiv-cik "/" aiv-accession "/index")))
+        (is (str/includes? body "id=\"edgar2-index\"")))
+      (finally (rm-r dir)))))
+
+(deftest index-page-links-html-and-xml
+  (with-redefs [ef/filing-index
+                (fn [_]
+                  {:formType "10-K"
+                   :filingDate "2012-02-16"
+                   :files [{:sequence "1"
+                            :name "d239844d10k.htm"
+                            :type "10-K"
+                            :description "FORM 10-K"
+                            :size "10"}
+                           {:sequence "2"
+                            :name "mo-20111231.xml"
+                            :type "EX-101.INS"
+                            :description "XBRL INSTANCE DOCUMENT"
+                            :size "20"}
+                           {:sequence "3"
+                            :name "xsl/viewer.xml"
+                            :type "XML"
+                            :description "viewer"
+                            :size "5"}]})]
+    (let [resp (web/filing-index-page
+                {:hyper/route {:path-params {:cik aiv-cik
+                                             :accession aiv-accession}}})
+          body (:body resp)]
+      (is (= 200 (:status resp)))
+      (is (str/includes? body (str "/filing/" aiv-cik "/" aiv-accession "/d239844d10k.htm")))
+      (is (str/includes? body (str "/filing/" aiv-cik "/" aiv-accession "/mo-20111231.xml")))
+      (is (not (re-find #"href=\"[^\"]*xsl/viewer.xml\"" body)))
+      (let [via-doc (web/raw-filing-page
+                     {:hyper/route {:path-params {:cik aiv-cik
+                                                  :accession aiv-accession
+                                                  :doc "index"}}})]
+        (is (= 200 (:status via-doc)))
+        (is (str/includes? (:body via-doc)
+                           (str "/filing/" aiv-cik "/" aiv-accession "/mo-20111231.xml")))))))
 
 (deftest cached-document-skips-sec
   (let [dir (io/file (System/getProperty "java.io.tmpdir")

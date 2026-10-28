@@ -234,16 +234,14 @@
     (vec (ds/column dss k))
     []))
 
-(defn calculate-annual
-  "Fundamentals from an `e/facts`-shaped dataset via `report-table`.
+(defn- calculate-tables
+  "Fundamentals from an annual report-table and the two quarterly tables.
 
   First table row is the current year; trailing rows feed growth and
-  average margins."
-  [dss]
-  (let [table (facts-ds/report-table dss :y annual-fields)
-        rows (table-rows table)
+  average margins. `q-ni` and `q-rev` are quarterly report-tables."
+  [table q-ni q-rev annual-count]
+  (let [rows (table-rows table)
         current (first rows)
-        annual-count (ds/row-count (facts-ds/annual-periods dss))
         concepts (calc-concept/calc-concepts table)
         rev (col-vec concepts :revenue)
         ni (col-vec concepts :net-income)
@@ -274,10 +272,8 @@
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
         earn (regression/earnings-regression
               (take-last sales-growth-window (reverse ni)))
-        ni-qoy (calc-q/net-income-change-q-on-y
-                (facts-ds/report-table dss :q net-income-tags))
-        rev-qoy (calc-q/sales-change-q-on-y
-                 (facts-ds/report-table dss :q revenue-tags))
+        ni-qoy (calc-q/net-income-change-q-on-y q-ni)
+        rev-qoy (calc-q/sales-change-q-on-y q-rev)
         margins (avg-profit-margin ni rev profit-margin-window)
         rev-score (direction-score (chron-nums rev))
         oi-score (direction-score (chron-nums oi))
@@ -321,3 +317,27 @@
       (number? ebit) (assoc :ebit ebit)
       (number? ebitda) (assoc :ebitda ebitda)
       (number? debt2ebitda) (assoc :debt2ebitda debt2ebitda))))
+
+(defn calculate-annual
+  "Fundamentals from an `e/facts`-shaped dataset via `report-table`.
+
+  First table row is the current year; trailing rows feed growth and
+  average margins."
+  [dss]
+  (calculate-tables
+   (facts-ds/report-table dss :y annual-fields)
+   (facts-ds/report-table dss :q net-income-tags)
+   (facts-ds/report-table dss :q revenue-tags)
+   (ds/row-count (facts-ds/annual-periods dss))))
+
+(defn calculate-selected
+  "Fundamentals from nippy `{:y :q}` select-data datasets.
+
+  Same result as `calculate-annual` on the companyfacts those datasets
+  were built from."
+  [{:keys [y q]}]
+  (calculate-tables
+   (facts-ds/report-table-selected y annual-fields)
+   (facts-ds/report-table-selected q net-income-tags)
+   (facts-ds/report-table-selected q revenue-tags)
+   (facts-ds/period-count y)))

@@ -375,6 +375,33 @@
   [dss q-or-y fields]
   (pivot-keeping-periods (select-data dss q-or-y fields) fields))
 
+(defn period-count
+  "Distinct `:period` values on a `select-data` dataset."
+  [selected]
+  (if (or (nil? selected)
+          (zero? (ds/row-count selected))
+          (not (ds/has-column? selected :period)))
+    0
+    (count (distinct (map str (ds/column selected :period))))))
+
+(defn report-table-selected
+  "Wide report from a long `select-data` dataset.
+
+  `fields` keeps those concepts and breaks same-`:filed` ties. Nil `fields`
+  keeps every concept."
+  [selected fields]
+  (let [wanted (when (some? fields) (set (map field-pair fields)))
+        long-ds (cond
+                  (or (nil? selected) (zero? (ds/row-count selected)))
+                  (ds/->dataset [] {:dataset-name "select-data-empty"})
+                  (nil? wanted) selected
+                  :else (ds/filter selected
+                                   (fn [row]
+                                     (contains? wanted
+                                                [(str (:taxonomy row))
+                                                 (str (:concept row))]))))]
+    (pivot-keeping-periods long-ds fields)))
+
 (defn- as-number
   [v]
   (when (number? v)
