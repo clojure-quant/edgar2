@@ -21,12 +21,47 @@
    {:id :registration :label "registration"}
    {:id :other :label "other"}])
 
+(defn- flag-on?
+  "SEC submissions store flags as 1/0. nil when the field is absent."
+  [v]
+  (cond
+    (nil? v) nil
+    (true? v) true
+    (false? v) false
+    (and (number? v) (== 1 (long v))) true
+    (and (number? v) (== 0 (long v))) false
+    :else (let [s (str/lower-case (str v))]
+            (cond
+              (#{"1" "true"} s) true
+              (#{"0" "false"} s) false
+              :else nil))))
+
+(defn quarterly-6k?
+  "True when a 6-K furnishes the quarter's financial statements.
+
+  `isXBRLNumeric` 1 is the statement package (Amer Sports 2026-06-30,
+  accession 0001988894-26-000085). Explicit 0 is a press release or other
+  current item filed the same day. Older submissions omit that flag;
+  inline XBRL is the fallback."
+  [filing]
+  (let [numeric (flag-on? (:isXBRLNumeric filing))]
+    (if (some? numeric)
+      numeric
+      (true? (flag-on? (:isInlineXBRL filing))))))
+
 (defn classify
-  "Category id for an SEC form type. Amendments stay with the form they amend."
-  [form]
-  (let [form (str form)]
+  "Category id for an SEC form type. Amendments stay with the form they amend.
+
+  A filing map is preferred. A bare form string still classifies; a 6-K
+  string alone stays a current report, because the quarterly ones are
+  identified by their XBRL flags."
+  [filing-or-form]
+  (let [filing (if (map? filing-or-form) filing-or-form {:form filing-or-form})
+        form (str (:form filing))]
     (cond
       (str/starts-with? form "10-Q") :quarterly
+      (and (str/starts-with? form "6-K")
+           (quarterly-6k? filing)) :quarterly
       (or (str/starts-with? form "10-K")
           (str/starts-with? form "20-F")
           (str/starts-with? form "40-F")) :annual
@@ -72,7 +107,7 @@
   "Category totals. The first row is every filing. Quarterly reports is
   always present so the default selection has a row."
   [filings]
-  (let [groups (group-by #(classify (:form %)) filings)
+  (let [groups (group-by classify filings)
         row (fn [id label xs]
               (assoc (date-span xs) :id id :label label))]
     (into [(row :all "all filings" filings)]
@@ -86,7 +121,7 @@
   [filings cat]
   (if (= cat :all)
     filings
-    (filter #(= cat (classify (:form %))) filings)))
+    (filter #(= cat (classify %)) filings)))
 
 (defn- by-date-desc
   [filings]

@@ -4,6 +4,7 @@
             [edgar.download :as dl]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.derived :as derived]
+            [edgar2.financials.ixbrl :as ixbrl]
             [clojure.pprint :as pprint]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]
@@ -129,11 +130,13 @@
     (<= 300 days 400)))
 
 (defn window-months
-  "3, 9, or 12 for a duration that is one quarter, nine months, or a year."
+  "3, 6, 9, or 12 for a duration that is one quarter, a half year,
+  nine months, or a year."
   [row]
   (when-let [days (period-days (:start row) (:end row))]
     (cond
       (<= 75 days 115) 3
+      (<= 160 days 200) 6
       (<= 250 days 290) 9
       (<= 300 days 400) 12)))
 
@@ -284,12 +287,45 @@
   [line-item]
   (boolean (re-find #"(?i)eps|per share|shares" (str line-item))))
 
+(defn- ytd-quarter-rows
+  "Single-quarter amounts from 6- and 9-month windows that have no :val-q.
+
+  edgarjure fills :val-q for 10-Q only. A 6-K year-to-date row minus the
+  window one quarter shorter (same :start) is the quarter at the longer
+  row's :end. A row that already carries :val-q stays on that path."
+  [flow line-item]
+  (let [tagged (keep (fn [r]
+                       (when-let [m (window-months r)]
+                         (assoc r ::months m)))
+                     flow)
+        by-key (reduce (fn [m r]
+                         (let [k [(str (:start r)) (::months r)]
+                               cur (get m k)]
+                           (if (or (nil? cur)
+                                   (pos? (compare (str (:filed r)) (str (:filed cur)))))
+                             (assoc m k r)
+                             m)))
+                       {}
+                       tagged)]
+    (keep (fn [r]
+            (when (and (not (number? (:val-q r)))
+                       (#{6 9} (::months r))
+                       (number? (:val r)))
+              (when-let [prior (get by-key [(str (:start r)) (- (::months r) 3)])]
+                (when (number? (:val prior))
+                  {:line-item line-item
+                   :end (:end r)
+                   :filed (:filed r)
+                   :val (- (double (:val r)) (double (:val prior)))}))))
+          tagged)))
+
 (defn quarterly-values
   "Period-end → single-quarter amount for one line.
 
   A reported ~3-month fact wins. Otherwise the quarter is the :val-q on the
-  year-to-date row. Q4 is not on the 10-Q; for additive lines it is the
-  annual fact minus the nine-month fact with the same start. Share counts
+  year-to-date row, or (when that is absent, as on a 6-K) the difference of
+  the YTD windows. Q4 is not on the interim report; for additive lines it is
+  the annual fact minus the nine-month fact with the same start. Share counts
   and EPS are not subtracted."
   [flow-rows annual-rows line-item]
   (let [flow (filter #(= line-item (:line-item %)) flow-rows)
@@ -299,17 +335,19 @@
                     (filter #(and (= 3 (window-months %)) (number? (:val %))))
                     latest-filed)
         derived (when-not share?
-                  (->> flow
-                       (filter #(and (number? (:val-q %))
-                                     (not= 3 (window-months %))))
-                       (group-by #(str (:end %)))
-                       vals
-                       (map latest-by-filed)
-                       (map (fn [r]
-                              {:line-item line-item
-                               :end (:end r)
-                               :filed (:filed r)
-                               :val (:val-q r)}))))
+                  (concat
+                   (->> flow
+                        (filter #(and (number? (:val-q %))
+                                      (not= 3 (window-months %))))
+                        (group-by #(str (:end %)))
+                        vals
+                        (map latest-by-filed)
+                        (map (fn [r]
+                               {:line-item line-item
+                                :end (:end r)
+                                :filed (:filed r)
+                                :val (:val-q r)})))
+                   (ytd-quarter-rows flow line-item)))
         nine-by-start (->> flow
                            (filter #(= 9 (window-months %)))
                            latest-by-start
@@ -623,21 +661,105 @@
             ends
             labels))))
 
+(def interim-forms
+  "Forms that carry interim financials. 10-Q for domestic issuers.
+  6-K for foreign private issuers: that current report is where they
+  furnish the quarterly IFRS (or US-GAAP) numbers a 10-Q would carry."
+  ["10-Q" "6-K"])
+
+(defn- statement-seq
+  "Long-format rows for each form. A form with no facts contributes nothing."
+  [forms fetch]
+  (mapcat (fn [form]
+            (ds/mapseq-reader (fetch form)))
+          forms))
+
+(defn- interim-form-label
+  "Form named on a quarterly statement. 10-Q when a domestic quarterly
+  report supplied rows; otherwise 6-K."
+  [rows]
+  (let [forms (set (map #(str (:form %)) rows))]
+    (cond
+      (some #(str/starts-with? % "10-Q") forms) "10-Q"
+      (some #(str/starts-with? % "6-K") forms) "6-K"
+      :else "10-Q")))
+
+(defn- chain-winners
+  "concept → line label. The first concept in each chain that this filing
+  actually reports wins; later aliases in the same chain are ignored."
+  [chains present]
+  (into {}
+        (keep (fn [[label & concepts]]
+                (when-let [concept (some #(when (present %) %) concepts)]
+                  [concept label])))
+        chains))
+
+(defn- to-line-rows
+  "Label facts with `chains`. `duration?` keeps flow facts; instant facts
+  (no :start) are the balance sheet."
+  [facts chains duration?]
+  (let [present (set (map :concept facts))
+        winners (chain-winners chains present)]
+    (keep (fn [fact]
+            (when-let [label (get winners (:concept fact))]
+              (let [flow? (not (str/blank? (str (:start fact))))]
+                (when (= flow? duration?)
+                  (assoc fact :line-item label)))))
+          facts)))
+
+(defn- known-accns
+  [rows]
+  (set (keep #(some-> (:accn %) str not-empty) rows)))
+
+(defn- latest-end
+  [rows]
+  (->> rows (map #(str (:end %))) (remove str/blank?) sort last))
+
+(defn- pending-6k-facts
+  "Facts from 6-K statement packages that are not in companyfacts yet.
+  The June 2026 Amer Sports quarter is one of these: the filing is on EDGAR,
+  and companyfacts still ends at 2025."
+  [cik rows]
+  (let [known (known-accns rows)
+        latest (latest-end rows)]
+    (->> (e/filings cik :include-amends? true)
+         (filter #(and (ixbrl/statement-package? % latest)
+                       (not (known (str (:accessionNumber %))))))
+         (mapcat (fn [filing]
+                   (try
+                     (ixbrl/filing-facts filing)
+                     (catch Exception _
+                       [])))))))
+
 (defn quarterly-statements
-  "10-Q single quarters, with Q4 taken from the annual report minus nine months."
+  "Single quarters from 10-Q or 6-K, with Q4 from the annual report minus nine months.
+
+  Foreign private issuers such as Amer Sports file interim financials on
+  Form 6-K. Domestic issuers stay on 10-Q. A form with no facts is skipped.
+  A 6-K that is not in companyfacts yet is read from its inline XBRL."
   [cik fiscal-year-end form]
-  (let [income (ds/mapseq-reader
-                (e/income cik :form "10-Q" :view :standardized
-                          :concepts (income-concepts cik)))
+  (let [concepts (income-concepts cik)
+        income-base (statement-seq interim-forms
+                                   #(e/income cik :form % :view :standardized
+                                              :concepts concepts))
+        bs-base (statement-seq interim-forms
+                               #(e/balance cik :form % :view :standardized))
+        cash-base (statement-seq interim-forms
+                                 #(e/cashflow cik :form % :view :standardized
+                                              :concepts cashflow-extra-concepts))
+        pending (pending-6k-facts cik (concat income-base bs-base cash-base))
+        balance-chains (:chains (e/concepts-for :balance))
+        income (concat income-base (to-line-rows pending concepts true))
         annual (annual-statement-rows cik fiscal-year-end form)
-        bs (concat (ds/mapseq-reader (e/balance cik :form "10-Q" :view :standardized))
+        bs (concat bs-base
+                   (to-line-rows pending balance-chains false)
                    (annual-balance-rows cik fiscal-year-end form))
-        cash (ds/mapseq-reader
-              (e/cashflow cik :form "10-Q" :view :standardized
-                          :concepts cashflow-extra-concepts))
+        cash (concat cash-base
+                     (to-line-rows pending cashflow-extra-concepts true))
         annual-cash (annual-cashflow-rows cik fiscal-year-end form cashflow-extra-concepts)
         items (vec (distinct (map :line-item (concat income annual))))]
-    {:income-values (into {} (for [item items]
+    {:form (interim-form-label income)
+     :income-values (into {} (for [item items]
                                [item (quarterly-values income annual item)]))
      :balance-values (into {} (for [item (distinct (map :line-item bs))]
                                 [item (annual-line-values bs item)]))
@@ -887,14 +1009,15 @@
                             n)
           labels (column-labels ends period (fye-month fye))
           ;; Quarterly columns include Q4 from the annual report.
-          filing-forms (if quarterly? ["10-Q" form] [form])
+          ;; Interim dates come from 10-Q or 6-K; the year-end column from `form`.
+          filing-forms (if quarterly? (conj interim-forms form) [form])
           filing-dates (filing-dates-by-end cik filing-forms)
           table (statement-rows by-pl* by-bs (:dividends source) (:repurchases source)
                                 ends labels filing-dates)]
       (merge {:ticker ticker
               :name (:name meta)
               :cik cik
-              :form (if quarterly? "10-Q" form)
+              :form (if quarterly? (:form source) form)
               :period period}
              table))))
 
