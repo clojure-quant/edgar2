@@ -10,6 +10,14 @@
 (defn- cell [v]
   (if (nil? v) "" (str v)))
 
+(defn- header-parts
+  "Split a kebab header so each `-` becomes a line break."
+  [label]
+  (let [parts (str/split (str label) #"-" -1)]
+    (if (= 1 (count parts))
+      [label]
+      (vec (interpose [:br] parts)))))
+
 (defn- screen-table
   [{:keys [columns rows]}]
   [:div.table-wrap
@@ -17,9 +25,9 @@
     [:thead
      [:tr
       (for [{:keys [key label num?]} columns]
-        [:th {:key (str key)
-              :class (when num? "num")}
-         label])]]
+        (into [:th {:key (str key)
+                    :class (when num? "num")}]
+              (header-parts label)))]]
     [:tbody
      (for [[i row] (map-indexed vector rows)]
        [:tr {:key i}

@@ -1,12 +1,20 @@
 (ns edgar2.financials.concepts
   "Canonical XBRL concept fallback chains for the project.
 
-  Each concept is {:id :label :data}. :data is usually a priority-ordered
-  seq of [taxonomy tag] pairs. A few entries use a label→pairs map instead
-  (see :ifrs-income-by-label and :income-fallbacks-by-label).
+  Each concept is {:id :label :data}. :data is a priority-ordered
+  seq of [taxonomy tag] pairs. 
 
   Public API: get-concept-id, series-mixed."
   (:require [tech.v3.dataset :as ds]))
+
+
+ #_{:id :ifrs-income-by-label
+ :label "IFRS income supplements by statement line"
+ :data {"Operating Expenses" [[:ifrs-full :OperatingExpense]]
+        "Operating Income" [[:ifrs-full :ProfitLossFromOperatingActivities]]
+        "Pre-Tax Income" [[:ifrs-full :ProfitLossBeforeTax]]
+        "Income Tax Expense" [[:ifrs-full :IncomeTaxExpenseContinuingOperations]]}}
+
 
 (def concepts
   [{:id :revenue
@@ -23,7 +31,7 @@
            [:ifrs-full :Revenue]
            [:ifrs-full :RevenueFromContractsWithCustomers]
            [:ifrs-full :RevenueFromSaleOfGoods]]}
-
+   
    {:id :cost-of-revenue
     :label "Cost of Revenue"
     :data [[:us-gaap :CostOfRevenue]
@@ -202,23 +210,7 @@
            [:ifrs-full :AmortisationIntangibleAssetsOtherThanGoodwill]
            [:ifrs-full :AmortisationExpense]]}
 
-   {:id :ifrs-income-by-label
-    :label "IFRS income supplements by statement line"
-    :data {"Revenue" [[:ifrs-full :RevenueFromContractsWithCustomers]
-                      [:ifrs-full :Revenue]]
-           "Cost of Revenue" [[:ifrs-full :CostOfSales]]
-           "Operating Expenses" [[:ifrs-full :OperatingExpense]]
-           "Operating Income" [[:ifrs-full :ProfitLossFromOperatingActivities]]
-           "Pre-Tax Income" [[:ifrs-full :ProfitLossBeforeTax]]
-           "Income Tax Expense" [[:ifrs-full :IncomeTaxExpenseContinuingOperations]]
-           "EPS Basic" [[:ifrs-full :BasicEarningsLossPerShare]]
-           "EPS Diluted" [[:ifrs-full :DilutedEarningsLossPerShare]]}}
-
-   {:id :income-fallbacks-by-label
-    :label "Extra income fallbacks by statement line"
-    :data {"Total Revenue" [[:us-gaap :RevenueFromContractWithCustomerExcludingAssessedTax]
-                            [:us-gaap :RevenueFromContractWithCustomerIncludingAssessedTax]
-                            [:us-gaap :SalesRevenueNet]]}}])
+   ])
 
 (def concept-dict
   (into {} (map (juxt :id identity) concepts)))

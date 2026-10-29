@@ -1,7 +1,7 @@
 (ns edgar2.algo.growth
   "Names sorted by stabilized earnings yield compounded three years at
   stabilized earnings growth. Keeps at least 7 annual reports, earnings
-  growth between 12% and 65%, sales growth of at least 15%, revenue-score
+  growth between 12% and 65%, sales growth of at least 12%, revenue-score
   of at least 65, and operating-income-score of at least 70."
   (:require [edgar2.report.screen :as report]
             [edgar2.screen.universe :as uni]
@@ -10,7 +10,7 @@
 (def min-annual-years 7)
 (def min-earnings-growth 12)
 (def max-earnings-growth 65)
-(def min-sales-growth 15)
+(def min-sales-growth 12)
 (def min-revenue-score 65)
 (def min-operating-income-score 70)
 
@@ -19,6 +19,7 @@
 
 (def columns
   [{:key :ticker :label "Ticker"}
+   {:key :entityName :label "Name"}
    {:key :annual-count :label "annual-count" :num? true :decimals 0}
    {:key :earnings-yield :label "earnings-yield" :num? true :decimals 1}
    {:key :earnings-stabilized-yield :label "earnings-stabilized-yield" :num? true :decimals 1}
@@ -60,7 +61,7 @@
 (def screen
   {:id :growth-
    :title "Growth"
-   :description ["At least 7 annual reports, stabilized earnings growth between 12% and 65%, sales-growth-avg-yoy at least 15%, revenue-score at least 65, and operating-income-score at least 70, sorted by earnings-future-3-yield."]
+   :description ["At least 7 annual reports, stabilized earnings growth between 12% and 65%, sales-growth-avg-yoy at least 12%, revenue-score at least 65, and operating-income-score at least 70, sorted by earnings-future-3-yield."]
    :params [uni/min-mc]
    :columns columns
    :universe uni/stats

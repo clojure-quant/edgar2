@@ -8,10 +8,10 @@
   [{:concept :revenue  ; CONCEPT
     :label "Revenue"
     :section :income}
-   {:edgarjure "Cost of Revenue"
+   {:concept :cost-of-revenue ; CONCEPT
     :label "Cost of Revenue"
     :section :income}
-   {:edgarjure "Gross Profit"
+   {:concept :gross-profit ; CONCEPT
     :label "Gross Profit"
     :section :income
     :style :background-pl-green}
@@ -27,8 +27,8 @@
    {:edgarjure "R&D Expense"
     :label "R&D Expense"
     :section :income}
-   {:concept :depreciation
-    :label "Depreciation"
+   {:concept :depreciation ; CONCEPT
+    :label "Depreciation" 
     :section :income}
    {:math :operating-expenses ; MATH
     :label "Operating Expenses"
@@ -37,7 +37,7 @@
     :label "Operating Income"
     :section :income
     :style :background-pl-green}
-   {:edgarjure "Interest Expense"
+   {:concept :interest-expense ; CONCEPT
     :label "Interest Expense"
     :section :income}
    {:edgarjure "Non-Operating Income"

@@ -27,7 +27,7 @@
                (item "FAIL-ANN" {:annual-count 6})
                (item "FAIL-YOY-LO" {:earnings-stabilized-yoy 11.9})
                (item "FAIL-YOY-HI" {:earnings-stabilized-yoy 65.1})
-               (item "FAIL-SALES" {:sales-growth-avg-yoy 14.9})
+               (item "FAIL-SALES" {:sales-growth-avg-yoy 11.9})
                (item "FAIL-REV" {:revenue-score 64.9})
                (item "FAIL-OI" {:operating-income-score 69.9})
                (item "NO-YIELD" {:earnings-future-3-yield nil})]
@@ -40,7 +40,7 @@
     (is (= [8 6 5 4 3] counts))
     (is (re-matches #"annual-count >= 7\s+8" (nth lines 0)))
     (is (re-matches #"earnings-stabilized-yoy between 12 and 65\s+6" (nth lines 1)))
-    (is (re-matches #"sales-growth-avg-yoy >= 15\s+5" (nth lines 2)))
+    (is (re-matches #"sales-growth-avg-yoy >= 12\s+5" (nth lines 2)))
     (is (re-matches #"revenue-score >= 65\s+4" (nth lines 3)))
     (is (re-matches #"operating-income-score >= 70\s+3" (nth lines 4)))
     (is (= growth/sort-line (last lines)))

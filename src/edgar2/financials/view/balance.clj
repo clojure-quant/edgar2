@@ -2,8 +2,9 @@
   "Shared balance-sheet field specs for financials views.")
 
 (def balance-fields
-  [{:edgarjure "Cash and Equivalents"
-    :label "Cash and Equivalents"
+  [; ASSETS / ACTIVE
+   {:concept :cash
+    :label "Cash"
     :section :balance
     :style :background-balance-active
     :format :background-balance-active}
@@ -17,7 +18,7 @@
     :section :balance
     :style :background-balance-active
     :format :background-balance-active}
-   {:edgarjure "Current Assets"
+   {:concept :assets-current
     :label "Current Assets"
     :section :balance
     :style :background-balance-active
@@ -32,6 +33,7 @@
     :section :balance
     :style :background-balance-active
     :format :background-balance-active}
+   ; LIABILIIES / PASSIVE
    {:edgarjure "Accounts Payable"
     :label "Accounts Payable"
     :section :balance
@@ -52,7 +54,7 @@
     :section :balance
     :style :background-balance-passive
     :format :background-balance-passive}
-   {:edgarjure "Current Liabilities"
+   {:concept :liabilities-current
     :label "Current Liabilities"
     :section :balance
     :style :background-balance-passive

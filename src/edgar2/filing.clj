@@ -225,9 +225,7 @@
   (let [sic (:sic (e/company-metadata cik))
         chains (:chains (e/concepts-for :income :industry (income-industry sic)))]
     (conj (mapv (fn [[label & concepts]]
-                  (let [concepts (cond-> (vec (concat concepts
-                                                      (concept-names-by-label :ifrs-income-by-label label)
-                                                      (concept-names-by-label :income-fallbacks-by-label label)))
+                  (let [concepts (cond-> (vec concepts)
                                    (#{"Revenue" "Total Revenue"} label)
                                    prioritize-revenue-concepts)]
                     (into [label] concepts)))

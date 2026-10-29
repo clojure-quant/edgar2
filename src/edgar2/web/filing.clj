@@ -43,6 +43,13 @@
 (def ^:private ix-ns
   "http://www.xbrl.org/2013/inlineXBRL")
 
+(def ^:private layout-snippet
+  "Cap HTML filings at 1200px and center them in the viewport."
+  (str
+   "<style id=\"edgar2-layout\">"
+   "html,body{max-width:1200px;margin-left:auto;margin-right:auto}"
+   "</style>"))
+
 (def ^:private ix-highlight-snippet
   "Injected into every HTML filing. Marks ix facts that have both name and id."
   (str
@@ -88,13 +95,18 @@
    "else mark();"
    "})();</script>"))
 
+(defn- inject-head
+  "Insert `snippet` just before </head>, or at the top if missing."
+  [html snippet]
+  (if-let [idx (or (str/index-of html "</head>")
+                    (str/index-of html "</HEAD>"))]
+    (str (subs html 0 idx) snippet (subs html idx))
+    (str snippet html)))
+
 (defn- inject-ix-highlight
   "Insert highlight CSS/JS just before </head>, or at the top if missing."
   [html]
-  (if-let [idx (or (str/index-of html "</head>")
-                    (str/index-of html "</HEAD>"))]
-    (str (subs html 0 idx) ix-highlight-snippet (subs html idx))
-    (str ix-highlight-snippet html)))
+  (inject-head html ix-highlight-snippet))
 
 (defn- html-escape
   [s]
@@ -135,7 +147,9 @@
 
 (defn- inject-filing-chrome
   [html file]
-  (let [html (inject-ix-highlight html)]
+  (let [html (-> html
+                 (inject-head layout-snippet)
+                 inject-ix-highlight)]
     (if-let [href (index-href file)]
       (inject-index-link html href)
       html)))
