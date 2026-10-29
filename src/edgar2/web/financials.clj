@@ -100,11 +100,16 @@
        (for [{:keys [label fields]} ratio-groups]
          [:div.fin-ratio-group {:key label}
           [:div.fin-ratio-group-label label]
-          [:div.fin-ratio-group-fields
-           (for [field fields]
-             [:div.fin-ratio {:key (:label field)}
-              [:div.fin-ratio-label (:label field)]
-              [:div.fin-ratio-value (ratio-cell row field)]])]])])))
+          [:table
+           [:thead
+            [:tr
+             [:th "Name"]
+             [:th.num "Value"]]]
+           [:tbody
+            (for [field fields]
+              [:tr {:key (str (:key field))}
+               [:td (:label field)]
+               [:td.num (ratio-cell row field)]])]]])])))
 
 (defn- col-heading
   "Annual columns are keyed by yyyy-mm-dd. The heading is the year."

@@ -170,46 +170,45 @@ tr.quintile-group th {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 0.75rem;
-  width: max-content;
-  max-width: 60rem;
+  max-width: 100%;
 }
 
 .fin-ratio-group {
-  border-top: 1px solid #ccc;
-  border-left: 1px solid #ccc;
+  flex: 0 0 auto;
+  border: 1px solid #ccc;
 }
 
 .fin-ratio-group-label {
   padding: 0.2rem 0.5rem;
   font-weight: 700;
   background: #f3f3f3;
-  border-right: 1px solid #ccc;
   border-bottom: 1px solid #ccc;
 }
 
-.fin-ratio-group-fields {
-  display: flex;
-  align-items: stretch;
+.fin-ratio-group table {
+  width: auto;
+  table-layout: auto;
 }
 
-.fin-ratio {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid #ccc;
-  border-bottom: 1px solid #ccc;
+.fin-ratio-group th,
+.fin-ratio-group td {
+  border: none;
+  border-bottom: 1px solid #eee;
 }
 
-.fin-ratio-label,
-.fin-ratio-value {
-  padding: 0.25rem 0.5rem;
-  text-align: right;
+.fin-ratio-group tr:last-child td {
+  border-bottom: none;
+}
+
+.fin-ratio-group td:first-child,
+.fin-ratio-group th:first-child {
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 
-.fin-ratio-label {
-  font-weight: 700;
-  border-bottom: 1px solid #ccc;
+.fin-ratio-group th.num,
+.fin-ratio-group td.num {
+  white-space: nowrap;
+  border-left: 1px solid #eee;
 }
 
 .fin-sic {
