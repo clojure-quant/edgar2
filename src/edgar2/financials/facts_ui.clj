@@ -1,24 +1,28 @@
 (ns edgar2.financials.facts-ui
   "Which rows the financials page shows.
 
-  A field is one of three kinds:
-    :raw       one companyfacts concept (taxonomy, concept, unit)
-    :edgarjure a fallback chain from edgarjure (e/concepts-for)
-    :edgar2    an id from edgar2.financials.concepts, via facts-ds/calc-concept
+  A field map is one of:
+    :field     one [taxonomy concept] pair
+    :concept   an id from edgar2.financials.concepts, via facts-ds/calc-concept
+    :edgarjure a statement label from edgarjure
+    :math      a key in edgar2.financials.math/math
 
-  :format is the row background: :background-pl-green,
-  :background-balance-active, or :background-balance-passive.
+  :style and :format are the row background (:background-pl-green,
+  :background-balance-active, or :background-balance-passive), written on
+  the field map and carried as column metadata. :section is :income or
+  :balance.
 
-  Views: :current (SIC-routed statement), :all (every concept select-data
-  keeps), :insurance, :bank, :reit (that industry's income chains, plus the
-  shared balance-sheet lines and dividend / repurchase rows)."
+  Views: :current (SIC-routed statement), :all (every concept on a wide
+  report-table), :insurance, :bank, :reit (that industry's income lines,
+  plus the shared balance-sheet lines and dividend / repurchase rows).
+
+  Each view's rows are a static vector of field maps, already in display
+  order. `statement` returns a wide period-row dataset; `format-columns`,
+  `to-presentable`, and `remove-presentable-empty` prepare it for display."
   (:require [clojure.string :as str]
-            [edgar.api :as e]
-            [edgar2.financials.calc.concept :as calc]
-            [edgar2.financials.concepts :as concepts]
-            [edgar2.financials.derived :as derived]
             [edgar2.financials.facts-ds :as facts-ds]
-            [tech.v3.dataset :as ds]))
+            [tech.v3.dataset :as ds]
+            [tech.v3.dataset.column :as col]))
 
 (def pl-column-order
   ["Total Revenue"
@@ -43,25 +47,6 @@
    "Shares Diluted"
    "Dividends Paid"
    "Stock Repurchase"])
-
-(def bs-column-order
-  "Main balance-sheet lines only."
-  ["Cash and Equivalents"
-   "Accounts Receivable"
-   "Inventory"
-   "Current Assets"
-   "PP&E Net"
-   "Total Assets"
-   "Accounts Payable"
-   "Current Debt"
-   "Current Portion of Long-Term Debt"
-   "Short-Term Borrowings"
-   "Current Liabilities"
-   "Long-Term Debt"
-   "Total Liabilities"
-   "Stockholders Equity"
-   "Total Equity"
-   "Total Liabilities and Equity"])
 
 (def view-choices
   [[:current "Current"]
@@ -120,79 +105,117 @@
     (asset-labels label) :background-balance-active
     (passive-labels label) :background-balance-passive))
 
-(defn- with-format
+(def ^:private income-labels
+  "edgarjure income line labels, by industry."
+  {:standard ["Revenue"
+              "Cost of Revenue"
+              "Gross Profit"
+              "Operating Expenses"
+              "Total Costs and Expenses"
+              "R&D Expense"
+              "SG&A Expense"
+              "Selling and Marketing Expense"
+              "General and Administrative Expense"
+              "Marketing Expense"
+              "Other Operating Expense"
+              "Excise Taxes"
+              "Restructuring Charges"
+              "Impairment Charges"
+              "Goodwill Impairment"
+              "Acquisition-Related Costs"
+              "Litigation Settlement"
+              "Gain (Loss) on Sale of Assets"
+              "In-Process R&D"
+              "Operating Income"
+              "Non-Operating Income"
+              "Interest Expense"
+              "Pre-Tax Income"
+              "Income Tax Expense"
+              "Net Income"
+              "EPS Basic"
+              "EPS Diluted"
+              "Shares Basic"
+              "Shares Diluted"]
+   :bank ["Interest Income"
+          "Interest Expense"
+          "Net Interest Income"
+          "Provision for Credit Losses"
+          "Net Interest Income After Provision"
+          "Noninterest Income"
+          "Noninterest Expense"
+          "Total Revenue"
+          "Total Net Revenue"
+          "Compensation Expense"
+          "Occupancy Expense"
+          "Pre-Tax Income"
+          "Income Tax Expense"
+          "Net Income"
+          "EPS Basic"
+          "EPS Diluted"
+          "Shares Basic"
+          "Shares Diluted"]
+   :insurance ["Premiums Earned"
+               "Net Investment Income"
+               "Realized Investment Gains"
+               "Total Revenue"
+               "Policyholder Benefits and Claims"
+               "Interest Credited to Policyholders"
+               "Policyholder Dividends"
+               "Acquisition Cost Amortization"
+               "Total Benefits and Expenses"
+               "Pre-Tax Income"
+               "Income Tax Expense"
+               "Net Income"
+               "EPS Basic"
+               "EPS Diluted"
+               "Shares Basic"
+               "Shares Diluted"]
+   :reit ["Revenue"
+          "Rental Revenue"
+          "Real Estate Revenue"
+          "Tenant Reimbursements"
+          "Other Property Revenue"
+          "Property Operating Expense"
+          "Real Estate Taxes"
+          "Ground Rent Expense"
+          "General and Administrative Expense"
+          "SG&A Expense"
+          "D&A"
+          "Impairment of Real Estate"
+          "Total Costs and Expenses"
+          "Gain on Sale of Real Estate"
+          "Operating Income"
+          "Non-Operating Income"
+          "Interest Expense"
+          "Pre-Tax Income"
+          "Income Tax Expense"
+          "Net Income"
+          "EPS Basic"
+          "EPS Diluted"
+          "Shares Basic"
+          "Shares Diluted"]})
+
+(defn- with-style
   [field]
-  (if-let [fmt (format-for (:label field))]
-    (assoc field :format fmt)
+  (if-let [style (format-for (:label field))]
+    (assoc field :style style)
     field))
 
-(defn- local-names
-  [pairs]
-  (mapv (comp name second) pairs))
+(defn- edgarjure-line
+  [section label]
+  (with-style {:edgarjure label :label label :section section}))
 
-(defn- names-by-label
+(defn- concept-line
   [id label]
-  (some-> (concepts/get-concept-id id) :data (get label) local-names))
+  (with-style {:concept id :label label :section :income}))
 
-(defn- prioritize-revenue
-  "Headline totals before ASC 606 contract subsets."
-  [concept-names]
-  (let [preferred (local-names (:data (concepts/get-concept-id :revenue)))
-        pri (set preferred)]
-    (into (filterv (set concept-names) preferred)
-          (remove pri concept-names))))
+(defn- math-line
+  [kw label]
+  (with-style {:math kw :label label :section :income}))
 
-(defn- income-chains
-  "[[label [concept-name ...]] ...] for an edgarjure income industry.
-  `:current?` appends the depreciation chain and IFRS supplements."
-  [industry current?]
-  (let [chains (:chains (e/concepts-for :income :industry (or industry :standard)))
-        lines (mapv (fn [[label & concept-names]]
-                      (let [names (vec (concat concept-names
-                                               (when current?
-                                                 (names-by-label :ifrs-income-by-label label))
-                                               (when current?
-                                                 (names-by-label :income-fallbacks-by-label label))))]
-                        [label (if (and current? (#{"Revenue" "Total Revenue"} label))
-                                 (prioritize-revenue names)
-                                 names)]))
-                    chains)]
-    (if current?
-      (conj lines ["Depreciation" (local-names (:data (concepts/get-concept-id :depreciation)))])
-      lines)))
-
-(defn- chain-field
-  [section label concept-names]
-  (with-format {:kind :edgarjure
-                :section section
-                :label label
-                :concepts (vec concept-names)}))
-
-(def ^:private edgar2-income
-  {"Operating Expenses" {:kind :edgar2
-                         :section :income
-                         :id :operating-expenses
-                         :label "Operating Expenses"
-                         :format :background-pl-green}
-   "Operating Income" {:kind :edgar2
-                       :section :income
-                       :id :operating-income
-                       :label "Operating Income"
-                       :format :background-pl-green}})
-
-(def cash-fields
-  [{:kind :edgar2
-    :section :income
-    :id :dividends-paid
-    :abs true
-    :label "Dividends Paid"
-    :format :background-pl-green}
-   {:kind :edgar2
-    :section :income
-    :id :stock-repurchase
-    :abs true
-    :label "Stock Repurchase"
-    :format :background-pl-green}])
+(def ^:private cash-lines
+  [(math-line :dividends-paid "Dividends Paid")
+   (math-line :stock-repurchase "Stock Repurchase")])
 
 (defn- order-fields
   "Labels in `preferred` first, then the remaining fields in their current order."
@@ -203,30 +226,125 @@
         tail (remove #(seen (:label %)) fields)]
     (vec (concat head tail))))
 
-(defn- balance-fields
-  []
-  (let [by (into {} (map (fn [[label & concept-names]]
-                           [label (vec concept-names)])
-                         (:chains (e/concepts-for :balance))))]
-    (into []
-          (keep (fn [label]
-                  (when-let [concept-names (get by label)]
-                    (chain-field :balance label concept-names))))
-          bs-column-order)))
+(defn- current-line
+  "Current view: revenue, depreciation, and the calculated operating and
+  cash lines. Every other label stays an edgarjure chain."
+  [label]
+  (case label
+    "Revenue" (concept-line :revenue "Revenue")
+    "Operating Expenses" (math-line :operating-expenses "Operating Expenses")
+    "Operating Income" (math-line :operating-income "Operating Income")
+    (edgarjure-line :income label)))
 
-(defn- income-fields
-  [industry current?]
-  (let [fields (mapv (fn [[label concept-names]]
-                       (chain-field :income label concept-names))
-                     (income-chains industry current?))
-        fields (if current?
-                 (mapv #(get edgar2-income (:label %) %) fields)
-                 fields)
-        have (set (map :label fields))
-        divs (remove #(have (:label %)) cash-fields)]
-    (if current?
-      (order-fields (into fields divs) pl-column-order)
-      (vec (concat fields divs)))))
+(defn- append-missing
+  [lines extras]
+  (let [have (set (map :label lines))]
+    (into lines (remove #(have (:label %)) extras))))
+
+(defn- current-income
+  [industry]
+  (let [labels (get income-labels industry (:standard income-labels))
+        lines (append-missing (mapv current-line labels)
+                              [(concept-line :depreciation "Depreciation")])]
+    (order-fields (append-missing lines cash-lines) pl-column-order)))
+
+(defn- industry-income
+  [industry]
+  (append-missing (mapv #(edgarjure-line :income %) (get income-labels industry))
+                  cash-lines))
+
+(def ^:private balance-fields
+  [{:edgarjure "Cash and Equivalents"
+    :label "Cash and Equivalents"
+    :section :balance
+    :style :background-balance-active
+    :format :background-balance-active}
+   {:edgarjure "Accounts Receivable"
+    :label "Accounts Receivable"
+    :section :balance
+    :style :background-balance-active
+    :format :background-balance-active}
+   {:edgarjure "Inventory"
+    :label "Inventory"
+    :section :balance
+    :style :background-balance-active
+    :format :background-balance-active}
+   {:edgarjure "Current Assets"
+    :label "Current Assets"
+    :section :balance
+    :style :background-balance-active
+    :format :background-balance-active}
+   {:edgarjure "PP&E Net"
+    :label "PP&E Net"
+    :section :balance
+    :style :background-balance-active
+    :format :background-balance-active}
+   {:edgarjure "Total Assets"
+    :label "Total Assets"
+    :section :balance
+    :style :background-balance-active
+    :format :background-balance-active}
+   {:edgarjure "Accounts Payable"
+    :label "Accounts Payable"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Current Debt"
+    :label "Current Debt"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Current Portion of Long-Term Debt"
+    :label "Current Portion of Long-Term Debt"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Short-Term Borrowings"
+    :label "Short-Term Borrowings"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Current Liabilities"
+    :label "Current Liabilities"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Long-Term Debt"
+    :label "Long-Term Debt"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Total Liabilities"
+    :label "Total Liabilities"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Stockholders Equity"
+    :label "Stockholders Equity"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Total Equity"
+    :label "Total Equity"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}
+   {:edgarjure "Total Liabilities and Equity"
+    :label "Total Liabilities and Equity"
+    :section :balance
+    :style :background-balance-passive
+    :format :background-balance-passive}])
+
+(def ^:private current-income-fields
+  {:standard (current-income :standard)
+   :bank (current-income :bank)
+   :insurance (current-income :insurance)
+   :reit (current-income :reit)})
+
+(def ^:private industry-income-fields
+  {:bank (industry-income :bank)
+   :insurance (industry-income :insurance)
+   :reit (industry-income :reit)})
 
 (defn view-fields
   "Field specs for `view`. `industry` is the company SIC route (:standard,
@@ -234,10 +352,18 @@
   [view industry]
   (case (parse-view view)
     :all []
-    :insurance (vec (concat (income-fields :insurance false) (balance-fields)))
-    :bank (vec (concat (income-fields :bank false) (balance-fields)))
-    :reit (vec (concat (income-fields :reit false) (balance-fields)))
-    (vec (concat (income-fields industry true) (balance-fields)))))
+    :insurance (vec (concat (:insurance industry-income-fields) balance-fields))
+    :bank (vec (concat (:bank industry-income-fields) balance-fields))
+    :reit (vec (concat (:reit industry-income-fields) balance-fields))
+    (vec (concat (get current-income-fields (or industry :standard)
+                      (:standard current-income-fields))
+                 balance-fields))))
+
+(def ^:private period-col-names
+  (set facts-ds/report-period-cols))
+
+(def ^:private presentable-meta-cols
+  #{:field :style :format :section})
 
 (defn- as-number
   [v]
@@ -248,140 +374,105 @@
       (long v)
       v)))
 
-(defn- jure-pairs
-  [concept-names]
-  (for [taxonomy [:us-gaap :ifrs-full :dei]
-        concept concept-names]
-    [taxonomy (keyword (str concept))]))
+(defn- eps-column?
+  [name]
+  (boolean (re-find #"(?i)eps|per\s*share" (str name))))
 
-(defn- field-pairs
-  "Concept pairs `report-table` must load for `fields`."
-  [fields]
-  (let [base (mapcat (fn [{:keys [kind concepts id]}]
-                       (case kind
-                         :edgarjure (jure-pairs concepts)
-                         :edgar2 (let [data (:data (concepts/get-concept-id id))]
-                                   (when (sequential? data) data))
-                         []))
-                     fields)
-        derived? (some #(and (= :edgar2 (:kind %))
-                             (#{:operating-expenses :operating-income} (:id %)))
-                       fields)
-        extra (when derived? (mapcat second derived/statement-lines))]
-    (vec (distinct (concat base extra)))))
+(defn- scale-display
+  "USD and share counts → millions. Per-share amounts stay in dollars."
+  [name v]
+  (when (number? v)
+    (if (eps-column? name)
+      (double v)
+      (long (/ (double v) 1.0e6)))))
 
-(defn- ends
-  [table]
-  (mapv #(str (:end %)) (ds/rows table {:nil-missing? true})))
+(defn- field-column-names
+  [ds]
+  (into []
+        (remove #(contains? period-col-names %))
+        (ds/column-names ds)))
 
-(defn- by-end
-  [table id]
-  (into {}
-        (keep (fn [[end v]]
-                (when (number? v) [end v]))
-              (map vector (ends table) (facts-ds/calc-concept table id)))))
+(defn- make-column
+  [name values metadata]
+  (let [values (vec values)
+        data (if (empty? values) (make-array Object 0) values)]
+    (col/new-column name data metadata)))
 
-(defn- operating-expenses-vec
-  "Per-row operating expenses, reported or derived, newest first."
-  [table]
-  (let [es (ends table)
-        by-item (into {}
-                      (map (fn [id]
-                             [(:label (concepts/get-concept-id id))
-                              (by-end table id)]))
-                      derived/statement-line-ids)
-        filled (derived/with-derived-lines by-item es)]
-    (mapv #(get (get filled derived/operating-expenses) %) es)))
+(defn format-columns
+  "Scale every field column on a wide statement dataset to millions.
 
-(defn- calc-chain
-  [table concept-names]
-  (let [names (mapv str concept-names)]
-    (mapv (fn [row]
-            (some #(as-number (get row %)) names))
-          (ds/rows table {:nil-missing? true}))))
+  Leaves `:filed :period :end` alone. EPS / per-share columns stay in
+  dollars. Column metadata is kept."
+  [ds]
+  (let [columns (mapv (fn [name]
+                        (let [c (ds/column ds name)
+                              metadata (dissoc (meta c) :name :datatype :n-elems)]
+                          (if (contains? period-col-names name)
+                            (make-column name (vec c) metadata)
+                            (make-column name
+                                         (mapv #(scale-display name %) c)
+                                         metadata))))
+                      (ds/column-names ds))]
+    (ds/new-dataset {:dataset-name (or (ds/dataset-name ds) "report-table")}
+                    columns)))
 
-(defn- line-vals
-  [table {:keys [kind concepts id abs]}]
-  (case kind
-    :edgarjure (calc-chain table concepts)
-    :edgar2 (cond
-              abs (calc/concept-absolute table id)
-              (= id :operating-income) (calc/operating-income table)
-              (= id :operating-expenses) (operating-expenses-vec table)
-              :else (facts-ds/calc-concept table id))
-    []))
+(defn to-presentable
+  "Transpose a wide period-row statement into a field-row table.
 
-(defn- period-maps
-  [table]
-  (mapv (fn [row]
-          {:end (str (:end row))
-           :filed (str (:filed row))
-           :period (:period row)})
-        (ds/rows table {:nil-missing? true})))
+  Period `:end` values become column names in row order (`:field` first).
+  Field column order is unchanged. Adds `:style` (from column `:style` or
+  `:format`), plus `:section` and `:format` when present. Keeps all-nil
+  field rows."
+  [ds]
+  (let [rows (vec (ds/rows ds {:nil-missing? true}))
+        ends (mapv #(str (:end %)) rows)
+        field-names (field-column-names ds)
+        present-rows
+        (mapv (fn [name]
+                (let [c (ds/column ds name)
+                      metadata (meta c)
+                      style (or (:style metadata) (:format metadata))
+                      period-vals (mapv (fn [row] (as-number (get row name))) rows)]
+                  (cond-> (into {:field (str name)}
+                                (map vector ends period-vals))
+                    style (assoc :style style)
+                    (:format metadata) (assoc :format (:format metadata))
+                    (:section metadata) (assoc :section (:section metadata)))))
+              field-names)
+        ;; ds/->dataset ignores :column-order for map rows; select-columns
+        ;; is what actually pins :field then period ends in row order.
+        meta-cols (filterv (fn [k]
+                             (some #(contains? % k) present-rows))
+                           [:style :format :section])
+        col-order (into (into [:field] ends) meta-cols)
+        table (ds/->dataset present-rows {:dataset-name "presentable"})]
+    (if (seq present-rows)
+      (ds/select-columns table col-order)
+      table)))
 
-(defn- curated-statement
-  [dss q-or-y fields]
-  (let [table (facts-ds/report-table dss q-or-y (field-pairs fields))]
-    {:periods (period-maps table)
-     :lines (mapv (fn [field]
-                    (assoc field :vals (line-vals table field)))
-                  fields)}))
+(defn remove-presentable-empty
+  "Drop presentable rows where every period value is non-numeric."
+  [ds]
+  (let [period-cols (into []
+                          (remove #(contains? presentable-meta-cols %))
+                          (ds/column-names ds))]
+    (ds/filter ds
+               (fn [row]
+                 (some #(number? (get row %)) period-cols)))))
 
-(defn- raw-label
-  [taxonomy concept unit]
-  (if (str/blank? (str unit))
-    (str taxonomy ":" concept)
-    (str taxonomy ":" concept " (" unit ")")))
-
-(defn- all-statement
-  "`select-data` with no concept filter. One :raw row per taxonomy, concept, and unit."
-  [dss q-or-y]
-  (let [rows (->> (ds/rows (facts-ds/select-data dss q-or-y nil) {:nil-missing? true})
-                  (remove #(str/blank? (str (:concept %))))
-                  vec)
-        periods (->> rows
-                     (group-by #(str (:end %)))
-                     (map (fn [[end facts]]
-                            (let [fact (first facts)]
-                              {:end end
-                               :filed (str (:filed fact))
-                               :period (:period fact)})))
-                     (sort-by :end #(compare %2 %1))
-                     vec)
-        ends (mapv :end periods)]
-    {:periods periods
-     :lines (->> rows
-                 (group-by (juxt #(str (:taxonomy %))
-                                 #(str (:concept %))
-                                 #(str (:unit %))))
-                 (sort-by key)
-                 (mapv (fn [[[taxonomy concept unit] facts]]
-                         (let [best (reduce (fn [m fact]
-                                              (let [end (str (:end fact))
-                                                    cur (get m end)]
-                                                (if (or (nil? cur)
-                                                        (pos? (compare (str (:filed fact))
-                                                                       (str (:filed cur)))))
-                                                  (assoc m end fact)
-                                                  m)))
-                                            {}
-                                            facts)]
-                           {:kind :raw
-                            :section :raw
-                            :taxonomy taxonomy
-                            :concept concept
-                            :unit unit
-                            :label (raw-label taxonomy concept unit)
-                            :vals (mapv #(as-number (:val (get best %))) ends)})))
-                 (filterv #(some number? (:vals %))))}))
+(defn presentable
+  "Wide statement → scaled, transposed, empty rows removed."
+  [ds]
+  (-> ds format-columns to-presentable remove-presentable-empty))
 
 (defn statement
-  "Rows for `view` over annual (`:y`) or quarterly (`:q`) periods.
+  "Wide report-table for `view` over annual (`:y`) or quarterly (`:q`).
 
-  `industry` is the SIC route used by :current. Returns
-  `{:periods [{:end :filed :period} ...] :lines [...]}`.
-  Periods and `:vals` are newest first."
+  Curated views use `report-table-full` with `view-fields`. `:all` uses
+  `report-table` with no field filter (same orientation, no style metadata).
+  Rows are newest `:end` first."
   [dss q-or-y view industry]
-  (if (= (parse-view view) :all)
-    (all-statement dss q-or-y)
-    (curated-statement dss q-or-y (view-fields view industry))))
+  (let [view (parse-view view)]
+    (if (= view :all)
+      (facts-ds/report-table dss q-or-y nil)
+      (facts-ds/report-table-full dss q-or-y (view-fields view industry)))))

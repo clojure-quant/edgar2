@@ -8,7 +8,8 @@
             [edgar2.report.stats-category :as stats-cat]
             [edgar2.web.fsds :as fsds]
             [edgar2.web.nav :refer [nav]]
-            [edgar2.web.ticker :as ticker]))
+            [edgar2.web.ticker :as ticker]
+            [tech.v3.dataset :as ds]))
 
 (def n-choices
   [5 10 15 20 25 30 35 40 45 50])
@@ -119,39 +120,49 @@
       (subs s 0 4)
       s)))
 
+(def ^:private presentable-meta-cols
+  #{:style :format :section})
+
 (defn- financials-table
-  [{:keys [columns rows]}]
-  [:div.table-wrap
-   [:table
-    [:thead
-     [:tr
-      (for [col columns]
-        [:th {:key (str col)
-              :class (when-not (= col :field) "num")}
-         (col-heading col)])]]
-    [:tbody
-     (mapcat
-      (fn [[i row]]
-        (let [field (:field row)
-              prev-field (:field (nth rows (dec i) nil))
-              next-field (:field (nth rows (inc i) nil))
-              ;; Two rules between the last addend and its total.
-              ;; No next row makes both sides nil, which must not draw a rule.
-              rule? (and (some? next-field)
-                         (= (get sum-line field) next-field))
-              below? (= (get sum-line prev-field) field)
-              class (if (#{"year-end" "filing-date"} field)
-                      "fin-year-end"
-                      (row-class field (:format row) rule? below?))]
-          (cond-> [[:tr (cond-> {:key i}
-                          class (assoc :class class))
-                    (for [col columns]
-                      [:td {:key (str col)
-                            :class (when-not (= col :field) "num")}
-                       (cell (get row col))])]]
-            rule? (conj [:tr.fin-double-rule {:key (str "rule-" i)}
-                         [:td {:colspan (count columns)}]]))))
-      (map-indexed vector rows))]]])
+  "Render a presentable financials dataset. Hides `:style` / `:format` /
+  `:section`. Missing style metadata skips row coloring (e.g. `:all`)."
+  [table]
+  (let [columns (into []
+                      (remove #(contains? presentable-meta-cols %))
+                      (ds/column-names table))
+        rows (vec (ds/rows table {:nil-missing? true}))]
+    [:div.table-wrap
+     [:table
+      [:thead
+       [:tr
+        (for [col columns]
+          [:th {:key (str col)
+                :class (when-not (= col :field) "num")}
+           (col-heading col)])]]
+      [:tbody
+       (mapcat
+        (fn [[i row]]
+          (let [field (:field row)
+                prev-field (:field (nth rows (dec i) nil))
+                next-field (:field (nth rows (inc i) nil))
+                ;; Two rules between the last addend and its total.
+                ;; No next row makes both sides nil, which must not draw a rule.
+                rule? (and (some? next-field)
+                           (= (get sum-line field) next-field))
+                below? (= (get sum-line prev-field) field)
+                style (or (:style row) (:format row))
+                class (if (#{"year-end" "filing-date"} field)
+                        "fin-year-end"
+                        (row-class field style rule? below?))]
+            (cond-> [[:tr (cond-> {:key i}
+                            class (assoc :class class))
+                      (for [col columns]
+                        [:td {:key (str col)
+                              :class (when-not (= col :field) "num")}
+                         (cell (get row col))])]]
+              rule? (conj [:tr.fin-double-rule {:key (str "rule-" i)}
+                           [:td {:colspan (count columns)}]]))))
+        (map-indexed vector rows))]]]))
 
 (def period-choices
   [["annual" "Annual"]
@@ -267,6 +278,6 @@
                                        (:ticker data) (:name data) (:cik data) (:form data))]
                               (sector-line ticker)
                               (ratios-table ticker)
-                              (financials-table data)]
+                              (financials-table (filing/presentable-financials data))]
                       [:p "Enter a ticker."])]))
        :unmount (fn [{:keys [stop]}] (stop))})))

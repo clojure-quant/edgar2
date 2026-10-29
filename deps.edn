@@ -16,8 +16,8 @@
            :exec-args {:ticker "XOM" :years 5}}
   :financials {:exec-fn edgar2.filing/financials
                :exec-args {:ticker "XOM" :n 5}}
-  :pl-fields {:exec-fn edgar2.filing/pl-fields
-              :exec-args {:ticker "XOM"}}
+  :demo-table-full {:exec-fn demo.report-table-full/run
+                    :exec-args {:ticker "XOM"}}
   :description {:exec-fn edgar2.description/description
                 :exec-args {:ticker "MSFT"}}
   ; download

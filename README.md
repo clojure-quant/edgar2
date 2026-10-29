@@ -19,7 +19,6 @@ Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first)
 clj -X:download  ; Download the last five XOM 10-Ks (default ticker and year count)
 clj -X:report :ticker AAPL :years 3  ; Print Apple’s last three years of annual income-statement figures
 clj -X:financials :ticker IMPP :n 20 ; Print P&L and main balance-sheet lines (last 20 fiscal years; 10-K, 20-F, or 40-F)
-clj -X:pl-fields :ticker OXY     ; Print last year’s income-statement lines with XBRL tags
 ```
 
 

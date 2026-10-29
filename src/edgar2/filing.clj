@@ -7,8 +7,8 @@
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.financials.facts-ui :as facts-ui]
             [edgar2.financials.ixbrl :as ixbrl]
-            [clojure.pprint :as pprint]
-            [tech.v3.dataset :as ds])
+            [tech.v3.dataset :as ds]
+            [tech.v3.dataset.column :as col])
   (:import [java.time LocalDate]
            [java.time.temporal ChronoUnit])
   (:gen-class))
@@ -510,12 +510,48 @@
        ds))))
 
 (def pl-column-order
-  "Income-statement row order. Defined in facts-ui."
-  facts-ui/pl-column-order)
+  "Income-statement row order for the legacy statement."
+  ["Total Revenue"
+   "Revenue"
+   "Cost of Revenue"
+   "Gross Profit"
+   "SG&A Expense"
+   "Selling and Marketing Expense"
+   "General and Administrative Expense"
+   "R&D Expense"
+   "Depreciation"
+   "Operating Expenses"
+   "Operating Income"
+   "Interest Expense"
+   "Non-Operating Income"
+   "Pre-Tax Income"
+   "Income Tax Expense"
+   "Net Income"
+   "EPS Basic"
+   "EPS Diluted"
+   "Shares Basic"
+   "Shares Diluted"
+   "Dividends Paid"
+   "Stock Repurchase"])
 
 (def bs-column-order
-  "Main balance-sheet lines only. Defined in facts-ui."
-  facts-ui/bs-column-order)
+  "Main balance-sheet lines for the legacy statement."
+  ["Cash and Equivalents"
+   "Accounts Receivable"
+   "Inventory"
+   "Current Assets"
+   "PP&E Net"
+   "Total Assets"
+   "Accounts Payable"
+   "Current Debt"
+   "Current Portion of Long-Term Debt"
+   "Short-Term Borrowings"
+   "Current Liabilities"
+   "Long-Term Debt"
+   "Total Liabilities"
+   "Stockholders Equity"
+   "Total Equity"
+   "Total Liabilities and Equity"])
 
 (defn pl-scale
   "USD and share counts → millions. EPS stays in dollars."
@@ -961,102 +997,89 @@
     (catch Exception _
       "10-Q")))
 
-(defn- display-num
-  "USD and share counts → millions. Per-share amounts stay in dollars."
-  [label val]
-  (when (number? val)
-    (if (re-find #"(?i)eps|per\s*share" (str label))
-      (double val)
-      (long (/ (double val) 1.0e6)))))
+(def ^:private share-labels
+  ["Shares Basic" "Shares Diluted"])
 
-(defn- shares-missing?
-  [lines]
-  (let [share-lines (filter #(#{"Shares Basic" "Shares Diluted"} (:label %)) lines)]
-    (not-any? #(some number? (:vals %)) share-lines)))
+(def ^:private presentable-meta-cols
+  #{:field :style :format :section})
 
-(defn- merge-share-lines
+(defn- make-column
+  [name values metadata]
+  (let [values (vec values)
+        data (if (empty? values) (make-array Object 0) values)]
+    (col/new-column name data metadata)))
+
+(defn- column-meta-keep
+  [c]
+  (dissoc (meta c) :name :datatype :n-elems))
+
+(defn- shares-columns-missing?
+  [table]
+  (not-any? (fn [label]
+              (and (ds/has-column? table label)
+                   (some number? (ds/column table label))))
+            share-labels))
+
+(defn- merge-share-columns
   "Fill Shares Basic / Shares Diluted from `shares` ({label {end val}}).
-  Inserts a missing line ahead of the balance sheet."
-  [lines periods shares]
+  Inserts a missing column ahead of the first `:balance` field."
+  [table shares]
   (if-not (seq shares)
-    lines
-    (let [ends (mapv #(str (:end %)) periods)
-          lines (mapv (fn [line]
-                        (if-let [by-end (get shares (:label line))]
-                          (assoc line :vals
-                                 (mapv (fn [end v]
-                                         (if (number? v) v (get by-end end)))
-                                       ends
-                                       (:vals line)))
-                          line))
-                      lines)
-          have (set (map :label lines))
+    table
+    (let [ends (mapv str (ds/column table :end))
+          names (vec (ds/column-names table))
+          have (set (map str names))
+          updated (mapv (fn [name]
+                          (let [c (ds/column table name)
+                                m (column-meta-keep c)]
+                            (if-let [by-end (get shares (str name))]
+                              (make-column name
+                                           (mapv (fn [end v]
+                                                   (if (number? v) v (get by-end end)))
+                                                 ends
+                                                 (vec c))
+                                           m)
+                              (make-column name (vec c) m))))
+                        names)
+          missing (remove #(have (key %)) shares)
+          bal-idx (or (first (keep-indexed
+                              (fn [i name]
+                                (when (= :balance (:section (meta (ds/column table name))))
+                                  i))
+                              names))
+                      (count names))
           extra (mapv (fn [[label by-end]]
-                        {:label label
-                         :section :income
-                         :vals (mapv #(get by-end %) ends)})
-                      (remove #(have (key %)) shares))
-          idx (or (first (keep-indexed
-                          (fn [i line]
-                            (when (= :balance (:section line)) i))
-                          lines))
-                  (count lines))]
-      (vec (concat (take idx lines) extra (drop idx lines))))))
+                        (make-column label
+                                     (mapv #(get by-end %) ends)
+                                     {:section :income}))
+                      missing)
+          columns (vec (concat (take bal-idx updated) extra (drop bal-idx updated)))]
+      (ds/new-dataset {:dataset-name (or (ds/dataset-name table) "report-table")}
+                      columns))))
 
-(defn- align-vals
-  "Oldest-first slice of a newest-first value vector."
-  [vals n]
-  (vec (reverse (take n vals))))
-
-(defn- table-from-lines
-  "Year-end, filing date, then statement lines. Columns are the `n` newest
-  periods, oldest first. A blank row separates the balance sheet."
-  [lines periods n period fye filing-dates]
-  (let [shown (vec (reverse (take n periods)))
-        ends (mapv #(str (:end %)) shown)
-        labels (column-labels ends period (fye-month fye))
-        columns (into [:field] labels)
-        year-end (into {:field "year-end"}
-                       (map (fn [end label] [label (str end)]) ends labels))
-        filing-date (into {:field "filing-date"}
-                          (map (fn [end label]
-                                 [label (get filing-dates (str end))])
-                               ends labels))
-        blank (into {:field ""} (map (fn [label] [label nil]) labels))
-        body (:rows
-              (reduce (fn [{:keys [rows saw? blanked?]} line]
-                        (let [vs (align-vals (:vals line) n)]
-                          (if-not (some number? vs)
-                            {:rows rows :saw? saw? :blanked? blanked?}
-                            (let [need-blank? (and saw?
-                                                   (not blanked?)
-                                                   (= :balance (:section line)))
-                                  row (cond-> (into {:field (:label line)}
-                                                    (map (fn [label v]
-                                                           [label (display-num (:label line) v)])
-                                                         labels vs))
-                                        (:format line) (assoc :format (:format line)))]
-                              {:rows (cond-> rows
-                                       need-blank? (conj blank)
-                                       true (conj row))
-                               :saw? true
-                               :blanked? (or blanked? need-blank?)}))))
-                      {:rows [] :saw? false :blanked? false}
-                      lines))]
-    {:columns columns
-     :rows (vec (concat [year-end filing-date] body))}))
+(defn- take-periods-oldest-first
+  "Keep the `n` newest period rows (table is newest-first), oldest first."
+  [table n]
+  (let [rc (ds/row-count table)
+        n' (min (long n) rc)
+        idxs (vec (range (dec n') -1 -1))]
+    (if (zero? n')
+      table
+      (ds/select-rows table idxs))))
 
 (defn financials-data
-  "P&L and balance-sheet lines from `facts-ds`.
+  "Wide statement dataset from `facts-ui/statement`, extended for display.
 
-  `:n` is how many columns to keep: fiscal years when annual, quarters
-  when quarterly. `:period` is annual (default) or quarterly.
+  `:n` is how many period columns to keep: fiscal years when annual,
+  quarters when quarterly. `:period` is annual (default) or quarterly.
   `:view` is `:current` (default), `:all`, `:insurance`, `:bank`, or `:reit`.
   `:inline-xbrl?` true appends 6-K inline XBRL that companyfacts lacks,
   and fills dual-class share counts from the annual filing. stats.edn
   does not set it.
 
-  Returns `{:ticker :name :cik :form :period :view :columns :rows}`."
+  Returns `{:ticker :name :cik :form :period :view :fye :filing-dates :table}`.
+  `:table` is period-row oriented (oldest first after the `n` slice). Run
+  `presentable-financials` for the scaled field-row view."
   [m]
   (let [{:keys [ticker n period]} (opts m)
         view (facts-ui/parse-view (:view m))
@@ -1070,25 +1093,70 @@
           facts (cond-> (e/facts cik)
                   inline? (with-pending-ixbrl cik))
           industry (income-industry (:sic meta))
-          {:keys [periods lines]} (facts-ui/statement facts
-                                                      (if quarterly? :q :y)
-                                                      view
-                                                      industry)
+          table (facts-ui/statement facts
+                                    (if quarterly? :q :y)
+                                    view
+                                    industry)
           shares (when (and inline?
                             (not= view :all)
-                            (shares-missing? lines))
+                            (shares-columns-missing? table))
                    (class-weighted-shares cik form))
-          lines (merge-share-lines lines periods shares)
+          table (cond-> table
+                  (seq shares) (merge-share-columns shares))
+          table (take-periods-oldest-first table n)
           filing-forms (if quarterly? (conj interim-forms form) [form])
-          filing-dates (filing-dates-by-end cik filing-forms)
-          table (table-from-lines lines periods n period fye filing-dates)]
-      (merge {:ticker ticker
-              :name (:name meta)
-              :cik cik
-              :form (if quarterly? (quarterly-form-label facts) form)
-              :period period
-              :view view}
-             table))))
+          filing-dates (filing-dates-by-end cik filing-forms)]
+      {:ticker ticker
+       :name (:name meta)
+       :cik cik
+       :form (if quarterly? (quarterly-form-label facts) form)
+       :period period
+       :view view
+       :fye fye
+       :filing-dates filing-dates
+       :table table})))
+
+(defn presentable-financials
+  "Scale and transpose `:table`, then add year-end / filing-date chrome.
+
+  Renames period columns with `column-labels`. Inserts a blank row before
+  the first `:balance` section when that metadata is present. Returns a
+  presentable dataset (field rows)."
+  [{:keys [table period fye filing-dates]}]
+  (let [p (facts-ui/presentable table)
+        ends (into []
+                   (remove #(contains? presentable-meta-cols %))
+                   (ds/column-names p))
+        labels (column-labels ends period (fye-month fye))
+        rename (zipmap ends labels)
+        renamed (if (seq rename) (ds/rename-columns p rename) p)
+        year-end (into {:field "year-end"}
+                       (map (fn [end label] [label (str end)]) ends labels))
+        filing-date (into {:field "filing-date"}
+                          (map (fn [end label]
+                                 [label (get filing-dates (str end))])
+                               ends labels))
+        blank (into {:field ""} (map (fn [label] [label nil]) labels))
+        body (:rows
+              (reduce (fn [{:keys [rows saw? blanked?]} row]
+                        (let [need-blank? (and saw?
+                                               (not blanked?)
+                                               (= :balance (:section row)))]
+                          {:rows (cond-> rows
+                                   need-blank? (conj blank)
+                                   true (conj row))
+                           :saw? true
+                           :blanked? (or blanked? need-blank?)}))
+                      {:rows [] :saw? false :blanked? false}
+                      (ds/rows renamed {:nil-missing? true})))
+        all-rows (vec (concat [year-end filing-date] body))
+        meta-present (filterv #(ds/has-column? renamed %)
+                              [:style :format :section])
+        col-order (into (into [:field] labels) meta-present)
+        table (ds/->dataset all-rows {:dataset-name "presentable-financials"})]
+    (if (seq all-rows)
+      (ds/select-columns table col-order)
+      table)))
 
 (defn financials
   "Print standardized P&L and main balance-sheet lines.
@@ -1100,60 +1168,19 @@
          clj -X:financials :ticker AAPL :period quarterly :n 10"
   ([] (financials {}))
   ([m]
-   (let [{:keys [ticker cik form columns rows] :as data} (financials-data m)
-         ds (ds/->dataset rows
-                          {:dataset-name (str ticker " financials ($ millions; EPS in $)")
-                           :column-order columns})]
+   (let [{:keys [ticker cik form] :as data} (financials-data m)
+         presentable (presentable-financials data)
+         drop-cols (filterv #(ds/has-column? presentable %)
+                            [:style :format :section])
+         shown (-> presentable
+                   (cond-> (seq drop-cols) (ds/remove-columns drop-cols))
+                   (ds/set-dataset-name
+                    (str ticker " financials ($ millions; EPS in $)")))]
      (println)
      (println (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
                       ticker (:name data) cik form))
-     (pprint/print-table columns rows)
-     ds)))
-
-(defn pl-fields
-  "Print last-year income-statement tags: line, XBRL concept, value.
-
-  Usage: clj -X:pl-fields :ticker OXY"
-  ([] (pl-fields {}))
-  ([m]
-   (let [{:keys [ticker]} (opts m)]
-     (ensure-identity!)
-     (let [cik (resolve-filer ticker)
-           meta (e/company-metadata cik)
-           fye (:fiscal-year-end meta)
-           reported (ds/mapseq-reader (e/income cik :form "10-K" :view :as-reported))
-           annual (filter annual-duration? reported)
-           latest-end (->> annual (map #(str (:end %))) sort last)
-           line-by-concept (->> (annual-statement-rows cik fye)
-                                (filter #(= latest-end (str (:end %))))
-                                (map (juxt :concept :line-item))
-                                (into {}))
-           fields (->> annual
-                       (filter #(= latest-end (str (:end %))))
-                       (group-by :concept)
-                       vals
-                       (map latest-by-filed)
-                       (map (fn [r]
-                              (let [usd? (= "USD" (:unit r))]
-                                {:line (or (line-by-concept (:concept r))
-                                           (:label r))
-                                 :tag (:concept r)
-                                 :value (when-let [v (:val r)]
-                                          (if usd?
-                                            (long (/ v 1.0e6))
-                                            v))
-                                 :unit (if usd? "USD millions" (:unit r))})))
-                       (sort-by (fn [{:keys [line tag]}]
-                                  (let [i (.indexOf pl-column-order (str line))]
-                                    [(if (neg? i) 1 0) (if (neg? i) 99 i) (str line) (str tag)]))))]
-       (println (format "%s  ticker=%s  CIK=%s  period=%s"
-                        (:name meta) ticker cik latest-end))
-       (println "Income-statement tags (as reported; USD in millions)")
-       (println)
-       (pprint/print-table [:line :tag :value :unit] fields)
-       (ds/->dataset fields
-                     {:dataset-name (str ticker " P&L fields " latest-end)
-                      :column-order [:line :tag :value :unit]})))))
+     (println (ds/print-all shown))
+     shown)))
 
 (defn -main
   [& _]
