@@ -6,6 +6,8 @@
             [edgar.xbrl :as xbrl]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.financials.facts-ui :as facts-ui]
+            [edgar2.financials.view.core :as view]
+            [edgar2.financials.view.edgarjure :as edgarjure]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds]))
 
@@ -18,54 +20,58 @@
      (json/read-value (slurp f) json/keyword-keys-object-mapper))))
 
 (defn- income-labels
-  [view industry]
-  (->> (facts-ui/view-fields view industry)
+  [view-id industry]
+  (->> (view/view-fields view-id industry)
        (filter #(= :income (:section %)))
        (map :label)
        vec))
 
 (deftest view-choices
-  (is (= [:current :all :insurance :bank :reit]
-         (mapv first facts-ui/view-choices)))
-  (is (= :current (facts-ui/parse-view nil)))
-  (is (= :bank (facts-ui/parse-view "bank")))
-  (is (= :current (facts-ui/parse-view "nope")))
-  (is (= [] (facts-ui/view-fields :all :standard))))
+  (is (= [:default :all :edgarjure-standard :edgarjure-insurance
+          :edgarjure-bank :edgarjure-reit]
+         (mapv first view/view-choices)))
+  (is (= :default (view/parse-view nil)))
+  (is (= :edgarjure-bank (view/parse-view "edgarjure-bank")))
+  (is (= :default (view/parse-view "nope")))
+  (is (= [] (view/view-fields :all :standard))))
 
 (deftest industry-income-matches-edgarjure
-  (doseq [industry [:insurance :bank :reit]]
+  (doseq [industry [:standard :insurance :bank :reit]]
     (let [chains (mapv first (:chains (e/concepts-for :income :industry industry)))
-          shown (income-labels industry industry)]
-      (is (= chains (vec (take (count chains) shown))))
-      (is (= ["Dividends Paid" "Stock Repurchase"]
-             (vec (take-last 2 shown)))))))
+          view-id (keyword (str "edgarjure-" (name industry)))
+          shown (income-labels view-id industry)
+          from-fn (mapv :label (edgarjure/edgarjure-income-industry industry))]
+      (is (= chains shown))
+      (is (= chains from-fn))
+      (is (= shown from-fn)))))
 
 (deftest formats-and-kinds
-  (let [current (into {} (map (juxt :label identity)
-                              (facts-ui/view-fields :current :standard)))
+  (let [default (into {} (map (juxt :label identity)
+                              (view/view-fields :default :standard)))
         bank (into {} (map (juxt :label identity)
-                           (facts-ui/view-fields :bank :bank)))
+                           (view/view-fields :edgarjure-bank :standard)))
         insurance (into {} (map (juxt :label identity)
-                                (facts-ui/view-fields :insurance :insurance)))]
-    (is (= :operating-income (:math (get current "Operating Income"))))
-    (is (= :operating-expenses (:math (get current "Operating Expenses"))))
-    (is (= :revenue (:concept (get current "Revenue"))))
-    (is (= :depreciation (:concept (get current "Depreciation"))))
-    (is (= "Net Income" (:edgarjure (get current "Net Income"))))
-    (is (= :background-pl-green (:style (get current "Net Income"))))
-    (is (= :background-pl-green (:style (get current "Gross Profit"))))
-    (is (= :background-pl-green (:style (get current "Dividends Paid"))))
-    (is (= :dividends-paid (:math (get current "Dividends Paid"))))
-    (is (= :background-balance-active (:style (get current "Total Assets"))))
-    (is (= :background-balance-passive (:style (get current "Total Liabilities"))))
-    (is (= :background-balance-passive (:style (get current "Total Equity"))))
+                                (view/view-fields :edgarjure-insurance :standard)))]
+    (is (= :operating-income (:math (get default "Operating Income"))))
+    (is (= :operating-expenses (:math (get default "Operating Expenses"))))
+    (is (= :revenue (:concept (get default "Revenue"))))
+    (is (= :depreciation (:concept (get default "Depreciation"))))
+    (is (= "Net Income" (:edgarjure (get default "Net Income"))))
+    (is (= :background-pl-green (:style (get default "Net Income"))))
+    (is (= :background-pl-green (:style (get default "Gross Profit"))))
+    (is (= :background-pl-green (:style (get default "Dividends Paid"))))
+    (is (= :dividends-paid (:math (get default "Dividends Paid"))))
+    (is (= :background-balance-active (:style (get default "Total Assets"))))
+    (is (= :background-balance-passive (:style (get default "Total Liabilities"))))
+    (is (= :background-balance-passive (:style (get default "Total Equity"))))
     (is (= :background-pl-green (:style (get bank "Net Interest Income"))))
     (is (= "Net Interest Income" (:edgarjure (get bank "Net Interest Income"))))
+    (is (nil? (:math (get bank "Net Interest Income"))))
     (is (= :background-pl-green (:style (get insurance "Premiums Earned"))))))
 
 (deftest statement-current-and-all-sw
   (let [dss (load-facts "SW")
-        current (facts-ui/statement dss :y :current :standard)
+        current (facts-ui/statement dss :y :default :standard)
         all (facts-ui/statement dss :y :all :standard)
         present (facts-ui/presentable current)
         net-col (ds/column current "Net Income")]
@@ -85,7 +91,7 @@
 
 (deftest format-columns-scales-non-eps
   (let [dss (load-facts "AAPL")
-        wide (facts-ui/statement dss :y :current :standard)
+        wide (facts-ui/statement dss :y :default :standard)
         scaled (facts-ui/format-columns wide)
         rev (first (filter number? (ds/column wide "Revenue")))
         rev-m (first (filter number? (ds/column scaled "Revenue")))]
@@ -99,7 +105,7 @@
   (let [dss (load-facts "AAPL")
         ;; Newest-first statement, then reverse so periods ascend like
         ;; financials-data's take-n slice.
-        wide (facts-ui/statement dss :y :current :standard)
+        wide (facts-ui/statement dss :y :default :standard)
         n (min 10 (ds/row-count wide))
         oldest-first (ds/select-rows wide (vec (range (dec n) -1 -1)))
         ends (mapv #(str (:end %)) (ds/rows oldest-first {:nil-missing? true}))

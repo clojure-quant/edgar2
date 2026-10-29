@@ -6,6 +6,7 @@
             [edgar2.financials.derived :as derived]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.financials.facts-ui :as facts-ui]
+            [edgar2.financials.view.core :as view]
             [edgar2.financials.ixbrl :as ixbrl]
             [tech.v3.dataset :as ds]
             [tech.v3.dataset.column :as col])
@@ -1072,7 +1073,8 @@
 
   `:n` is how many period columns to keep: fiscal years when annual,
   quarters when quarterly. `:period` is annual (default) or quarterly.
-  `:view` is `:current` (default), `:all`, `:insurance`, `:bank`, or `:reit`.
+  `:view` is `:default` (default), `:all`, or `:edgarjure-standard` /
+  `:edgarjure-insurance` / `:edgarjure-bank` / `:edgarjure-reit`.
   `:inline-xbrl?` true appends 6-K inline XBRL that companyfacts lacks,
   and fills dual-class share counts from the annual filing. stats.edn
   does not set it.
@@ -1082,7 +1084,7 @@
   `presentable-financials` for the scaled field-row view."
   [m]
   (let [{:keys [ticker n period]} (opts m)
-        view (facts-ui/parse-view (:view m))
+        view (view/parse-view (:view m))
         inline? (boolean (:inline-xbrl? m))]
     (ensure-identity!)
     (let [cik (resolve-filer ticker)

@@ -3,7 +3,7 @@
             [hyper.core :as h]
             [hyper.effects :as effects]
             [edgar2.filing :as filing]
-            [edgar2.financials.facts-ui :as facts-ui]
+            [edgar2.financials.view.core :as view]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats-category :as stats-cat]
             [edgar2.web.fsds :as fsds]
@@ -177,8 +177,8 @@
   [req]
   (let [p (get-in req [:hyper/route :path-params])
         q (get-in req [:hyper/route :query-params])]
-    (facts-ui/parse-view (or (:view p) (get p "view")
-                             (:view q) (get q "view")))))
+    (view/parse-view (or (:view p) (get p "view")
+                         (:view q) (get q "view")))))
 
 (defn- go-financials!
   "Open financials for the tab's ticker, count, period, and field view.
@@ -192,11 +192,11 @@
   (let [ticker (ticker/current)
         n (parse-n n)
         period (name (filing/parse-period period))
-        view (facts-ui/parse-view view)
+        view (view/parse-view view)
         q (when ticker {:ticker ticker})]
     (when (and ticker n)
       (cond
-        (not= view :current)
+        (not= view :default)
         (effects/navigate! :company-financials-view
                            {:n (str n)
                             :period period
@@ -241,7 +241,7 @@
               :data-on:change
               (h/action
                (go-financials! (:n $form-data) (:period $form-data) (:view $form-data)))}
-     (for [[value label] facts-ui/view-choices]
+     (for [[value label] view/view-choices]
        [:option (cond-> {:key value :value (name value)}
                   (= value view) (assoc :selected true))
         label])]]
@@ -270,7 +270,7 @@
                     (case status
                       :loading [:p (str "Loading " ticker " (n=" n ", "
                                         (name period) ", "
-                                        (facts-ui/view-label view) ")…")]
+                                        (view/view-label view) ")…")]
                       :error [:p.error message]
                       :ready [:div
                               [:p.fin-header
