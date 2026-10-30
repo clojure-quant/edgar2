@@ -3,7 +3,7 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [hyper.core :as h]
-            [edgar2.filing :as filing]
+            [edgar2.util :as util]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
 
@@ -131,9 +131,9 @@
   "Filings for a ticker or a CIK. A ticker wins when both are set.
   Tickers go through the same CIK resolution as the financials page."
   [ticker cik]
-  (filing/ensure-identity!)
+  (util/ensure-identity!)
   (let [id (if ticker
-             (filing/resolve-filer ticker)
+             (util/resolve-filer ticker)
              (e/cik cik))
         filings (vec (e/filings id :include-amends? true))
         company (e/company id)]

@@ -1,9 +1,11 @@
 (ns demo.sharecount-check
   "Compare the facts-universe share count with shares implied by earnings.
 
-  The share count is `edgar2.download.facts-universe/shares-outstanding`.
+  The share count is `edgar2.download.facts-universe/shares-outstanding`
+  (quarterly report table when it was filed after the annual row, unless
+  the quarterly count is more than 100 times smaller).
   The estimate is |:net-income| / |:eps| from that share count's own period
-  (concept priority in `edgar2.financials.concepts`). A 10-Q share count is
+  (concept priority in `edgar2.financials.concepts`). A quarterly share count is
   compared with that quarter; an annual share count with that year.
   `edgar2.financials.calc.annual/ratio` only divides a pair of values from
   the same report-table row, so a quarterly share count is never compared
@@ -34,19 +36,6 @@
     (when-let [entry (.getEntry zf (str "CIK" cik ".json"))]
       (with-open [in (.getInputStream zf entry)]
         (json/read-value in json/keyword-keys-object-mapper)))))
-
-(defn- frequency
-  "`:q` for a 10-Q share count, `:y` for an annual report. Nil otherwise."
-  [form]
-  (cond
-    (universe/quarterly-share-forms (str form)) :q
-    (universe/annual-share-forms (str form)) :y))
-
-(defn- share-period
-  "Report-table period of the share count, e.g. \"2011-Q1\" or \"2010-FY\"."
-  [{:keys [fy fp]}]
-  (when (and fy (not-empty (str fp)))
-    (str fy "-" fp)))
 
 (defn- periods
   [dss q-or-y]
@@ -121,18 +110,17 @@
   by more than 50%. Nil when companyfacts is missing or either figure is."
   [data]
   (when data
-    (let [obs (universe/shares-outstanding-obs (:facts data))
+    (let [dss (xbrl/facts->dataset data)
+          obs (universe/shares-outstanding-obs dss)
           shares (:val obs)
-          q-or-y (frequency (:form obs))]
+          q-or-y (:q-or-y obs)]
       (when (and (number? shares) (pos? (double shares)) q-or-y)
         (when-let [est (try
-                         (estimate-shares (xbrl/facts->dataset data)
-                                          q-or-y
-                                          (share-period obs))
+                         (estimate-shares dss q-or-y (:period obs))
                          (catch Throwable _ nil))]
           (let [estimated (:estimated est)]
             {:shares (double shares)
-             :share-form (not-empty (str (:form obs)))
+             :share-form (get (form-by-end dss q-or-y) (:end obs))
              :earn-form (:form est)
              :end (:end est)
              :period (:period est)

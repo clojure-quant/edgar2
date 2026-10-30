@@ -2,11 +2,18 @@
   "Inline XBRL facts from a filing companyfacts has not ingested yet.
 
   Contexts often live in the cover HTML and the statement numbers in an
-  exhibit such as as-20260630_d2.htm. Both are read and joined on context id."
+  exhibit such as as-20260630_d2.htm. Both are read and joined on context id.
+
+  An annual report can be in the same state. GreenPower's 2026 20-F is
+  inline XBRL, and companyfacts kept only the cover-page share count.
+  The year ended 2025-03-31 is a comparative column of that filing."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [edgar.api :as e]
             [edgar.core :as ec]
-            [edgar.filing :as ef])
+            [edgar.filing :as ef]
+            [edgar2.financials.facts-ds :as facts-ds]
+            [tech.v3.dataset :as ds])
   (:import [java.math BigDecimal]))
 
 (def ^:private filing-dir "data/filings")
@@ -160,15 +167,13 @@
            (sort-by (fn [name] [(if (statement-name? name) 1 0) name]))
            vec))))
 
-(defn filing-facts
-  "Undimensioned facts from a 6-K's inline XBRL.
+(defn- facts-from-docs
+  "Undimensioned facts from `names`, joined on context id.
 
-  Each map is {:taxonomy :concept :start :end :unit :val :accn :form :filed}.
-  A later _d2 exhibit replaces the same fact from the cover."
-  [filing]
-  (let [names (or (seq (cached-html-names filing))
-                  (html-names (ef/filing-index filing)))
-        htmls (mapv #(read-doc! filing %) names)
+  A later document replaces the same fact. Each map is
+  {:taxonomy :concept :start :end :unit :val :accn :form :filed}."
+  [filing names]
+  (let [htmls (mapv #(read-doc! filing %) names)
         ctx (reduce merge {} (map contexts htmls))
         rows (mapcat #(fact-seq % ctx) htmls)]
     (->> rows
@@ -183,3 +188,137 @@
                       :form (str (:form filing))
                       :filed (:filingDate filing)))
          vec)))
+
+(defn filing-facts
+  "Undimensioned facts from a 6-K's inline XBRL.
+
+  Each map is {:taxonomy :concept :start :end :unit :val :accn :form :filed}.
+  A later _d2 exhibit replaces the same fact from the cover."
+  [filing]
+  (facts-from-docs filing (or (seq (cached-html-names filing))
+                              (html-names (ef/filing-index filing)))))
+
+(defn annual-report-form?
+  "10-K, 20-F, 40-F, including amendments."
+  [form]
+  (boolean (re-find #"^(10-K|20-F|40-F)" (str form))))
+
+(defn inline-annual?
+  "True when this filing is an inline-XBRL annual report."
+  [filing]
+  (and (annual-report-form? (:form filing))
+       (true? (flag-on? (:isInlineXBRL filing)))))
+
+(defn- annual-window-row?
+  [row]
+  (and (annual-report-form? (:form row))
+       (facts-ds/annual-duration? row)))
+
+(defn pending-annual-filings
+  "Inline annual reports whose ~12-month window is missing from companyfacts.
+
+  `rows` are companyfacts fact rows. A filing is pending when it is inline
+  XBRL, its report date is after the latest annual period-end already
+  present, and its accession has no ~12-month fact. Companyfacts can still
+  list that accession: GreenPower's 2026 20-F is there as the cover-page
+  share count only. When companyfacts has no annual window, only the newest
+  inline annual is pending."
+  [filings rows]
+  (let [known (into #{}
+                    (keep (fn [row]
+                            (when (annual-window-row? row)
+                              (not-empty (str (:accn row))))))
+                    rows)
+        latest (->> rows
+                    (filter annual-window-row?)
+                    (map #(str (:end %)))
+                    (remove str/blank?)
+                    sort
+                    last)
+        candidates (->> filings
+                        (filter (fn [filing]
+                                  (and (inline-annual? filing)
+                                       (not (contains? known (str (:accessionNumber filing))))
+                                       (or (nil? latest)
+                                           (pos? (compare (str (:reportDate filing))
+                                                          latest))))))
+                        (sort-by #(str (:filingDate %)) #(compare %2 %1))
+                        vec)]
+    (if (some? latest)
+      candidates
+      (vec (take 1 candidates)))))
+
+(defn- ended-by-filing?
+  [fact]
+  (not (pos? (compare (str (:end fact)) (str (:filed fact))))))
+
+(defn annual-statement-facts
+  "Annual-duration facts and instants on those period-ends, tagged `:fp` FY.
+
+  Short windows (a share issuance, a quarter) are omitted. `:fy` is the
+  period-end year, so a comparative column is labeled as its own year.
+  A window that ends after the filing date is omitted."
+  [facts]
+  (let [windows (filterv #(and (facts-ds/annual-duration? %)
+                               (ended-by-filing? %))
+                         facts)
+        ends (set (map #(str (:end %)) windows))
+        instants (filterv (fn [fact]
+                            (and (str/blank? (str (:start fact)))
+                                 (contains? ends (str (:end fact)))
+                                 (ended-by-filing? fact)))
+                          facts)]
+    (mapv (fn [fact]
+            (let [year (some-> (facts-ds/parse-date (:end fact)) .getYear)]
+              (assoc fact :fp "FY" :fy (or (:fy fact) year))))
+          (concat windows instants))))
+
+(defn- exhibit-name?
+  [name]
+  (boolean (re-find #"(?i)exhibit" (str name))))
+
+(defn- annual-doc-names
+  "Primary annual document, plus a `_d2` statement exhibit when the
+  filing has one. Contract exhibits are not the statements."
+  [filing]
+  (let [primary (some-> (:primaryDocument filing) str str/trim not-empty)
+        indexed (try (html-names (ef/filing-index filing))
+                     (catch Exception _ []))
+        d2 (filter statement-name? indexed)
+        cover (when-not primary
+                (first (remove exhibit-name? indexed)))]
+    (vec (distinct (keep not-empty (concat [primary cover] d2))))))
+
+(defn annual-filing-facts
+  "Annual-statement facts from an annual report's inline XBRL.
+
+  Reads the primary document and a `_d2` exhibit. Same maps as
+  `filing-facts`, with `:fp` FY and `:fy` set."
+  [filing]
+  (annual-statement-facts (facts-from-docs filing (annual-doc-names filing))))
+
+(defn with-pending-annual-ixbrl
+  "Companyfacts plus inline XBRL from annual reports that never fully
+  landed in companyfacts.
+
+  GreenPower's 2026 20-F is one of these. Its comparative column is the
+  year ended 2025-03-31, which companyfacts does not have, and the 2025
+  20-F itself was filed without XBRL. A failure leaves `dss` unchanged."
+  [dss cik]
+  (try
+    (let [rows (when dss (vec (ds/rows dss {:nil-missing? true})))
+          pending (pending-annual-filings
+                   (e/filings cik :include-amends? true :limit 1000)
+                   rows)
+          extra (mapcat (fn [filing]
+                          (try
+                            (annual-filing-facts filing)
+                            (catch Exception _
+                              [])))
+                        pending)]
+      (if (seq extra)
+        (ds/->dataset (concat rows extra)
+                      {:dataset-name "facts-with-annual-ixbrl"})
+        dss))
+    (catch Exception _
+      dss)))

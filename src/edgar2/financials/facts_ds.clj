@@ -240,11 +240,27 @@
   (str/blank? (str (:start row))))
 
 (defn- annual-stock-fact?
-  "Instant facts for annual periods: FY / 10-K / 20-F / 40-F only.
+  "Instant facts on the annual table: FY / 10-K / 20-F / 40-F only.
   Later 10-Qs often restate year-end balances with rounded values."
   [fact]
   (or (= "FY" (str (:fp fact)))
       (annual-forms (str (:form fact)))))
+
+(defn- quarterly-instant-period
+  "Quarterly period a balance-sheet instant belongs to.
+
+  The filing's own quarter only. `:end` equal to that quarter's end is the
+  balance at period end. An `:end` that is not any quarterly period end is
+  the cover page (DEI shares dated the filing day) and attaches to that
+  same quarter. A comparative instant, whose `:end` is some other quarter,
+  stays off — a later 10-Q would otherwise replace that quarter's figures."
+  [fact periods-by-accn periods-by-end]
+  (let [end (str (:end fact))
+        owns (get periods-by-accn (str (:accn fact)))]
+    (or (some #(when (= end (str (:end %))) %) owns)
+        (when (and (seq owns)
+                   (not (contains? periods-by-end end)))
+          (last (sort-by #(str (:end %)) owns))))))
 
 (defn- matching-period
   "Period for one fact.
@@ -254,12 +270,17 @@
   own year is this period (a 10-K/A of the same year). A later 10-K that
   only repeats the year as a comparative does not attach, and neither does
   a proxy: DEF 14A often repeats the year in thousands.
-  Instant (blank `:start`): annual filings only; `:accn`+`:end`, else same
-  `:end` when this filing reports that year, else (cover-page DEI) the
-  filing's own period when `:end` matches none.
+  Instant (blank `:start`): on the annual table, FY / 10-K / 20-F / 40-F
+  only — `:accn`+`:end`, else same `:end` when this filing reports that
+  year. A 10-K / 20-F / 40-F whose statements were filed on another
+  submission (a 6-K) still attaches when its `:fy` is that period's year:
+  the cover-page share count lives only on the annual form. A later
+  filing's comparative instant has the later `:fy` and stays off.
+  Otherwise (cover-page DEI dated the filing day) the filing's own period
+  when `:end` matches none. On the quarterly table, `quarterly-instant-period`.
 
   `own-end-by-accn` is accession → the period-end that filing reports.
-  Nil keeps the looser match used for quarterly periods."
+  Nil selects the quarterly rule."
   [fact periods-by-accn-end periods-by-end periods-by-accn own-end-by-accn]
   (let [accn (str (:accn fact))
         end (str (:end fact))
@@ -267,16 +288,22 @@
         own-end (when own-end-by-accn (get own-end-by-accn accn))
         files-this-year? (or (nil? own-end-by-accn) (= end own-end))]
     (if (blank-start? fact)
-      (when (annual-stock-fact? fact)
-        (or (first (get periods-by-accn-end [accn end]))
-            (when files-this-year?
-              (first (get periods-by-end end)))
-            (when-not (contains? periods-by-end end)
-              (if own-end
-                (or (some #(when (= own-end (str (:end %))) %)
-                          (get periods-by-accn accn))
-                    (first (get periods-by-end own-end)))
-                (first (get periods-by-accn accn))))))
+      (if (nil? own-end-by-accn)
+        (quarterly-instant-period fact periods-by-accn periods-by-end)
+        (when (annual-stock-fact? fact)
+          (or (first (get periods-by-accn-end [accn end]))
+              (when files-this-year?
+                (first (get periods-by-end end)))
+              (when (annual-forms (str (:form fact)))
+                (when-let [period (first (get periods-by-end end))]
+                  (when (= (str (:fy fact)) (str (:fy period)))
+                    period)))
+              (when-not (contains? periods-by-end end)
+                (if own-end
+                  (or (some #(when (= own-end (str (:end %))) %)
+                            (get periods-by-accn accn))
+                      (first (get periods-by-end own-end)))
+                  (first (get periods-by-accn accn)))))))
       (or (some #(when (= start (str (:start %))) %)
                 (get periods-by-accn-end [accn end]))
           (when (and files-this-year?
@@ -296,7 +323,9 @@
   Returns a long-format dataset with period columns `:filed :period :end`,
   plus `:taxonomy :concept :unit :val` (and `:label` when present). Instant
   facts (no `:start`) match on `:accn` (and `:end` when it aligns); duration
-  facts also require `:start`."
+  facts also require `:start`. Quarterly datasets also carry one shell row
+  per period end (`:concept` blank) so a quarter with no attached fact still
+  has a row."
   [dss q-or-y fields]
   (let [periods (case q-or-y
                   :y (annual-periods dss)
@@ -310,22 +339,30 @@
                    (own-end-by-accn (annual-window-rows dss)))
         wanted (when (some? fields) (set (map field-pair fields)))
         out-cols (into report-period-cols [:taxonomy :concept :label :unit :val])
-        rows (->> (ds/rows dss {:nil-missing? true})
-                  (keep (fn [fact]
-                          (when (or (nil? wanted)
-                                    (contains? wanted
-                                               [(str (:taxonomy fact))
-                                                (str (:concept fact))]))
-                            (when-let [period (matching-period fact by-accn-end by-end by-accn own-ends)]
-                              (-> fact
-                                  (merge (select-keys period report-period-cols))
-                                  ;; keep the fact's own :filed for restatement preference
-                                  (assoc :filed (:filed fact))
-                                  (select-keys out-cols))))))
-                  (sort-by (juxt #(str (:end %))
-                                 #(str (:taxonomy %))
-                                 #(str (:concept %))
-                                 #(str (:unit %)))))]
+        fact-rows (->> (ds/rows dss {:nil-missing? true})
+                       (keep (fn [fact]
+                               (when (or (nil? wanted)
+                                         (contains? wanted
+                                                    [(str (:taxonomy fact))
+                                                     (str (:concept fact))]))
+                                 (when-let [period (matching-period fact by-accn-end by-end by-accn own-ends)]
+                                   (-> fact
+                                       (merge (select-keys period report-period-cols))
+                                       ;; keep the fact's own :filed for restatement preference
+                                       (assoc :filed (:filed fact))
+                                       (select-keys out-cols))))))
+                       (sort-by (juxt #(str (:end %))
+                                      #(str (:taxonomy %))
+                                      #(str (:concept %))
+                                      #(str (:unit %)))))
+        shells (when (= q-or-y :q)
+                 (->> period-rows
+                      (group-by #(str (:end %)))
+                      vals
+                      (map (fn [rs]
+                             (select-keys (last (sort-by #(str (:filed %)) rs))
+                                          report-period-cols)))))
+        rows (into (vec fact-rows) shells)]
     (ds/->dataset rows {:dataset-name (str "select-data-" (name q-or-y))})))
 
 (defn- field-rank
@@ -341,29 +378,47 @@
       :else (< (get ranks [(str (:taxonomy a)) (str (:concept a))] 9999)
                (get ranks [(str (:taxonomy b)) (str (:concept b))] 9999)))))
 
+(defn- period-shell?
+  "Quarterly placeholder: a period end with no concept attached."
+  [row]
+  (str/blank? (str (:concept row))))
+
 (defn- pivot-keeping-periods
   "Wide table: `:filed :period :end` plus one column per concept name.
-  One value per [end, concept]; later `:filed` / `fields` order break ties."
+  One value per [end, concept]; later `:filed` / `fields` order break ties.
+  A quarterly shell row supplies a period that had no attached fact."
   [long-ds fields]
   (let [ranks (field-rank fields)
         rows (ds/rows long-ds {:nil-missing? true})
         chosen (reduce (fn [acc r]
-                         (let [k [(str (:end r)) (str (:concept r))]
-                               cur (get acc k)]
-                           (if (or (nil? cur) (better-fact? r cur ranks))
-                             (assoc acc k r)
-                             acc)))
+                         (if (period-shell? r)
+                           acc
+                           (let [k [(str (:end r)) (str (:concept r))]
+                                 cur (get acc k)]
+                             (if (or (nil? cur) (better-fact? r cur ranks))
+                               (assoc acc k r)
+                               acc))))
                        {}
                        rows)
-        wide (->> chosen
-                  vals
-                  (group-by #(str (:end %)))
-                  (map (fn [[_ facts]]
-                         (let [period (select-keys (first facts) report-period-cols)
-                               vals (into {}
-                                          (map (fn [f] [(str (:concept f)) (:val f)])
-                                               facts))]
-                           (merge period vals))))
+        from-facts (->> chosen
+                        vals
+                        (group-by #(str (:end %)))
+                        (map (fn [[_ facts]]
+                               (let [period (select-keys (first facts) report-period-cols)
+                                     vals (into {}
+                                                (map (fn [f] [(str (:concept f)) (:val f)])
+                                                     facts))]
+                                 (merge period vals)))))
+        present (set (map #(str (:end %)) from-facts))
+        from-shells (->> rows
+                         (filter period-shell?)
+                         (remove #(contains? present (str (:end %))))
+                         (group-by #(str (:end %)))
+                         vals
+                         (map (fn [rs]
+                                (select-keys (last (sort-by #(str (:filed %)) rs))
+                                             report-period-cols))))
+        wide (->> (concat from-facts from-shells)
                   (sort-by #(str (:end %)) #(compare %2 %1))
                   vec)]
     (ds/->dataset wide {:dataset-name "report-table"})))
@@ -371,9 +426,11 @@
 (defn report-table
   "Wide report for `fields` over annual (`:y`) or quarterly (`:q`) periods.
 
-  `select-data`, then pivot to one row per period (newest `:end` first) with
-  period columns `:filed :period :end` and one column per concept.
-  Nil `fields` keeps every concept; later `:filed` breaks ties."
+  `select-data`, then pivot to one row per period end (newest `:end` first)
+  with period columns `:filed :period :end` and one column per concept.
+  Quarterly tables keep a row for every period end, with empty concept
+  columns when nothing attached. Nil `fields` keeps every concept; later
+  `:filed` breaks ties."
   [dss q-or-y fields]
   (pivot-keeping-periods (select-data dss q-or-y fields) fields))
 
@@ -399,9 +456,10 @@
                   (nil? wanted) selected
                   :else (ds/filter selected
                                    (fn [row]
-                                     (contains? wanted
-                                                [(str (:taxonomy row))
-                                                 (str (:concept row))]))))]
+                                     (or (str/blank? (str (:concept row)))
+                                         (contains? wanted
+                                                    [(str (:taxonomy row))
+                                                     (str (:concept row))])))))]
     (pivot-keeping-periods long-ds fields)))
 
 (defn- as-number

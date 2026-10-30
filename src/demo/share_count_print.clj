@@ -13,7 +13,7 @@
             [edgar2.db.universe :as db-universe]
             [edgar2.download.facts :as dl]
             [edgar2.download.facts-universe :as universe]
-            [edgar2.filing :as filing]
+            [edgar2.util :as util]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
             [jsonista.core :as json]
@@ -147,19 +147,19 @@
 
   `q-or-y` is `:q` for quarters and `:y` for years. Shares and net income
   are millions. EPS is dollars per share. The header line is the share count
-  `shares-outstanding` actually selects, with its form and period-end."
+  `shares-outstanding` selects, with its period and period-end."
   ([ticker] (run ticker :y))
   ([ticker q-or-y]
-   (filing/ensure-identity!)
+   (util/ensure-identity!)
    (let [ticker (str/upper-case (str/trim (str ticker)))
          quarterly? (= q-or-y :q)
          row (universe-row ticker)
-         cik (or (:cik row) (filing/resolve-filer2 ticker))
+         cik (or (:cik row) (util/resolve-filer2 ticker))
          zip-path (dl/ensure-zip! {})]
      (with-open [zf (ZipFile. (str zip-path))]
        (if-let [data (read-cik-json zf cik)]
-         (let [obs (universe/shares-outstanding-obs (:facts data))
-               dss (xbrl/facts->dataset data)
+         (let [dss (xbrl/facts->dataset data)
+               obs (universe/shares-outstanding-obs dss)
                long-ds (try
                          (facts-ds/select-data dss q-or-y (map :pair table-tags))
                          (catch Throwable ex
@@ -182,7 +182,7 @@
                             ticker (or (:entityName data) (:entityName row)) cik))
            (println (format "shares-outstanding  %s million  %s  %s"
                             (or (millions (:val obs)) "—")
-                            (or (:form obs) "—")
+                            (or (:period obs) "—")
                             (or (:end obs) "—")))
            (println (format "shares and net income in millions; EPS in dollars per share; a blank cell means that tag is not reported for the %s" span))
            (when (seq periods)

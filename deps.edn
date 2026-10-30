@@ -18,6 +18,8 @@
                :exec-args {:ticker "XOM" :n 5}}
   :demo-table-full {:exec-fn demo.report-table-full/run
                     :exec-args {:ticker "XOM"}}
+  :demo-table-full-shares {:exec-fn demo.report-table-full-shares/run
+                           :exec-args {:ticker "CCBG"}}
   :description {:exec-fn edgar2.description/description
                 :exec-args {:ticker "MSFT"}}
   ; download

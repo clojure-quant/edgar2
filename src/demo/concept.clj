@@ -3,7 +3,7 @@
   (:require [edgar.api :as e]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.filing :as filing]
+            [edgar2.util :as util]
             [tech.v3.dataset :as ds]))
 
 (def tickers ["XOM" "BP" "SONY"])
@@ -11,7 +11,7 @@
 (defn load-facts
   "Companyfacts for `ticker` (XOM via resolve-filer2)."
   [ticker]
-  (e/facts (filing/resolve-filer2 ticker)))
+  (e/facts (util/resolve-filer2 ticker)))
 
 (defn with-revenue
   "Annual report-table for all :revenue tags, plus :revenue-c from calc-concept."
@@ -24,7 +24,7 @@
 (defn run
   "Load XOM / BP / SONY facts, add :revenue-c, print each table."
   []
-  (filing/ensure-identity!)
+  (util/ensure-identity!)
   (doseq [ticker tickers]
     (let [f (load-facts ticker)
           table (with-revenue f :y)

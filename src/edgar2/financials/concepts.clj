@@ -187,7 +187,11 @@
            [:us-gaap :WeightedAverageNumberOfSharesOutstandingBasicAndDiluted]
            [:us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding]
            [:ifrs-full :WeightedAverageShares]
-           [:ifrs-full :NumberOfSharesOutstanding]]}
+           [:ifrs-full :NumberOfSharesOutstanding]
+           ;[:ifrs-full :IncreaseDecreaseInNumberOfSharesOutstanding]
+           ; ifrs-full:AdjustedWeightedAverageShares
+           ; ifrs-full:IssuedCapital
+           ]}
 
    {:id :depreciation
     :label "Depreciation"

@@ -10,7 +10,7 @@
             [edgar2.download.facts :as dl]
             [edgar2.download.facts-universe :as universe]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.filing :as filing]
+            [edgar2.util :as util]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
   (:import [java.util.zip ZipFile]))
@@ -100,7 +100,7 @@
   ([]
    (study-missing-from-stats! {}))
   ([{:keys [limit]}]
-   (filing/ensure-identity!)
+   (util/ensure-identity!)
    (let [stats (load-stats)
          missing (cond->> (filterv #(not (number? (:revenue %))) stats)
                    limit (take (long limit)))
@@ -196,7 +196,7 @@
   ([]
    (study-universe-calc! {:limit 200}))
   ([{:keys [limit]}]
-   (filing/ensure-identity!)
+   (util/ensure-identity!)
    (let [u (vec (cond->> (load-universe)
                   limit (take (long limit))))
          results

@@ -4,7 +4,9 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar.xbrl :as xbrl]
             [edgar2.financials.concepts :as concepts]
+            [edgar2.financials.shares-outstanding :as shares]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.facts :as dl]
             [edgar2.util.ticker-info :as ticker-info]
@@ -12,9 +14,6 @@
   (:import [java.util.zip ZipFile]))
 
 (def universe-path "data/universe-facts.edn")
-
-(def share-tags
-  (:data (concepts/get-concept-id :shares-outstanding)))
 
 (def revenue-tags
   (:data (concepts/get-concept-id :revenue)))
@@ -50,81 +49,25 @@
            (sort-by #(str (:filed %) "|" (:end %)))
            last))
 
-(def quarterly-share-forms
-  #{"10-Q" "10-Q/A"})
-
-(def annual-share-forms
-  #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"})
-
-(defn- positive-share-obs
-  [facts tag-pairs]
-  (filter #(and (number? (:val %))
-                (= "shares" (:unit %))
-                (pos? (double (:val %))))
-          (mapcat (fn [[tax tag]] (concept-observations facts tax tag))
-                  tag-pairs)))
-
-(defn- latest-share-obs
-  "Observation with the latest period-end. A later filing breaks a tie."
-  [obs]
-  (when-let [xs (seq obs)]
-    (->> xs
-         (sort-by (fn [{:keys [end filed accn]}]
-                    [(str end) (str filed) (str accn)]))
-         last)))
-
-(defn- share-obs
-  "Latest positive share observation on `forms`. nil means any form."
-  [facts tag-pairs forms]
-  (latest-share-obs
-   (let [obs (positive-share-obs facts tag-pairs)]
-     (if forms
-       (filter #(forms (str (:form %))) obs)
-       obs))))
-
-(defn most-recent-share-count
-  "Latest positive share count on `forms`. nil means any form."
-  ([facts tag-pairs] (most-recent-share-count facts tag-pairs nil))
-  ([facts tag-pairs forms]
-   (:val (share-obs facts tag-pairs forms))))
-
-(defn- shares-obs-on
-  "First `:shares-outstanding` tag, in concept order, with an observation
-  on `forms`. Common shares, then weighted-average, then IFRS."
-  [facts forms]
-  (some #(share-obs facts [%] forms) share-tags))
-
 (defn shares-outstanding-obs
-  "Observation `shares-outstanding` uses.
+  "Share count from annual and quarterly report tables.
 
-  The most recent 10-Q wins, unless an annual report (10-K, 20-F, 40-F)
-  has a later period-end, or no 10-Q reports a share count. Any other
-  form is used only when neither a 10-Q nor an annual report has a count.
-  The map includes `:form`, `:end`, `:filed`, and `:val`."
-  [facts]
-  (let [quarterly (shares-obs-on facts quarterly-share-forms)
-        annual (shares-obs-on facts annual-share-forms)
-        annual-later? (and annual quarterly
-                           (pos? (compare (str (:end annual))
-                                          (str (:end quarterly)))))]
-    (cond
-      (and quarterly (not annual-later?)) quarterly
-      annual annual
-      :else (shares-obs-on facts nil))))
+  `dss` is a companyfacts dataset (`edgar.xbrl/facts->dataset`).
+  Both frequencies run `report-table-full` over the
+  `:shares-outstanding` tags, then `calc-concept` adds
+  `:shares-outstanding`. The quarterly row is used when it was filed
+  after the annual row, unless it is more than 100 times smaller.
+  Includes `:val`, `:end`, `:filed`, `:period`,
+  and `:q-or-y`."
+  [dss]
+  (shares/shares-outstanding-obs dss))
 
 (defn shares-outstanding
-  "Shares outstanding from the most recent 10-Q.
+  "Shares outstanding for `dss`, a companyfacts dataset.
 
-  The annual report (10-K, 20-F, 40-F) is used when its period-end is
-  later than the 10-Q, or when no 10-Q reports a share count. A 10-Q
-  from an older year does not replace a later annual report. Any other
-  form is used only when neither a 10-Q nor an annual report has a count.
-
-  Tags follow `:shares-outstanding` priority: common shares, then
-  weighted-average shares, then IFRS. Cover-page public float is a
-  dollar amount, not a share count, so it is not used."
-  [facts]
-  (:val (shares-outstanding-obs facts)))
+  See `shares-outstanding-obs`."
+  [dss]
+  (:val (shares-outstanding-obs dss)))
 
 (defn reporting-standard
   "us-gaap, ifrs-full, and/or ffd (filing-fee disclosure)."
@@ -138,10 +81,11 @@
 (defn compact-company-facts
   [data]
   (let [facts (:facts data)
+        dss (try (xbrl/facts->dataset data) (catch Exception _ nil))
         rev (most-recent-obs facts revenue-tags)]
     (cond-> {:cik (when (:cik data) (pad-cik (:cik data)))
              :entityName (:entityName data)
-             :shares-outstanding (shares-outstanding facts)
+             :shares-outstanding (when dss (shares-outstanding dss))
              :revenue (:val rev)
              :reporting-standard (reporting-standard facts)}
       (:unit rev) (assoc :report-currency (:unit rev))

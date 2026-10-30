@@ -6,7 +6,7 @@
    [tablecloth.api :as tc]
    [edgar.api :as e]
    [edgar2.financials.facts-ds :as facts-ds]
-   [edgar2.filing :refer [resolve-filer2]]))
+   [edgar2.util :refer [resolve-filer2]]))
 
 (def demo-fields
   [[:dei :EntityCommonStockSharesOutstanding]

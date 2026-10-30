@@ -5,7 +5,6 @@
             [clojure.string :as str]
             [edgar.xbrl :as xbrl]
             [jsonista.core :as json]
-            [tech.v3.dataset :as ds]
             [edgar.api :as e]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
@@ -15,7 +14,8 @@
             [edgar2.db.universe :as db-universe]
             [edgar2.financials.calc.annual :as annual]
             [edgar2.financials.calc.valuation :as valuation]
-            [edgar2.financials.facts-ds-converter :as facts-nippy])
+            [edgar2.financials.facts-ds-converter :as facts-nippy]
+            [edgar2.financials.shares-outstanding :as shares])
   (:import [java.util.zip ZipFile]))
 
 (def stats-path "data/stats.edn")
@@ -122,16 +122,18 @@
   (including ADR ratio), SIC enrichment, and the cached price changes
   for the ticker. Looks up the universe row by `cik` unless `:row` is
   passed.   Optional opts for the batch path: `:row`, `:prices`, `:sic-db`,
-  `:shares`, `:data` (raw companyfacts map for shares-outstanding).
-  When `:annual-map` is passed, it is used instead of `calculate-annual`."
+  `:shares`. When `:shares` is omitted and `dss` is present, the count
+  is `facts-universe/shares-outstanding` (report tables plus
+  `calc-concept`). When `:annual-map` is passed, it is used instead of
+  `calculate-annual`."
   ([dss cik]
    (stats-one dss cik {}))
-  ([dss cik {:keys [row prices sic-db shares data annual-map] :as opts}]
+  ([dss cik {:keys [row prices sic-db shares annual-map] :as opts}]
    (let [row (or row (db-universe/universe-row-by-cik cik) {:cik (str cik)})
          prices (or prices (load-price-by-ticker))
          sic-db (or sic-db (db-sic/load-sic-index))
          shares (or shares
-                    (when data (universe/shares-outstanding (:facts data)))
+                    (when dss (universe/shares-outstanding dss))
                     (:shares-outstanding row))
          changes (db-price-change/get-change (:ticker row))]
      (try
@@ -163,9 +165,10 @@
   :net-income-change-q-on-y and :sales-change-q-on-y (latest quarter vs
   4 quarters earlier, %, |prior| denominator), profit margin, 10-year mean
   profit margin (Net Income / revenue), return on assets (Net Income / assets),
-  return on capital employed (EBIT / (assets − current liabilities)), plus :shares (most recent 10-Q
-  when that quarter is at least as recent as the annual report; otherwise
-  the annual report), :annual-count (distinct annual periods in companyfacts),
+  return on capital employed (EBIT / (assets − current liabilities)), plus :shares
+  (calc-concept of :shares-outstanding on the quarterly report table when that
+  row was filed after the annual row, unless the quarterly count is more than
+  100 times smaller), :annual-count (distinct annual periods in companyfacts),
   :price, :change50, :change200, :change400
   (close / closeN - 1 from data/price-change.edn, when that ticker is there),
   :marketcap, :price-sales,
@@ -227,15 +230,10 @@
                               (println (format "  facts-ds %s (%s)" (:cik row) (.getMessage ex)))
                               nil)))
                  t2 (System/nanoTime)
-                 shares (or (when data
-                              (universe/shares-outstanding (:facts data)))
-                            (:shares-outstanding row))
                  st (stats-one dss (:cik row)
                                {:row row
                                 :prices prices
-                                :sic-db sic-db
-                                :shares shares
-                                :data data})
+                                :sic-db sic-db})
                  t3 (System/nanoTime)
                  i' (inc i)]
              (when (or (zero? (mod i' 250)) (= i' total))
@@ -296,36 +294,17 @@
                               (count (filter :sic out))))
              out))))))))
 
-(defn- latest-share
-  "Latest positive share observation on a select-data dataset.
-
-  Walks `:shares-outstanding` tags in priority order and keeps the first
-  tag that has a positive `shares` value."
-  [selected]
-  (when (and selected (pos? (ds/row-count selected)))
-    (let [rows (ds/rows selected {:nil-missing? true})]
-      (some (fn [[_ concept]]
-              (let [n (name concept)]
-                (->> rows
-                     (filter (fn [row]
-                               (and (= n (str (:concept row)))
-                                    (= "shares" (str (:unit row)))
-                                    (number? (:val row))
-                                    (pos? (double (:val row))))))
-                     (sort-by #(str (:end %) "|" (:filed %)))
-                     last)))
-            universe/share-tags))))
-
 (defn- shares-from-reports
-  "Share count from quarterly select-data, unless the annual period-end
-  is later. Nil when neither dataset has a share count."
+  "Share count from quarterly select-data when that row was filed after
+  the annual row, unless the quarterly count is more than 100 times smaller.
+
+  Each dataset is pivoted to the `:shares-outstanding` tags and
+  `calc-concept` supplies the column. Nil when neither dataset has a
+  positive count."
   [{:keys [y q]}]
-  (let [qy (latest-share q)
-        ay (latest-share y)]
-    (cond
-      (and qy ay (pos? (compare (str (:end ay)) (str (:end qy))))) (:val ay)
-      qy (:val qy)
-      ay (:val ay))))
+  (:val (shares/choose-shares-outstanding
+         (shares/shares-table-from-selected y)
+         (shares/shares-table-from-selected q))))
 
 (defn- ticker-key
   [row]

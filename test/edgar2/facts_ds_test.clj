@@ -9,6 +9,7 @@
             [clojure.test :refer [deftest is testing]]
             [edgar.xbrl :as xbrl]
             [edgar2.financials.facts-ds :as facts-ds]
+            [edgar2.financials.shares-outstanding :as shares]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]))
@@ -197,3 +198,114 @@
     (is (= 699000000.0 (double (get ni "2025-12-31"))))
     (is (= 1604000000.0 (double (get sga "2023-12-31"))))
     (is (= 2793000000.0 (double (get sga "2024-12-31"))))))
+
+(deftest shares-outstanding-quarterly-when-no-annual-adig
+  "ADIG has no 10-K. The share count is the cover figure on the latest 10-Q."
+  (let [dss (load-facts "ADIG")
+        {:keys [y q]} (shares/shares-outstanding-tables dss)
+        obs (shares/shares-outstanding-obs dss)]
+    (is (nil? y))
+    (is (= 1 (ds/row-count q)))
+    (is (= :q (:q-or-y obs)))
+    (is (= "2026-Q2" (:period obs)))
+    (is (= 75923198 (:val obs)))))
+
+(deftest shares-outstanding-tables-add-calc-concept-aapl
+  "Both frequencies carry every :shares-outstanding tag, then calc-concept."
+  (let [dss (load-facts "AAPL")
+        {:keys [y q]} (shares/shares-outstanding-tables dss)
+        chosen (shares/choose-shares-outstanding y q)
+        labels (set (map :label (shares/shares-outstanding-fields)))]
+    (doseq [table [y q]]
+      (is (pos? (ds/row-count table)))
+      (is (ds/has-column? table :shares-outstanding))
+      (is (set/subset? labels (set (map str (ds/column-names table)))))
+      (is (= (vec (ds/column table :shares-outstanding))
+             (facts-ds/calc-concept table :shares-outstanding))))
+    (is (#{:y :q} (:q-or-y chosen)))
+    (is (pos? (double (:val chosen))))
+    (let [winning (if (= :q (:q-or-y chosen)) q y)
+          row (->> (ds/rows winning {:nil-missing? true})
+                   (filter #(= (str (:end chosen)) (str (:end %))))
+                   first)
+          from-selected (shares/shares-table-from-selected
+                         (facts-ds/select-data dss (:q-or-y chosen)
+                                               (mapv :field (shares/shares-outstanding-fields))))]
+      (is (= (:val chosen) (:shares-outstanding row)))
+      (is (= (:period chosen) (str (:period row))))
+      (is (= (vec (ds/column winning :shares-outstanding))
+             (vec (ds/column from-selected :shares-outstanding)))))))
+
+(defn- long-val
+  [v]
+  (when (number? v)
+    (long v)))
+
+(deftest annual-cover-shares-when-statements-are-on-6k-asm
+  "ASM files the annual statements on a 6-K and the cover-page share count
+  on a later or same-day 40-F. Companyfacts then has
+  EntityCommonStockSharesOutstanding only on the 40-F accession.
+  That instant still belongs on the 6-K's year. A later 40-F comparative
+  (fy of the new filing, end of the prior year) does not replace the prior
+  year, and neither does a 6-K that repeats the prior year-end."
+  (let [dss (load-facts "ASM")
+        table (facts-ds/report-table dss :y
+                                     [[:dei :EntityCommonStockSharesOutstanding]
+                                      [:ifrs-full :Revenue]
+                                      [:ifrs-full :Assets]])
+        by-end (into {} (map (fn [r] [(str (:end r)) r])
+                             (ds/rows table {:nil-missing? true})))]
+    (is (= ["2023-12-31" "2024-12-31" "2025-12-31"]
+           (mapv #(str (:end %))
+                 (reverse (ds/rows table {:nil-missing? true})))))
+    (is (= 162308988 (long-val (get (get by-end "2025-12-31")
+                                    "EntityCommonStockSharesOutstanding"))))
+    (is (= 140565642 (long-val (get (get by-end "2024-12-31")
+                                    "EntityCommonStockSharesOutstanding"))))
+    (is (= 128728248 (long-val (get (get by-end "2023-12-31")
+                                    "EntityCommonStockSharesOutstanding"))))
+    (is (= 300 (long-val (get (get by-end "2025-12-31") "Revenue"))))
+    (is (= 200 (long-val (get (get by-end "2024-12-31") "Revenue"))))
+    (is (= 128340000 (long-val (get (get by-end "2023-12-31") "Assets"))))
+    (is (= 148711000 (long-val (get (get by-end "2024-12-31") "Assets"))))))
+
+(deftest quarterly-own-period-instants-aibt
+  "A 10-Q instant attaches to that filing's quarter. Cover-page shares
+  (end = filing day) and the quarter-end balance both land on 2026-Q2.
+  A later 10-Q's repeat of 2025-12-31 does not replace the 10-K. Every
+  quarterly period end is a row, including ends with no value for the
+  requested concept."
+  (let [dss (load-facts "AIBT")
+        fields [[:dei :EntityCommonStockSharesOutstanding]
+                [:us-gaap :CommonStockSharesOutstanding]]
+        selected (facts-ds/select-data dss :q fields)
+        hits (fn [concept]
+               (->> (ds/rows selected {:nil-missing? true})
+                    (filter #(= concept (str (:concept %))))
+                    (map (fn [r] [(str (:end r)) (str (:filed r)) (long-val (:val r))]))
+                    set))
+        dei (hits "EntityCommonStockSharesOutstanding")
+        common (hits "CommonStockSharesOutstanding")
+        periods (facts-ds/quarterly-periods dss)
+        ends (set (map #(str (:end %)) (ds/rows periods {:nil-missing? true})))
+        table (facts-ds/report-table dss :q fields)
+        by-end (into {} (map (fn [r] [(str (:end r)) r])
+                             (ds/rows table {:nil-missing? true})))
+        q2 (get by-end "2026-06-30")
+        empty-concept (facts-ds/report-table
+                       dss :q
+                       [[:us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding]])]
+    (testing "2026 Q2 cover count and quarter-end balance"
+      (is (= "2026-Q2" (:period q2)))
+      (is (= 850165334 (long-val (get q2 "EntityCommonStockSharesOutstanding"))))
+      (is (= 722506634 (long-val (get q2 "CommonStockSharesOutstanding")))))
+    (testing "later 10-Q comparative at 2025-12-31 stays off that quarter"
+      (is (contains? common ["2025-12-31" "2026-04-15" 486895359]))
+      (is (not (some #(= "2026-08-19" (second %))
+                     (filter #(= "2025-12-31" (first %)) common))))
+      (is (contains? dei ["2025-12-31" "2026-04-15" 567695492])))
+    (testing "every quarterly period end is a row"
+      (is (= ends (set (map #(str (:end %)) (ds/rows table {:nil-missing? true})))))
+      (is (= (count ends) (ds/row-count empty-concept)))
+      (is (every? #(nil? (get % "WeightedAverageNumberOfDilutedSharesOutstanding"))
+                  (ds/rows empty-concept {:nil-missing? true}))))))
