@@ -138,7 +138,7 @@
              (vec (sort #(compare %2 %1)
                         (mapv #(str (:end %))
                               (ds/rows table {:nil-missing? true})))))))
-    (testing "period columns are only :filed :period :end"
+    (testing "period columns are only :filed :period :end :form"
       (let [meta-cols (set (map name facts-ds/report-period-cols))
             concept-cols #{"CostOfGoodsSold" "CostOfGoodsAndServicesSold"
                            "EntityCommonStockSharesOutstanding"
@@ -241,14 +241,13 @@
   (when (number? v)
     (long v)))
 
-(deftest annual-cover-shares-when-statements-are-on-6k-asm
-  "ASM files the annual statements on a 6-K and the cover-page share count
-  on a later or same-day 40-F. Companyfacts then has
-  EntityCommonStockSharesOutstanding only on the 40-F accession.
-  That instant still belongs on the 6-K's year. A later 40-F comparative
-  (fy of the new filing, end of the prior year) does not replace the prior
-  year, and neither does a 6-K that repeats the prior year-end."
+(deftest annual-period-keeps-40f-over-6k-and-8k-asm
+  "ASM files the statements on a 6-K and the cover on a 40-F. A later 8-K
+  also reports 2025. The annual period stays the 40-F. The 6-K numbers
+  still attach. A later comparative does not replace the prior year."
   (let [dss (load-facts "ASM")
+        periods (vec (ds/rows (facts-ds/annual-periods dss) {:nil-missing? true}))
+        period (into {} (map (fn [r] [(str (:end r)) r]) periods))
         table (facts-ds/report-table dss :y
                                      [[:dei :EntityCommonStockSharesOutstanding]
                                       [:ifrs-full :Revenue]
@@ -256,8 +255,13 @@
         by-end (into {} (map (fn [r] [(str (:end r)) r])
                              (ds/rows table {:nil-missing? true})))]
     (is (= ["2023-12-31" "2024-12-31" "2025-12-31"]
-           (mapv #(str (:end %))
-                 (reverse (ds/rows table {:nil-missing? true})))))
+           (mapv #(str (:end %)) periods)))
+    (is (= "40-F" (str (:form (get period "2025-12-31")))))
+    (is (= "2026-03-27" (str (:filed (get period "2025-12-31")))))
+    (is (= "0001477932-26-001629" (str (:accn (get period "2025-12-31")))))
+    (is (= "40-F" (str (:form (get period "2024-12-31")))))
+    (is (= "40-F" (str (:form (get by-end "2025-12-31")))))
+    (is (= "2026-03-27" (str (:filed (get by-end "2025-12-31")))))
     (is (= 162308988 (long-val (get (get by-end "2025-12-31")
                                     "EntityCommonStockSharesOutstanding"))))
     (is (= 140565642 (long-val (get (get by-end "2024-12-31")

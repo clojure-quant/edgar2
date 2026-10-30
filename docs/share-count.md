@@ -32,4 +32,4 @@ GP
 companyfacts misses the last 2 filings.
 clj -X:demo-table-full :ticker GP :show shares :ixbrl true
 
-
+HALF YEAR REPORTS ???

@@ -12,7 +12,11 @@
 
 (def report-period-cols
   "Period columns kept on `select-data` / `report-table` rows."
-  [:filed :period :end])
+  [:filed :period :end :form])
+
+(def current-report-forms
+  "8-K and 6-K. An annual form for the same year is kept instead."
+  #{"8-K" "8-K/A" "6-K" "6-K/A"})
 
 (def annual-forms
   #{"10-K" "10-K/A" "20-F" "20-F/A" "40-F" "40-F/A"})
@@ -140,13 +144,51 @@
        (map #(select-keys % period-cols))))
 
 (defn- own-period-by-filing
-  "The annual window each filing actually reports: latest `:start` on that
-  `:filed` date. Earlier windows on the same date are comparatives."
+  "The annual window each accession reports: latest `:start` on that filing.
+  Earlier windows are comparatives. A 40-F and a 6-K filed the same day
+  stay separate, so the annual form can be kept."
   [rows]
   (->> rows
-       (group-by #(str (:filed %)))
+       (group-by #(str (:accn %)))
        vals
        (map (fn [rs] (last (sort-by #(str (:start %)) rs))))))
+
+(defn- prefer-own-filing
+  "The filing that represents a year.
+
+  A 10-K, 20-F, or 40-F stays when an 8-K or 6-K also reports that year.
+  Latest `:filed` breaks ties inside that class, so a 40-F/A still replaces
+  the 40-F."
+  [rows]
+  (let [annual (filterv #(annual-forms (str (:form %))) rows)
+        pool (if (seq annual) annual rows)]
+    (last (sort-by #(str (:filed %)) pool))))
+
+(defn- cover-owner-rows
+  "Annual reports that have no ~12-month window of their own.
+
+  ASM's 2025 40-F is the cover page only; the statements are on the 6-K.
+  The latest FY instant on that accession is the year it reports. `:start`
+  is copied from a duration window with the same `:end`, so the 6-K facts
+  still line up. `owned-accns` already have a duration window."
+  [facts duration-rows owned-accns]
+  (let [start-by-end (into {}
+                           (map (fn [[end rs]]
+                                  [end (str (:start (last (sort-by #(str (:start %)) rs))))]))
+                           (group-by #(str (:end %)) duration-rows))]
+    (->> (ds/rows facts {:nil-missing? true})
+         (filter #(and (annual-forms (str (:form %)))
+                       (= "FY" (str (:fp %)))
+                       (str/blank? (str (:start %)))
+                       (period-ended-by-filing? %)
+                       (not (contains? owned-accns (str (:accn %))))))
+         (group-by #(str (:accn %)))
+         vals
+         (keep (fn [rs]
+                 (let [row (last (sort-by #(str (:end %)) rs))
+                       start (get start-by-end (str (:end row)))]
+                   (when-not (str/blank? (str start))
+                     (assoc (select-keys row period-cols) :start start))))))))
 
 (defn- own-end-by-accn
   "Accession → period-end of the year that filing reports.
@@ -164,9 +206,12 @@
   Year-to-date or prior-year windows tagged Q2/Q3 on a 10-Q are excluded.
   Windows whose `:end` is after `:filed` are dropped (forward stubs).
 
-  Each filing date contributes the window with the latest `:start`: that is
-  the year the annual report is for. A later filing of the same year
+  Each accession contributes the window with the latest `:start`: that is
+  the year that filing reports. A later filing of the same year
   (a 10-K/A, or another 10-K with that year as its own period) replaces it.
+  A 10-K, 20-F, or 40-F is kept when an 8-K or 6-K also reports that year.
+  A 40-F that has only the cover-page instant still owns the year; its
+  `:start` comes from the 6-K or 8-K window.
 
   Earlier windows on the same filing are comparatives. A comparative year is
   kept when no annual report has that year as its own period. The earliest
@@ -178,12 +223,15 @@
   (`:period` is `fy-FY`, e.g. 2025-FY; a comparative uses its `:end` year)."
   [facts]
   (let [rows (annual-window-rows facts)
-        owns (vec (own-period-by-filing rows))
+        duration-owns (vec (own-period-by-filing rows))
+        owns (vec (concat duration-owns
+                          (cover-owner-rows facts rows
+                                            (set (map #(str (:accn %)) duration-owns)))))
         own-ends (set (map #(str (:end %)) owns))
         own-best (->> owns
                       (group-by #(str (:end %)))
                       vals
-                      (map (fn [rs] (last (sort-by #(str (:filed %)) rs)))))
+                      (map prefer-own-filing))
         comparative-best (->> rows
                               (remove #(contains? own-ends (str (:end %))))
                               (group-by #(str (:end %)))
@@ -266,10 +314,10 @@
   "Period for one fact.
 
   Duration: same `:accn`+`:start`+`:end`, else an annual form
-  (10-K / 20-F / 40-F) with the same `:start`+`:end` when that filing's
-  own year is this period (a 10-K/A of the same year). A later 10-K that
-  only repeats the year as a comparative does not attach, and neither does
-  a proxy: DEF 14A often repeats the year in thousands.
+  (10-K / 20-F / 40-F) or the 6-K / 8-K that reports that year, with the
+  same `:start`+`:end`, when that filing's own year is this period.
+  A later 10-K that only repeats the year as a comparative does not attach,
+  and neither does a proxy: DEF 14A often repeats the year in thousands.
   Instant (blank `:start`): on the annual table, FY / 10-K / 20-F / 40-F
   only — `:accn`+`:end`, else same `:end` when this filing reports that
   year. A 10-K / 20-F / 40-F whose statements were filed on another
@@ -308,7 +356,8 @@
                 (get periods-by-accn-end [accn end]))
           (when (and files-this-year?
                      (annual-duration? fact)
-                     (annual-forms (str (:form fact))))
+                     (or (annual-forms (str (:form fact)))
+                         (current-report-forms (str (:form fact)))))
             (some #(when (= start (str (:start %))) %)
                   (get periods-by-end end)))))))
 
@@ -338,7 +387,8 @@
         own-ends (when (= q-or-y :y)
                    (own-end-by-accn (annual-window-rows dss)))
         wanted (when (some? fields) (set (map field-pair fields)))
-        out-cols (into report-period-cols [:taxonomy :concept :label :unit :val])
+        out-cols (into report-period-cols [:taxonomy :concept :label :unit :val
+                                          :fact-filed :fact-form])
         fact-rows (->> (ds/rows dss {:nil-missing? true})
                        (keep (fn [fact]
                                (when (or (nil? wanted)
@@ -347,9 +397,9 @@
                                                      (str (:concept fact))]))
                                  (when-let [period (matching-period fact by-accn-end by-end by-accn own-ends)]
                                    (-> fact
+                                       (assoc :fact-filed (:filed fact)
+                                              :fact-form (:form fact))
                                        (merge (select-keys period report-period-cols))
-                                       ;; keep the fact's own :filed for restatement preference
-                                       (assoc :filed (:filed fact))
                                        (select-keys out-cols))))))
                        (sort-by (juxt #(str (:end %))
                                       #(str (:taxonomy %))
@@ -369,14 +419,24 @@
   [fields]
   (into {} (map-indexed (fn [i pair] [(field-pair pair) i]) (or fields []))))
 
+(defn- current-report-form?
+  [form]
+  (current-report-forms (str form)))
+
 (defn- better-fact?
-  "Prefer a later `:filed`, then earlier `fields` order."
+  "Prefer a 10-K / 20-F / 40-F over an 8-K or 6-K, then a later `:fact-filed`,
+  then earlier `fields` order. The row's `:filed` stays the annual period's."
   [a b ranks]
-  (let [filed (compare (str (:filed a)) (str (:filed b)))]
+  (let [a-cur (current-report-form? (:fact-form a))
+        b-cur (current-report-form? (:fact-form b))]
     (cond
-      (not= 0 filed) (pos? filed)
-      :else (< (get ranks [(str (:taxonomy a)) (str (:concept a))] 9999)
-               (get ranks [(str (:taxonomy b)) (str (:concept b))] 9999)))))
+      (and a-cur (not b-cur)) false
+      (and b-cur (not a-cur)) true
+      :else (let [filed (compare (str (:fact-filed a)) (str (:fact-filed b)))]
+              (cond
+                (not= 0 filed) (pos? filed)
+                :else (< (get ranks [(str (:taxonomy a)) (str (:concept a))] 9999)
+                         (get ranks [(str (:taxonomy b)) (str (:concept b))] 9999)))))))
 
 (defn- period-shell?
   "Quarterly placeholder: a period end with no concept attached."
@@ -384,8 +444,9 @@
   (str/blank? (str (:concept row))))
 
 (defn- pivot-keeping-periods
-  "Wide table: `:filed :period :end` plus one column per concept name.
-  One value per [end, concept]; later `:filed` / `fields` order break ties.
+  "Wide table: `:filed :period :end :form` plus one column per concept name.
+  One value per [end, concept]. A 10-K / 20-F / 40-F beats an 8-K or 6-K;
+  otherwise later `:fact-filed` / `fields` order break ties.
   A quarterly shell row supplies a period that had no attached fact."
   [long-ds fields]
   (let [ranks (field-rank fields)
