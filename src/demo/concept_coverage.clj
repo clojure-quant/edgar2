@@ -11,6 +11,7 @@
             [edgar2.download.facts-universe :as universe]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.util :as util]
+            [edgar2.util.ticker-info :as ticker-info]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
   (:import [java.util.zip ZipFile]))
@@ -73,7 +74,7 @@
         ni-known (known-tag-names net-income-tags)
         rev-hit (filterv rev-known all)
         ni-hit (filterv ni-known all)]
-    {:cik (universe/pad-cik (:cik data))
+    {:cik (ticker-info/pad-cik (:cik data))
      :entityName (:entityName data)
      :standards (universe/reporting-standard facts)
      :rev-hit rev-hit
@@ -92,7 +93,7 @@
 
 (defn cik-entry-name
   [cik]
-  (str "CIK" (universe/pad-cik cik) ".json"))
+  (str "CIK" (ticker-info/pad-cik cik) ".json"))
 
 (defn study-missing-from-stats!
   "Re-parse companyfacts for tickers that lack aligned :revenue/:net-profit

@@ -8,17 +8,15 @@
   Shares and net income are millions; EPS is dollars per share."
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [edgar.api :as e]
-            [edgar.xbrl :as xbrl]
             [edgar2.db.universe :as db-universe]
             [edgar2.download.facts :as dl]
             [edgar2.download.facts-universe :as universe]
             [edgar2.util :as util]
+            [edgar2.util.ticker-info :as ticker-info]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
-            [jsonista.core :as json]
-            [tech.v3.dataset :as ds])
-  (:import [java.util.zip ZipFile]))
+            [edgar2.financials.facts-zip :as facts-zip]
+            [tech.v3.dataset :as ds]))
 
 (def n-periods
   "How many period columns to show."
@@ -45,12 +43,6 @@
   (let [want (str/upper-case (str/trim (str ticker)))]
     (some #(when (= want (str/upper-case (str (:ticker %)))) %)
           (db-universe/load-universe))))
-
-(defn- read-cik-json
-  [zf cik]
-  (when-let [entry (.getEntry zf (str "CIK" (universe/pad-cik cik) ".json"))]
-    (with-open [in (.getInputStream zf entry)]
-      (json/read-value in json/keyword-keys-object-mapper))))
 
 (defn- millions
   "Amount in millions. Nil stays blank. A positive amount under
@@ -154,16 +146,16 @@
    (let [ticker (str/upper-case (str/trim (str ticker)))
          quarterly? (= q-or-y :q)
          row (universe-row ticker)
-         cik (or (:cik row) (util/resolve-filer2 ticker))
-         zip-path (dl/ensure-zip! {})]
-     (with-open [zf (ZipFile. (str zip-path))]
-       (if-let [data (read-cik-json zf cik)]
-         (let [dss (xbrl/facts->dataset data)
+         cik (ticker-info/pad-cik (or (:cik row) (util/resolve-filer2 ticker)))]
+     (dl/ensure-zip! {})
+     (with-open [zf (facts-zip/open-facts-zip)]
+       (if-let [dss (facts-zip/load-dataset zf cik)]
+         (let [entity (or (:entityName row) (ds/dataset-name dss))
                obs (universe/shares-outstanding-obs dss)
                long-ds (try
                          (facts-ds/select-data dss q-or-y (map :pair table-tags))
                          (catch Throwable ex
-                           (println (format "%s  %s  CIK=%s" ticker (:entityName data) cik))
+                           (println (format "%s  %s  CIK=%s" ticker entity cik))
                            (println (str (if quarterly? "no quarterly periods: " "no annual periods: ")
                                          (.getMessage ex)))
                            nil))
@@ -179,7 +171,7 @@
                labels (period-labels q-or-y periods)
                span (if quarterly? "quarter" "year")]
            (println (format "%s  %s  CIK=%s"
-                            ticker (or (:entityName data) (:entityName row)) cik))
+                            ticker entity cik))
            (println (format "shares-outstanding  %s million  %s  %s"
                             (or (millions (:val obs)) "—")
                             (or (:period obs) "—")

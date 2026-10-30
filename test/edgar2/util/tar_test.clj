@@ -1,7 +1,7 @@
-(ns edgar2.filing.tar-test
+(ns edgar2.util.tar-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is]]
-            [edgar2.filing.tar :as tar])
+            [edgar2.util.tar :as tar])
   (:import [java.util.zip GZIPOutputStream]))
 
 (defn- put-bytes

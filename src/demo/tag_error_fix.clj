@@ -8,8 +8,8 @@
   would slow the universe rebuild dramatically."
   (:require [clojure.java.io :as io]
             [edgar.api :as e]
-            [edgar2.download.facts-universe :as universe]
-            [edgar2.filing :as filing]))
+            [edgar2.filing :as filing]
+            [edgar2.util.ticker-info :as ticker-info]))
 
 (defn whole-dollar?
   "True when v is a positive whole number. A split ($.98 …) tag lands here as 98."
@@ -23,7 +23,7 @@
   [cik accn]
   (let [f (io/file "data/ix-html" (str accn ".htm"))]
     (or (when (.exists f) (slurp f))
-        (when-let [html (e/html {:cik (universe/pad-cik cik)
+        (when-let [html (e/html {:cik (ticker-info/pad-cik cik)
                                  :accessionNumber (str accn)})]
           (.mkdirs (.getParentFile f))
           (spit f html)

@@ -1,4 +1,4 @@
-(ns edgar2.filing.zip
+(ns edgar2.util.zip
   "Random-access reader for a .zip archive.
 
   (open-zip-file filename) returns a java.util.zip.ZipFile. Close it with

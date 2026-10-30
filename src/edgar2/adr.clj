@@ -6,6 +6,7 @@
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds :as dl]
             [edgar2.download.fsds-universe :as fsds]
+            [edgar2.util.map-progress :refer [map-progress]]
             [edgar2.util.ticker-info :as ticker-info])
   (:import [java.time LocalDate]))
 
@@ -260,12 +261,10 @@
                        limit (take (long limit))))
            n (count subs)
            _ (println (format "Scanning %d foreign annual filings for Security12bTitle…" n))
-           rows (->> subs
-                     (map-indexed
-                      (fn [i sub]
-                        (when (zero? (mod (inc i) 50))
-                          (println (format "  %d/%d" (inc i) n))
-                          (flush))
+           rows (->> (map-progress
+                      (fn [i total _]
+                        (format "  %d/%d" i total))
+                      (fn [sub]
                         (try
                           (let [html (primary-html (:cik sub) (:adsh sub))
                                 titles (security12b-titles html)]
@@ -274,7 +273,8 @@
                             (println (format "  skip %s %s (%s)"
                                              (:cik sub) (:adsh sub)
                                              (.getMessage ex)))
-                            nil))))
+                            nil)))
+                      subs)
                      (remove nil?)
                      (sort-by :ticker)
                      vec)]

@@ -5,8 +5,9 @@
             [edgar.api :as e]
             [edgar2.download.facts :as dl]
             [edgar2.db.universe :as db-universe]
-            [edgar2.report.stats :as stats])
-  (:import [java.util.zip ZipFile]))
+            [edgar2.financials.facts-zip :as facts-zip]
+            [edgar2.report.stats :as stats]
+            [edgar2.util.map-progress :refer [map-progress]]))
 
 (def cef-path "data/cef.edn")
 
@@ -82,32 +83,30 @@
      (println (format "cef  scanning %d of %d universe  ← %s"
                       total (count all) zip-path))
      (flush)
-     (with-open [zf (ZipFile. (str zip-path))]
-       (loop [i 0
-              acc (transient [])
-              rows filers]
-         (if-let [row (first rows)]
-           (let [data (try (stats/read-cik-json zf (:cik row))
-                           (catch Exception ex
-                             (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
-                             nil))
-                 st (when data (cef-one row data))
-                 i' (inc i)]
-             (when (or (zero? (mod i' 1000)) (= i' total))
-               (println (format "  %d/%d  found=%d  %s"
-                                i' total (count acc)
-                                (or (:ticker row) (:cik row))))
-               (flush))
-             (recur i'
-                    (cond-> acc st (conj! st))
-                    (next rows)))
-           (let [out (->> (persistent! acc)
-                          (sort-by :ticker)
-                          vec)]
-             (save-cef! out)
-             (println)
-             (pprint/print-table
-              cef-field-order
-              (take 25 out))
-             (println (format "Wrote %s  (%d cefs)" cef-path (count out)))
-             out)))))))
+     (with-open [zf (facts-zip/open-facts-zip)]
+       (let [found (volatile! 0)
+             hits (map-progress
+                   (fn [i total {:keys [row]}]
+                     (format "  %d/%d  found=%d  %s"
+                             i total @found
+                             (or (:ticker row) (:cik row))))
+                   (fn [row]
+                     (let [data (try (facts-zip/read-cik-json zf (:cik row))
+                                    (catch Exception ex
+                                      (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
+                                      nil))
+                           st (when data (cef-one row data))]
+                       (when st (vswap! found inc))
+                       {:row row :st st}))
+                   filers)
+             out (->> hits
+                      (keep :st)
+                      (sort-by :ticker)
+                      vec)]
+         (save-cef! out)
+         (println)
+         (pprint/print-table
+          cef-field-order
+          (take 25 out))
+         (println (format "Wrote %s  (%d cefs)" cef-path (count out)))
+         out)))))

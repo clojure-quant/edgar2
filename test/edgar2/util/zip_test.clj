@@ -1,7 +1,7 @@
-(ns edgar2.filing.zip-test
+(ns edgar2.util.zip-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is]]
-            [edgar2.filing.zip :as zip])
+            [edgar2.util.zip :as zip])
   (:import [java.util.zip ZipEntry ZipOutputStream]))
 
 (defn- write-zip!

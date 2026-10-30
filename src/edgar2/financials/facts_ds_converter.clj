@@ -6,16 +6,16 @@
   The file is gzip around a Nippy payload."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [jsonista.core :as json]
             [taoensso.nippy :as nippy]
             [tech.v3.dataset.io.nippy]
             [edgar.api :as e]
-            [edgar.xbrl :as xbrl]
             [edgar2.db.universe :as db-universe]
             [edgar2.download.facts :as dl]
-            [edgar2.financials.facts-ds :as facts-ds])
+            [edgar2.financials.facts-ds :as facts-ds]
+            [edgar2.financials.facts-zip :as facts-zip]
+            [edgar2.util.map-progress :refer [map-progress]])
   (:import [java.io DataInputStream DataOutputStream]
-           [java.util.zip GZIPInputStream GZIPOutputStream ZipFile]))
+           [java.util.zip GZIPInputStream GZIPOutputStream]))
 
 (def facts-path "data/facts.nippy.gz")
 
@@ -26,14 +26,6 @@
                      GZIPInputStream.
                      DataInputStream.)]
     (nippy/thaw-from-in! in)))
-
-(defn- read-cik-json
-  [zf cik]
-  (when cik
-    (let [entry (.getEntry zf (str "CIK" cik ".json"))]
-      (when entry
-        (with-open [in (.getInputStream zf entry)]
-          (json/read-value in json/keyword-keys-object-mapper))))))
 
 (defn- ticker-key
   [row]
@@ -67,31 +59,26 @@
         t0 (System/nanoTime)
         _ (do (println (format "facts  %d tickers  ← %s" total zip-path))
               (flush))
-        facts (with-open [zf (ZipFile. (str zip-path))]
-                (loop [i 0
-                       acc (transient {})
-                       rows rows]
-                  (if-let [[ticker row] (first rows)]
-                    (let [data (try (read-cik-json zf (:cik row))
-                                    (catch Exception ex
-                                      (println (format "  skip %s (%s)" ticker (.getMessage ex)))
-                                      nil))
-                          dss (when data
-                                (try (xbrl/facts->dataset data)
-                                     (catch Exception ex
-                                       (println (format "  facts-ds %s (%s)" ticker (.getMessage ex)))
-                                       nil)))
-                          reports (when dss
-                                    (try (reports dss)
-                                         (catch Exception ex
-                                           (println (format "  select %s (%s)" ticker (.getMessage ex)))
-                                           nil)))
-                          i' (inc i)]
-                      (when (or (zero? (mod i' 250)) (= i' total))
-                        (println (format "  %d/%d  %s" i' total ticker))
-                        (flush))
-                      (recur i' (cond-> acc reports (assoc! ticker reports)) (next rows)))
-                    (persistent! acc))))
+        facts (with-open [zf (facts-zip/open-facts-zip)]
+                (into {}
+                      (keep (fn [{:keys [ticker built]}]
+                              (when built
+                                [ticker built])))
+                      (map-progress
+                       (fn [i total {:keys [ticker]}]
+                         (format "  %d/%d  %s" i total ticker))
+                       (fn [[ticker row]]
+                         (let [dss (try (facts-zip/load-dataset zf (:cik row))
+                                        (catch Exception ex
+                                          (println (format "  skip %s (%s)" ticker (.getMessage ex)))
+                                          nil))
+                               built (when dss
+                                       (try (reports dss)
+                                            (catch Exception ex
+                                              (println (format "  select %s (%s)" ticker (.getMessage ex)))
+                                              nil)))]
+                           {:ticker ticker :built built}))
+                       rows)))
         file (io/file facts-path)
         tmp (io/file (str facts-path ".tmp"))
         mins (/ (double (- (System/nanoTime) t0)) 6.0e10)]

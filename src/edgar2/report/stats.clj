@@ -3,8 +3,6 @@
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [edgar.xbrl :as xbrl]
-            [jsonista.core :as json]
             [edgar.api :as e]
             [edgar2.download.facts :as dl]
             [edgar2.download.price :as price]
@@ -15,8 +13,9 @@
             [edgar2.financials.calc.annual :as annual]
             [edgar2.financials.calc.valuation :as valuation]
             [edgar2.financials.facts-ds-converter :as facts-nippy]
-            [edgar2.financials.shares-outstanding :as shares])
-  (:import [java.util.zip ZipFile]))
+            [edgar2.financials.facts-zip :as facts-zip]
+            [edgar2.financials.shares-outstanding :as shares]
+            [edgar2.util.map-progress :refer [map-progress]]))
 
 (def stats-path "data/stats.edn")
 
@@ -36,14 +35,6 @@
         (map (fn [{:keys [ticker close]}]
                [(str/upper-case (str ticker)) (double close)])
              (price/load-prices))))
-
-(defn read-cik-json
-  [zf cik]
-  (when cik
-    (let [entry (.getEntry zf (str "CIK" cik ".json"))]
-      (when entry
-        (with-open [in (.getInputStream zf entry)]
-          (json/read-value in json/keyword-keys-object-mapper))))))
 
 (def stats-field-order
   [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
@@ -106,6 +97,16 @@
 (defn fmt-growth
   [x]
   (when x (format "%.1f" (double x))))
+
+(defn- stats-progress-line
+  [i total st]
+  (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roce=%s"
+          i total
+          (or (:ticker st) (:cik st))
+          (fmt-growth (:sales-growth-avg-yoy st))
+          (some-> (:profit-margin st) (* 100) (#(format "%.1f" %)))
+          (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
+          (some-> (:return-on-capital-employed st) (* 100) (#(format "%.1f" %)))))
 
 (defn round1
   [x]
@@ -209,90 +210,72 @@
      (println (format "stats  %d of %d universe  ← %s"
                       total (count all) zip-path))
      (flush)
-     (with-open [zf (ZipFile. (str zip-path))]
-       (let [t-start (System/nanoTime)]
-       (loop [i 0
-              acc (transient [])
-              rows filers
-              json-ns 0
-              dataset-ns 0
-              calc-ns 0]
-         (if-let [row (first rows)]
-           (let [t0 (System/nanoTime)
-                 data (try (read-cik-json zf (:cik row))
-                           (catch Exception ex
-                             (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
-                             nil))
-                 t1 (System/nanoTime)
-                 dss (when data
-                       (try (xbrl/facts->dataset data)
-                            (catch Exception ex
-                              (println (format "  facts-ds %s (%s)" (:cik row) (.getMessage ex)))
-                              nil)))
-                 t2 (System/nanoTime)
-                 st (stats-one dss (:cik row)
-                               {:row row
-                                :prices prices
-                                :sic-db sic-db})
-                 t3 (System/nanoTime)
-                 i' (inc i)]
-             (when (or (zero? (mod i' 250)) (= i' total))
-               (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roce=%s"
-                                i' total
-                                (or (:ticker st) (:cik st))
-                                (fmt-growth (:sales-growth-avg-yoy st))
-                                (some-> (:profit-margin st) (* 100) (#(format "%.1f" %)))
-                                (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
-                                (some-> (:return-on-capital-employed st) (* 100) (#(format "%.1f" %)))))
-               (flush))
-             (recur i' (conj! acc st) (next rows)
-                    (+ json-ns (- t1 t0))
-                    (+ dataset-ns (- t2 t1))
-                    (+ calc-ns (- t3 t2))))
-           (let [out (vec (persistent! acc))
-                 mins #(/ (double %) 6.0e10)
-                 loop-ns (- (System/nanoTime) t-start)]
-             (println (format "time  json=%.1fm  dataset=%.1fm  calc=%.1fm  loop=%.1fm"
-                              (mins json-ns) (mins dataset-ns) (mins calc-ns) (mins loop-ns)))
-             (flush)
-             (save-stats! out)
-             (println)
-             (pprint/print-table
-              [:ticker :price :marketcap :price-sales :price-earnings
-               :sales-growth-avg-yoy :profit-margin :return-on-assets :return-on-capital-employed]
-              (take 25
-                    (map (fn [r]
-                           (-> r
-                               (update :sales-growth-avg-yoy round1)
-                               (update :profit-margin round4)
-                               (update :return-on-assets round4)
-                               (update :return-on-capital-employed round4)
-                               (update :price-sales round4)
-                               (update :price-earnings round4)))
-                         out)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roce=%d  price=%d  chg50=%d  chg200=%d  chg400=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
-                              stats-path
-                              (count out)
-                              (count (filter :sales-growth-avg-yoy out))
-                              (count (filter :profit-margin out))
-                              (count (filter :avg-profit-margin out))
-                              (count (filter :return-on-assets out))
-                              (count (filter :return-on-capital-employed out))
-                              (count (filter :price out))
-                              (count (filter :change50 out))
-                              (count (filter :change200 out))
-                              (count (filter :change400 out))
-                              (count (filter :marketcap out))
-                              (count (filter :adr-ratio out))
-                              (count (filter :price-earnings out))
-                              (count (filter :enterprise-value out))
-                              (count (filter :ev-ebit out))
-                              (count (filter :dividend-coverage out))
-                              (count (filter :buyback-yield out))
-                              (count (filter :revenue-score out))
-                              (count (filter :operating-income-score out))
-                              (count (filter :sic out))))
-             out))))))))
+     (with-open [zf (facts-zip/open-facts-zip)]
+       (let [t-start (System/nanoTime)
+             dataset-ns (volatile! 0)
+             calc-ns (volatile! 0)
+             out (map-progress
+                  (fn [i total st]
+                    (stats-progress-line i total st))
+                  (fn [row]
+                    (let [t0 (System/nanoTime)
+                          dss (try (facts-zip/load-dataset zf (:cik row))
+                                   (catch Exception ex
+                                     (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
+                                     nil))
+                          t1 (System/nanoTime)
+                          st (stats-one dss (:cik row)
+                                        {:row row
+                                         :prices prices
+                                         :sic-db sic-db})
+                          t2 (System/nanoTime)]
+                      (vswap! dataset-ns + (- t1 t0))
+                      (vswap! calc-ns + (- t2 t1))
+                      st))
+                  filers)
+             mins #(/ (double %) 6.0e10)
+             loop-ns (- (System/nanoTime) t-start)]
+         (println (format "time  json=%.1fm  dataset=%.1fm  calc=%.1fm  loop=%.1fm"
+                          (mins 0) (mins @dataset-ns) (mins @calc-ns) (mins loop-ns)))
+         (flush)
+         (save-stats! out)
+         (println)
+         (pprint/print-table
+          [:ticker :price :marketcap :price-sales :price-earnings
+           :sales-growth-avg-yoy :profit-margin :return-on-assets :return-on-capital-employed]
+          (take 25
+                (map (fn [r]
+                       (-> r
+                           (update :sales-growth-avg-yoy round1)
+                           (update :profit-margin round4)
+                           (update :return-on-assets round4)
+                           (update :return-on-capital-employed round4)
+                           (update :price-sales round4)
+                           (update :price-earnings round4)))
+                     out)))
+         (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roce=%d  price=%d  chg50=%d  chg200=%d  chg400=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
+                          stats-path
+                          (count out)
+                          (count (filter :sales-growth-avg-yoy out))
+                          (count (filter :profit-margin out))
+                          (count (filter :avg-profit-margin out))
+                          (count (filter :return-on-assets out))
+                          (count (filter :return-on-capital-employed out))
+                          (count (filter :price out))
+                          (count (filter :change50 out))
+                          (count (filter :change200 out))
+                          (count (filter :change400 out))
+                          (count (filter :marketcap out))
+                          (count (filter :adr-ratio out))
+                          (count (filter :price-earnings out))
+                          (count (filter :enterprise-value out))
+                          (count (filter :ev-ebit out))
+                          (count (filter :dividend-coverage out))
+                          (count (filter :buyback-yield out))
+                          (count (filter :revenue-score out))
+                          (count (filter :operating-income-score out))
+                          (count (filter :sic out))))
+         out)))))
 
 (defn- shares-from-reports
   "Share count from quarterly select-data when that row was filed after
@@ -335,49 +318,38 @@
      (println (format "stats-nippy  %d universe  %d in %s  load=%.1fm"
                       total (count facts) facts-nippy/facts-path (mins load-ns)))
      (flush)
-     (let [t1 (System/nanoTime)]
-       (loop [i 0
-              acc (transient [])
-              rows filers]
-         (if-let [row (first rows)]
-           (let [ticker (ticker-key row)
-                 reports (get facts ticker)
-                 annual-map (when reports
-                              (try (annual/calculate-selected reports)
-                                   (catch Exception ex
-                                     (println (format "  stats-fail %s (%s)"
-                                                      ticker (.getMessage ex)))
-                                     nil)))
-                 shares (or (when reports (shares-from-reports reports))
-                            (:shares-outstanding row))
-                 st (stats-one nil (:cik row)
+     (let [t1 (System/nanoTime)
+           out (map-progress
+                (fn [i total st]
+                  (stats-progress-line i total st))
+                (fn [row]
+                  (let [ticker (ticker-key row)
+                        reports (get facts ticker)
+                        annual-map (when reports
+                                     (try (annual/calculate-selected reports)
+                                          (catch Exception ex
+                                            (println (format "  stats-fail %s (%s)"
+                                                             ticker (.getMessage ex)))
+                                            nil)))
+                        shares (or (when reports (shares-from-reports reports))
+                                   (:shares-outstanding row))]
+                    (stats-one nil (:cik row)
                                {:row row
                                 :prices prices
                                 :sic-db sic-db
                                 :shares shares
-                                :annual-map annual-map})
-                 i' (inc i)]
-             (when (or (zero? (mod i' 250)) (= i' total))
-               (println (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roce=%s"
-                                i' total
-                                (or (:ticker st) ticker)
-                                (fmt-growth (:sales-growth-avg-yoy st))
-                                (some-> (:profit-margin st) (* 100) (#(format "%.1f" %)))
-                                (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
-                                (some-> (:return-on-capital-employed st) (* 100) (#(format "%.1f" %)))))
-               (flush))
-             (recur i' (conj! acc st) (next rows)))
-           (let [out (vec (persistent! acc))
-                 calc-ns (- (System/nanoTime) t1)]
-             (save-stats! out)
-             (println (format "time  load=%.1fm  calc=%.1fm"
-                              (mins load-ns) (mins calc-ns)))
-             (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roa=%d  roce=%d)"
-                              stats-path
-                              (count out)
-                              (count (filter :sales-growth-avg-yoy out))
-                              (count (filter :profit-margin out))
-                              (count (filter :return-on-assets out))
-                              (count (filter :return-on-capital-employed out))))
-             (flush)
-             out)))))))
+                                :annual-map annual-map})))
+                filers)
+           calc-ns (- (System/nanoTime) t1)]
+       (save-stats! out)
+       (println (format "time  load=%.1fm  calc=%.1fm"
+                        (mins load-ns) (mins calc-ns)))
+       (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roa=%d  roce=%d)"
+                        stats-path
+                        (count out)
+                        (count (filter :sales-growth-avg-yoy out))
+                        (count (filter :profit-margin out))
+                        (count (filter :return-on-assets out))
+                        (count (filter :return-on-capital-employed out))))
+       (flush)
+       out))))

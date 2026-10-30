@@ -1,4 +1,4 @@
-(ns edgar2.filing.tar
+(ns edgar2.util.tar
   "Reader for a .tar.gz archive.
 
   A gzip stream cannot be rewound, so each call scans from the start.

@@ -2,9 +2,9 @@
   "One EDGAR daily feed: {dest}/{year}/QTR{n}/{yyyymmdd}.nc.tar.gz.
 
   Members are stored as ./{accession}.nc. Archive bytes are read through
-  edgar2.filing.tar."
+  edgar2.util.tar."
   (:require [clojure.java.io :as io]
-            [edgar2.filing.tar :as tar]))
+            [edgar2.util.tar :as tar]))
 
 (def dest
   "/run/media/florian/26ad683d-44f4-42d8-bbd9-0a5d0b792fe0/sec")

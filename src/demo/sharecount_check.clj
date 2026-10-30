@@ -13,29 +13,20 @@
   than 50%."
   (:require [clojure.pprint :as pprint]
             [edgar.api :as e]
-            [edgar.xbrl :as xbrl]
             [edgar2.download.facts :as dl]
             [edgar2.download.facts-universe :as universe]
             [edgar2.db.universe :as db-universe]
             [edgar2.financials.calc.annual :as annual]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
-            [jsonista.core :as json]
-            [tech.v3.dataset :as ds])
-  (:import [java.util.zip ZipFile]))
+            [edgar2.financials.facts-zip :as facts-zip]
+            [tech.v3.dataset :as ds]))
 
 (def earnings-tags
   (:data (concepts/get-concept-id :net-income)))
 
 (def eps-tags
   (:data (concepts/get-concept-id :eps)))
-
-(defn read-cik-json
-  [zf cik]
-  (when cik
-    (when-let [entry (.getEntry zf (str "CIK" cik ".json"))]
-      (with-open [in (.getInputStream zf entry)]
-        (json/read-value in json/keyword-keys-object-mapper)))))
 
 (defn- periods
   [dss q-or-y]
@@ -108,10 +99,9 @@
 
   Returns a map when both figures exist. `:off?` is true when they differ
   by more than 50%. Nil when companyfacts is missing or either figure is."
-  [data]
-  (when data
-    (let [dss (xbrl/facts->dataset data)
-          obs (universe/shares-outstanding-obs dss)
+  [dss]
+  (when dss
+    (let [obs (universe/shares-outstanding-obs dss)
           shares (:val obs)
           q-or-y (:q-or-y obs)]
       (when (and (number? shares) (pos? (double shares)) q-or-y)
@@ -171,19 +161,19 @@
          total (count filers)]
      (println (format "sharecount-check  %d universe  ← %s" total zip-path))
      (flush)
-     (with-open [zf (ZipFile. (str zip-path))]
+     (with-open [zf (facts-zip/open-facts-zip)]
        (loop [rows filers
               i 0
               compared 0
               off []]
          (if-let [row (first rows)]
-           (let [data (try
-                        (read-cik-json zf (:cik row))
-                        (catch Throwable _
-                          nil))
-                 hit (when data
+           (let [dss (try
+                       (facts-zip/load-dataset zf (:cik row))
+                       (catch Throwable _
+                         nil))
+                 hit (when dss
                        (try
-                         (check-company data)
+                         (check-company dss)
                          (catch Throwable _
                            nil)))
                  compared' (if hit (inc compared) compared)

@@ -2,7 +2,8 @@
   "Universe-facts rows for stats (data/universe-facts.edn)."
   (:require [clojure.java.io :as io]
             [edgar2.download.dataset :as dataset]
-            [edgar2.download.facts-universe :as facts-universe]))
+            [edgar2.download.facts-universe :as facts-universe]
+            [edgar2.util.ticker-info :as ticker-info]))
 
 (def ^:private cache-ttl-ms (* 60 1000))
 
@@ -26,6 +27,6 @@
 (defn universe-row-by-cik
   "Universe-facts row for `cik`, or nil. Uses `load-universe` (1-minute cache)."
   [cik]
-  (let [want (facts-universe/pad-cik cik)]
-    (some #(when (= (facts-universe/pad-cik (:cik %)) want) %)
+  (let [want (ticker-info/pad-cik cik)]
+    (some #(when (= (ticker-info/pad-cik (:cik %)) want) %)
           (load-universe))))

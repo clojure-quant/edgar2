@@ -1,0 +1,8 @@
+{:config-paths ["imports/taoensso/encore"
+                "imports/cnuernber/dtype-next"
+                "imports/cnuernber/ham-fisted"
+                "imports/io.replikativ/datahike"
+                "imports/metosin/malli"
+                "imports/babashka/fs"
+                "imports/babashka/sci"
+                "imports/dynamic-alpha/hyper"]}

@@ -3,13 +3,13 @@
 
   `quarter` is {:year 2026 :quarter 3}. The zip is
   {dir}/{year}/QTR{n}/master.zip and the entry is master.idx.
-  Bind *index-dir* to read a different tree. Bytes come from edgar2.filing.zip.
+  Bind *index-dir* to read a different tree. Bytes come from edgar2.util.zip.
 
   Each row is {:cik :company-name :form :date-filed :filename}
   from CIK|Company Name|Form Type|Date Filed|Filename."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [edgar2.filing.zip :as zip]))
+            [edgar2.util.zip :as zip]))
 
 (def ^:dynamic *index-dir*
   "Directory that holds {year}/QTR{n}/master.zip."
