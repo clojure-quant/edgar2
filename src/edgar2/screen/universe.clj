@@ -2,8 +2,9 @@
   "Ticker lists a screen can score.
 
   `stats` reads data/stats.edn and keeps companies at or above :min-mc.
-  `eodhd` reads the EODHD equity list and keeps symbols that have a bar
-  file. Neither function loads a bar series; that happens in calculate."
+  `stats-all` reads the same file and keeps every company. `eodhd`
+  reads the EODHD equity list and keeps symbols that have a bar file.
+  None of these functions loads a bar series; that happens in calculate."
   (:require [clojure.java.io :as io]
             [edgar2.download.dataset :as dataset]
             [edgar2.eodhd.ingress :as ingress]
@@ -23,6 +24,24 @@
   [_]
   [(.lastModified (io/file stats/stats-path))])
 
+(defn- company-items
+  [rows]
+  (mapv (fn [r]
+          {:ticker (:ticker r)
+           :name (:entityName r)
+           :row r})
+        rows))
+
+(defn stats-all
+  "Every company in data/stats.edn.
+
+  Each item is {:ticker :name :row}. Market cap is not applied; a
+  screen that wants that cut filters in its own pipeline. The
+  company count is reported by that pipeline, as the universe stage."
+  [_]
+  {:items (company-items (report/load-stats))
+   :lines []})
+
 (defn stats
   "Companies in data/stats.edn at or above :min-mc.
 
@@ -32,11 +51,7 @@
   (let [min-mc (long (or min-mc report/default-min-mc))
         all (report/load-stats)
         rows (report/at-least-mc all min-mc)]
-    {:items (mapv (fn [r]
-                    {:ticker (:ticker r)
-                     :name (:entityName r)
-                     :row r})
-                  rows)
+    {:items (company-items rows)
      :lines [(format "  mc >= %d ($ millions; n=%d of %d)"
                      min-mc (count rows) (count all))]}))
 

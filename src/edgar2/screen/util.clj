@@ -3,6 +3,7 @@
 
   apply-and-pipeline walks {:label :pred} steps in order. Each
   predicate runs on the tickers that survived the previous step.
+  The first stage is the incoming count, labeled universe.
   report-pipeline-info formats those stages as the count lines the
   screen prints, label on the left and survivors on the right.")
 
@@ -26,25 +27,26 @@
   "Filter `tickers` through `filter-ands` in order.
 
   Each step is {:label :pred}. :pred is applied to the tickers still
-  in the list. Returns {:tickers <survivors>
-  :stages [{:label :n} ...]}, where :n is how many tickers remain
-  after that step."
+  in the list. Returns {:tickers <survivors> :stages [{:label :n} ...]}.
+  The first stage is the incoming count, labeled universe. Each later
+  :n is how many tickers remain after that step."
   [tickers filter-ands]
-  (reduce (fn [{:keys [tickers] :as result} {:keys [label pred]}]
-            (when-not (ifn? pred)
-              (throw (ex-info "Filter step needs a :pred function"
-                              {:label label})))
-            (let [kept (filterv pred tickers)]
-              {:tickers kept
-               :stages (conj (:stages result)
-                             {:label (str label) :n (count kept)})}))
-          {:tickers (vec tickers)
-           :stages []}
-          filter-ands))
+  (let [tickers (vec tickers)]
+    (reduce (fn [{:keys [tickers] :as result} {:keys [label pred]}]
+              (when-not (ifn? pred)
+                (throw (ex-info "Filter step needs a :pred function"
+                                {:label label})))
+              (let [kept (filterv pred tickers)]
+                {:tickers kept
+                 :stages (conj (:stages result)
+                               {:label (str label) :n (count kept)})}))
+            {:tickers tickers
+             :stages [{:label "universe" :n (count tickers)}]}
+            filter-ands)))
 
 (defn report-pipeline-info
-  "Lines for `pipeline-result`: each filter label, and the count still
-  in the list after that filter. Counts share a column on the right."
+  "Lines for `pipeline-result`: each stage label, and the count still
+  in the list. Counts share a column on the right."
   [pipeline-result]
   (let [stages (vec (:stages pipeline-result))
         widest (reduce max 0 (map #(count (:label %)) stages))
