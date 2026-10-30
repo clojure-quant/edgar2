@@ -5,8 +5,8 @@
             [edgar.api :as e]
             [edgar.core :as ec]
             [edgar.filing :as ef]
-            [edgar2.filing :as filing]
-            [edgar2.util :as util]))
+            [edgar2.util :as util]
+            [edgar2.util.filing :as ufiling]))
 
 (defn- content-type
   [file]
@@ -187,18 +187,18 @@
   [ticker]
   (util/ensure-identity!)
   (let [cik (util/resolve-filer ticker)
-        form (filing/annual-form cik)
+        form (ufiling/annual-form cik)
         f (e/filing cik :form form)
         primary (when f (ef/primary-doc (ef/filing-index f)))]
     (when primary
-      (let [path (io/file filing/filing-dir
+      (let [path (io/file ufiling/filing-dir
                           (str (:form f))
                           (str (:cik f))
                           (str (:accessionNumber f))
                           (str (:name primary)))]
         (if (.isFile path)
           path
-          (when-let [saved (ef/filing-save! f filing/filing-dir)]
+          (when-let [saved (ef/filing-save! f ufiling/filing-dir)]
             (io/file saved)))))))
 
 (defn annual-report-page
@@ -260,7 +260,7 @@
   [cik accession doc-name]
   (when (and accession doc-name)
     (let [names (distinct (mapcat cik-dir-names [cik (accession-cik accession)]))
-          root (io/file filing/filing-dir)]
+          root (io/file ufiling/filing-dir)]
       (when (.isDirectory root)
         (some (fn [^java.io.File form-dir]
                 (when (.isDirectory form-dir)
@@ -362,7 +362,7 @@
 (defn- cache-file
   [f doc-name]
   (when (and doc-name (:form f) (:cik f) (:accessionNumber f))
-    (io/file filing/filing-dir
+    (io/file ufiling/filing-dir
              (str (:form f))
              (str (:cik f))
              (str (:accessionNumber f))

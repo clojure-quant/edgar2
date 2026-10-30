@@ -27,6 +27,9 @@ units ['AUD', 'AUD/shares', 'Account', 'Aircraft', 'Bank', 'BarrelofOilEquivalen
 - some filers report future periods which contains
   only tax rates or other data, we need to remove it. 
 
+- COKE has two type of common shares; with two dei attributes,
+  this seems to fuck up the company-facts.json import, 
+  there is no dei field returned. 
 
 # FACTS-JSON
 - for each [:taxonomy :concept] there is one series with 

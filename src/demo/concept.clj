@@ -61,9 +61,11 @@
    :concept :val])
 
 (def raw-concepts
-  ["Revenue"
-   "RevenueFromContractWithCustomerExcludingAssessedTax"
-   "Revenues"])
+  [;"Revenue"
+   ;"RevenueFromContractWithCustomerExcludingAssessedTax"
+   ;"Revenues"
+   "EntityCommonStockSharesOutstanding"
+   ])
 
 (defn- raw-cols
   "Observation columns, then revenue-tag columns, skipping any that `facts` lacks."

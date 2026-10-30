@@ -7,7 +7,7 @@
             [clojure.test :refer [deftest is]]
             [edgar.core]
             [edgar.filing :as ef]
-            [edgar2.filing :as filing]
+            [edgar2.util.filing :as ufiling]
             [edgar2.web.filing :as web]))
 
 (def aiv-cik "0000922864")
@@ -103,7 +103,7 @@
                      (str "edgar2-filing-" (System/nanoTime)))
         urls (atom [])]
     (try
-      (with-redefs [filing/filing-dir (.getPath dir)
+      (with-redefs [ufiling/filing-dir (.getPath dir)
                     edgar.core/edgar-get (fn [url & _]
                                            (swap! urls conj url)
                                            "<xml/>")]
@@ -182,7 +182,7 @@
     (.mkdirs (.getParentFile file))
     (spit file "ok")
     (try
-      (with-redefs [filing/filing-dir (.getPath dir)
+      (with-redefs [ufiling/filing-dir (.getPath dir)
                     ef/filing-index (fn [_]
                                       (swap! calls inc)
                                       (throw (http-ex 503)))]

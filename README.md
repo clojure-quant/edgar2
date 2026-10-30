@@ -9,18 +9,10 @@ clj -X:web
 clj -X:web :port 8080
 ```
 
-Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first). `/screen` is the screen tabs, same tables as `clj -X:screen`. `/company/financials` is one ticker, same tables as `clj -X:financials`. The ticker stays with the browser tab across `/company/financials`, `/company/google-finance`, `/company/filings`, `/company/current-annual`, and `/company/description`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
+Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first). `/screen` is the screen tabs, same tables as `clj -X:screen`. `/company/financials` is one ticker. The ticker stays with the browser tab across `/company/financials`, `/company/google-finance`, `/company/filings`, `/company/current-annual`, and `/company/description`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
 
 
 ## Entrypoints for cli tasks
-
-
-```bash
-clj -X:download  ; Download the last five XOM 10-Ks (default ticker and year count)
-clj -X:report :ticker AAPL :years 3  ; Print Apple’s last three years of annual income-statement figures
-clj -X:financials :ticker IMPP :n 20 ; Print P&L and main balance-sheet lines (last 20 fiscal years; 10-K, 20-F, or 40-F)
-```
-
 
 
 ```bash
@@ -34,7 +26,7 @@ clj -X:download-universe-fsds
 clj -X:download-universe-fsds :limit 10
 ```
 
-Build a fast all-filer overview (`data/universe-fsds.edn`) from a few SEC **bulk** files (latest FSDS quarters + the exchange list) — not one HTTP call per company. Each row includes `:adr-ratio` from the latest 20-F when that filing tagged `EntityListingDepositoryReceiptRatio` (ordinary shares per ADR). Full statements and 10-K text stay on the per-ticker aliases.
+Build a fast all-filer overview (`data/universe-fsds.edn`) from a few SEC **bulk** files (latest FSDS quarters + the exchange list) — not one HTTP call per company. Each row includes `:adr-ratio` from the latest 20-F when that filing tagged `EntityListingDepositoryReceiptRatio` (ordinary shares per ADR). Full statements are on the company financials page.
 
 
 ```bash
@@ -55,7 +47,3 @@ clj -X:stats :limit 25
 ```
 
 From `universe-facts.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on assets (Net Income / assets), return on capital employed (EBIT / (assets − current liabilities)), `:shares` (most recent 10-Q when that quarter is at least as recent as the annual report; otherwise the annual report), `:price`, `:marketcap` (price × shares), `:price-sales` (USD market cap / USD revenue), `:price-earnings` (USD market cap / USD Net Income, else USD price / USD EPS), `:dividend-yield` (USD dividends paid / USD market cap, else USD dividend per share / price, %), and `:dividend-coverage` (net income / dividends paid, only when a dividend was paid).
-
-
-
-`:ticker` and `:years` work on the download and report aliases. `:financials` takes `:n`: fiscal years when annual, quarters when `:period` is quarterly. `:years` is still accepted there as a synonym for `:n`.

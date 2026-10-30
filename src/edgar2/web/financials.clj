@@ -2,11 +2,14 @@
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [hyper.effects :as effects]
-            [edgar2.filing :as filing]
+            [edgar2.financials.facts-ui :as facts-ui]
+            [edgar2.financials.facts-zip :as facts-zip]
             [edgar2.financials.view.core :as view]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats-category :as stats-cat]
-            [edgar2.web.fsds :as fsds]
+            [edgar2.util :as util]
+            [edgar2.util.filing :as ufiling]
+            [edgar2.util.ticker-info :as ticker-info]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]
             [tech.v3.dataset :as ds]))
@@ -29,22 +32,6 @@
 (defn- cell
   [v]
   (if (nil? v) "" (str v)))
-
-(defn- sector-line
-  "SIC code, then sector, industry, and subindustry."
-  [ticker]
-  (let [{:keys [sic sector industry subindustry sic-description]} (fsds/company ticker)
-        code (some-> sic str str/trim not-empty)
-        names (->> [sector industry subindustry]
-                   (keep #(some-> % str str/trim not-empty)))
-        desc (if (seq names)
-               (str/join " · " names)
-               (some-> sic-description str str/trim not-empty))]
-    (when (or code desc)
-      [:p.fin-sector
-       (when code [:span.fin-sic code])
-       (when (and code desc) " ")
-       desc])))
 
 (def sum-line
   "Last addend → the total drawn under the double rule.
@@ -77,6 +64,38 @@
       (catch Throwable _
         {}))))
 
+(defn- stats-row
+  "Row from data/stats.edn for `ticker`, or nil."
+  [ticker]
+  (get @stats-by-ticker (str/upper-case (str ticker))))
+
+(defn- sector-line
+  "SIC code, then sector, industry, and subindustry from the stats row."
+  [ticker]
+  (let [{:keys [sic sector industry subindustry]} (stats-row ticker)
+        code (some-> sic str str/trim not-empty)
+        names (->> [sector industry subindustry]
+                   (keep #(some-> % str str/trim not-empty)))]
+    (when (or code (seq names))
+      [:p.fin-sector
+       (when code [:span.fin-sic code])
+       (when (and code (seq names)) " ")
+       (when (seq names) (str/join " · " names))])))
+
+(defn- header-text
+  "Ticker, company name, and CIK from the stats row.
+  Ticker only when that row is missing."
+  [ticker]
+  (let [row (stats-row ticker)
+        name (some-> (:entityName row) str str/trim not-empty)
+        cik (some-> (:cik row) str str/trim not-empty)
+        ident (if row
+                (->> [(str ticker) name (when cik (str "CIK=" cik))]
+                     (keep identity)
+                     (str/join "  "))
+                (str ticker))]
+    (str ident "  ($ millions; EPS in $)")))
+
 (def ratio-groups
   "Ratio columns, grouped from `stats-category/categories`."
   (mapv (fn [cat]
@@ -94,7 +113,7 @@
 
 (defn- ratios-table
   [ticker]
-  (let [row (get @stats-by-ticker (str/upper-case (str ticker)))]
+  (let [row (stats-row ticker)]
     (if-not row
       [:p.fin-ratios-missing "No ratios in stats.edn."]
       [:div.fin-ratios
@@ -113,12 +132,9 @@
                [:td.num (ratio-cell row field)]])]]])])))
 
 (defn- col-heading
-  "Annual columns are keyed by yyyy-mm-dd. The heading is the year."
+  "Period columns stay yyyy-mm-dd so quarters in one year stay distinct."
   [col]
-  (let [s (str col)]
-    (if (re-matches #"\d{4}-\d{2}-\d{2}" s)
-      (subs s 0 4)
-      s)))
+  (str col))
 
 (def ^:private presentable-meta-cols
   #{:style :format :section})
@@ -151,9 +167,7 @@
                            (= (get sum-line field) next-field))
                 below? (= (get sum-line prev-field) field)
                 style (or (:style row) (:format row))
-                class (if (#{"year-end" "filing-date"} field)
-                        "fin-year-end"
-                        (row-class field style rule? below?))]
+                class (row-class field style rule? below?)]
             (cond-> [[:tr (cond-> {:key i}
                             class (assoc :class class))
                       (for [col columns]
@@ -170,7 +184,7 @@
 
 (defn- period-param
   [req]
-  (filing/parse-period (get-in req [:hyper/route :path-params :period])))
+  (ufiling/parse-period (get-in req [:hyper/route :path-params :period])))
 
 (defn- view-param
   "Path segment wins. `?view=` still works on a full page load."
@@ -191,7 +205,7 @@
   [n period view]
   (let [ticker (ticker/current)
         n (parse-n n)
-        period (name (filing/parse-period period))
+        period (name (ufiling/parse-period period))
         view (view/parse-view view)
         q (when ticker {:ticker ticker})]
     (when (and ticker n)
@@ -247,6 +261,49 @@
         label])]]
    [:button {:type "submit"} "Show"]])
 
+(defn- take-n-oldest-first
+  "Keep the `n` newest period rows (table is newest-first), oldest first."
+  [table n]
+  (let [rc (ds/row-count table)
+        n' (min (long n) rc)
+        idxs (vec (range (dec n') -1 -1))]
+    (if (zero? n')
+      table
+      (ds/select-rows table idxs))))
+
+(defn- companyfacts-cik
+  "10-digit CIK for the companyfacts zip entry.
+
+  XOM uses the operating filer (`resolve-filer2`). Every other ticker
+  uses the local exchange listing. `e/cik` would require an SEC identity."
+  [ticker]
+  (let [t (some-> ticker str str/trim not-empty str/upper-case)]
+    (ticker-info/pad-cik
+     (if (= t "XOM")
+       (util/resolve-filer2 t)
+       (ticker-info/ticker->cik t)))))
+
+(defn- load-statement
+  "Presentable statement for `ticker` from data/companyfacts.zip.
+
+  `:n` is fiscal years when annual and quarters when quarterly."
+  [ticker n period view]
+  (let [cik (companyfacts-cik ticker)]
+    (when-not cik
+      (throw (ex-info (str "No CIK for " ticker) {:ticker ticker})))
+    (let [dss (with-open [zf (facts-zip/open-facts-zip)]
+                (facts-zip/load-dataset zf cik))]
+      (when-not dss
+        (throw (ex-info
+                (format "No companyfacts for CIK %s in data/companyfacts.zip" cik)
+                {:ticker ticker :cik cik})))
+      (let [wide (facts-ui/statement dss
+                                     (if (= period :quarterly) :q :y)
+                                     view
+                                     :standard)]
+        {:ticker ticker
+         :table (facts-ui/presentable (take-n-oldest-first wide n))}))))
+
 (defn financials-page
   [req]
   (let [n (n-param req)
@@ -257,11 +314,7 @@
                 (ticker/seed! req)
                 (ticker/begin
                   (fn [t]
-                    (filing/financials-data {:ticker t
-                                             :n n
-                                             :period period
-                                             :view view
-                                             :inline-xbrl? true}))))
+                    (load-statement t n period view))))
        :render (fn [{:keys [result*]} req]
                  (let [{:keys [status data message ticker]} @result*]
                    [:div.page
@@ -273,11 +326,9 @@
                                         (view/view-label view) ")…")]
                       :error [:p.error message]
                       :ready [:div
-                              [:p.fin-header
-                               (format "%s  %s  CIK=%s  %s  ($ millions; EPS in $)"
-                                       (:ticker data) (:name data) (:cik data) (:form data))]
+                              [:p.fin-header (header-text ticker)]
                               (sector-line ticker)
                               (ratios-table ticker)
-                              (financials-table (filing/presentable-financials data))]
+                              (financials-table (:table data))]
                       [:p "Enter a ticker."])]))
        :unmount (fn [{:keys [stop]}] (stop))})))
