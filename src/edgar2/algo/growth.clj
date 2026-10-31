@@ -74,7 +74,8 @@
    {:key :rev-score :label "revenue-score" :num? true :decimals 1}
    {:key :oi-score :label "operating-income-score" :num? true :decimals 1}
    {:key :sales-growth-avg-yoy :label "sales-growth-avg-yoy" :num? true :decimals 1}
-   {:key :net-income-change-q-on-y :label "net-income-change-q-on-y" :num? true :decimals 1}])
+   {:key :net-income-change-q-on-y :label "net-income-change-q-on-y" :num? true :decimals 1}
+   {:key :earnings-variation :label "earnings-variation" :num? true :decimals 1}])
 
 (defn- param-value
   "Value of `param` in `params`, or that param's default."

@@ -75,6 +75,8 @@
     (assoc :earnings-stabilized-yield (stats/round1 (:earnings-stabilized-yield r)))
     (number? (:earnings-stabilized-yoy r))
     (assoc :earnings-stabilized-yoy (stats/round1 (:earnings-stabilized-yoy r)))
+    (number? (:earnings-variation r))
+    (assoc :earnings-variation (stats/round1 (:earnings-variation r)))
     (number? (:earnings-future-3-yield r))
     (assoc :earnings-future-3-yield
            (stats/round1 (:earnings-future-3-yield r)))
