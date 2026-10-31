@@ -6,6 +6,7 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
             [tech.v3.dataset :as ds]))
@@ -39,7 +40,7 @@
   of the `:shares-outstanding` tags."
   ([] (run {}))
   ([{:keys [ticker]}]
-   (util/ensure-identity!)
+   (ucore/ensure-identity!)
    (let [ticker (ticker-name ticker)
          dss (e/facts (util/resolve-filer2 ticker))]
      (print-table (str ticker " annual")

@@ -12,6 +12,7 @@
             [edgar2.download.dataset :as dataset]
             [edgar2.filing.xbrl :as xbrl]
             [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.util.filing :as ufiling]
             [edgar2.util.map-progress :refer [map-progress]]
             [jsonista.core :as json])
@@ -156,9 +157,9 @@
   the cover so its facts can use the cover's contexts. The extracted
   instance (`form40f_htm.xml`) is included when SEC has one, so a cover
   fact can use a context that the inline HTML left out.
-  Returns `{:cik cik :shares <share-summary>}`."
+  Returns `{:cik :filing-date :form-type :shares}`."
   [cik]
-  (util/ensure-identity!)
+  (ucore/ensure-identity!)
   (let [filing (ufiling/latest-annual-filing cik)]
     (when-not filing
       (throw (ex-info "no annual filing" {:cik cik})))
@@ -173,12 +174,14 @@
                                         :filed (:filingDate filing)
                                         :form (:form filing)})]
       {:cik cik
+       :filing-date (:filingDate filing)
+       :form-type (:form filing)
        :shares (share-summary parsed)})))
 
 (defn share-summary-ticker
   "CIK for `ticker`, then `share-summary-cik`, with `:ticker` added."
   [ticker]
-  (util/ensure-identity!)
+  (ucore/ensure-identity!)
   (let [ticker (ticker-name ticker)
         cik (util/resolve-filer2 ticker)]
     (when-not cik
@@ -224,8 +227,8 @@
 
   Progress prints every 100 tickers. The file is written after the last one."
   []
-  (util/ensure-identity!)
-  (e/enable-disk-cache! :dir "data/edgar-cache")
+  (ucore/ensure-identity!)
+  (ucore/enable-cache)
   (let [rows (->> (universe/load-universe)
                   (filter #(not (str/blank? (str (:ticker %)))))
                   vec)

@@ -1,11 +1,7 @@
 (ns edgar2.util
-  "SEC identity and ticker-to-CIK resolution shared by filings and demos."
+  "Ticker-to-CIK resolution shared by filings and demos."
   (:require [clojure.string :as str]
             [edgar.api :as e]))
-
-(def identity-header
-  (or (System/getenv "EDGAR_IDENTITY")
-      "clojure-quant edgar2 research@clojure-quant.org"))
 
 (def ^:private annual-form-names
   ["10-K" "20-F" "40-F"])
@@ -80,7 +76,3 @@
   (if (= (str/upper-case (str ticker)) "XOM")
     xom-operating-cik
     (e/cik ticker)))
-
-(defn ensure-identity!
-  []
-  (e/init! identity-header))

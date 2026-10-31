@@ -8,8 +8,8 @@
             [clojure.string :as str]
             [taoensso.nippy :as nippy]
             [tech.v3.dataset.io.nippy]
-            [edgar.api :as e]
             [edgar2.db.universe :as db-universe]
+            [edgar2.util.core :as ucore]
             [edgar2.download.facts :as dl]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.financials.facts-zip :as facts-zip]
@@ -48,7 +48,7 @@
   `clj -X` passes an option map; it is ignored."
   ([] (convert-zip-to-dataset {}))
   ([_]
-  (e/init! dl/identity-header)
+  (ucore/ensure-identity!)
   (let [zip-path (dl/ensure-zip! {})
         rows (->> (db-universe/load-universe)
                   (keep (fn [row]

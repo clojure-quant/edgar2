@@ -12,6 +12,7 @@
             [edgar2.download.facts :as dl]
             [edgar2.download.facts-universe :as universe]
             [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.util.ticker-info :as ticker-info]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
@@ -142,7 +143,7 @@
   `shares-outstanding` selects, with its period and period-end."
   ([ticker] (run ticker :y))
   ([ticker q-or-y]
-   (util/ensure-identity!)
+   (ucore/ensure-identity!)
    (let [ticker (str/upper-case (str/trim (str ticker)))
          quarterly? (= q-or-y :q)
          row (universe-row ticker)

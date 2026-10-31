@@ -6,6 +6,7 @@
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds :as dl]
             [edgar2.download.fsds-universe :as fsds]
+            [edgar2.util.core :as ucore]
             [edgar2.util.map-progress :refer [map-progress]]
             [edgar2.util.ticker-info :as ticker-info])
   (:import [java.time LocalDate]))
@@ -248,8 +249,8 @@
          clj -X:adr :limit 20"
   ([] (run {}))
   ([{:keys [limit]}]
-   (e/init! dl/identity-header)
-   (e/enable-disk-cache! :dir "data/edgar-cache")
+   (ucore/ensure-identity!)
+   (ucore/enable-cache)
    (println (format "adr  → %s" adr-path))
    (println "Ensuring recent FSDS quarters…")
    (let [zips (dl/ensure-quarters!)]

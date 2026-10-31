@@ -6,7 +6,8 @@
    [tablecloth.api :as tc]
    [edgar.api :as e]
    [edgar2.financials.facts-ds :as facts-ds]
-   [edgar2.util :refer [resolve-filer2]]))
+   [edgar2.util :refer [resolve-filer2]]
+   [edgar2.util.core :as ucore]))
 
 (def demo-fields
   [[:dei :EntityCommonStockSharesOutstanding]
@@ -18,7 +19,7 @@
    ])
 
 (comment
-  (e/init! "Your Name your@email.com")
+  (ucore/ensure-identity!)
   
   (def dss (e/facts (resolve-filer2 "XOM") ))
   

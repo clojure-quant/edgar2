@@ -10,7 +10,7 @@
             [edgar2.download.facts :as dl]
             [edgar2.download.facts-universe :as universe]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.util.ticker-info :as ticker-info]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
@@ -101,7 +101,7 @@
   ([]
    (study-missing-from-stats! {}))
   ([{:keys [limit]}]
-   (util/ensure-identity!)
+   (ucore/ensure-identity!)
    (let [stats (load-stats)
          missing (cond->> (filterv #(not (number? (:revenue %))) stats)
                    limit (take (long limit)))
@@ -197,7 +197,7 @@
   ([]
    (study-universe-calc! {:limit 200}))
   ([{:keys [limit]}]
-   (util/ensure-identity!)
+   (ucore/ensure-identity!)
    (let [u (vec (cond->> (load-universe)
                   limit (take (long limit))))
          results

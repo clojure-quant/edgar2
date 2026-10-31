@@ -6,9 +6,8 @@
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.test :refer [deftest is testing]]
-            [edgar.api :as e]
             [edgar.xbrl :as xbrl]
-            [edgar2.download.facts :as dl]
+            [edgar2.util.core :as ucore]
             [edgar2.financials.facts-ds :as facts-ds]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
@@ -138,7 +137,7 @@
   ~75–115 day windows and non-FY `:fp`. Note: companyfacts often lacks
   6-K numeric data even when EDGAR has HTML 6-K filings."
   (when (zip-available?)
-    (e/init! dl/identity-header)
+    (ucore/ensure-identity!)
     (with-open [zf (ZipFile. companyfacts-zip)]
       (let [rows (mapv (fn [t]
                          (compare-ticker (load-facts zf (:cik t)) t))

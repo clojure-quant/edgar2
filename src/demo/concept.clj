@@ -9,6 +9,7 @@
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.util.ticker-info :as ticker-info]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
@@ -124,7 +125,7 @@
   ([{:keys [ticker]}]
    (if-let [ticker (ticker-name ticker)]
      (do
-       (util/ensure-identity!)
+       (ucore/ensure-identity!)
        (let [f (load-facts-zip ticker)
              table (with-revenue f :y)
              table-q (with-revenue f :q)]

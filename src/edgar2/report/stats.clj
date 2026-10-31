@@ -3,8 +3,8 @@
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [edgar.api :as e]
             [edgar2.download.facts :as dl]
+            [edgar2.util.core :as ucore]
             [edgar2.download.price :as price]
             [edgar2.download.facts-universe :as universe]
             [edgar2.db.price-change :as db-price-change]
@@ -200,7 +200,7 @@
   ([] (stats {}))
   ([{:keys [limit force]
      :or {force false}}]
-   (e/init! dl/identity-header)
+   (ucore/ensure-identity!)
    (let [zip-path (dl/ensure-zip! {:force force})
          all (db-universe/load-universe)
          prices (load-price-by-ticker)

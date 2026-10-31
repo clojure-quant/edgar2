@@ -1,15 +1,12 @@
 (ns edgar2.download.facts
   (:require [clojure.java.io :as io]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [edgar2.util.core :as ucore])
   (:import [java.io FileOutputStream]
            [java.net URI]
            [java.net.http HttpClient HttpRequest HttpResponse$BodyHandlers]
            [java.time Instant LocalDate ZoneId ZonedDateTime]
            [java.time.format DateTimeFormatter]))
-
-(def identity-header
-  (or (System/getenv "EDGAR_IDENTITY")
-      "clojure-quant edgar2 research@clojure-quant.org"))
 
 (def companyfacts-url
   "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip")
@@ -68,7 +65,7 @@
                    (.build))
         req (-> (HttpRequest/newBuilder)
                 (.uri (URI/create url))
-                (.header "User-Agent" identity-header)
+                (.header "User-Agent" ucore/identity-header)
                 (.GET)
                 (.build))
         resp (.send client req (HttpResponse$BodyHandlers/ofInputStream))

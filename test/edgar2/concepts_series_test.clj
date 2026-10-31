@@ -3,10 +3,9 @@
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.test :refer [deftest is testing]]
-            [edgar.api :as e]
             [edgar.xbrl :as xbrl]
             [edgar2.financials.concepts :as concepts]
-            [edgar2.download.facts :as dl]
+            [edgar2.util.core :as ucore]
             [edgar2.financials.facts-ds :as facts-ds]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
@@ -52,7 +51,7 @@
 (deftest series-mixed-net-income-rail
   ;; FreightCar America: NetIncomeLoss through 2021, then ProfitLoss.
   (when (zip-available?)
-    (e/init! dl/identity-header)
+    (ucore/ensure-identity!)
     (with-open [zf (ZipFile. companyfacts-zip)]
       (let [series (concept-series (load-facts zf "0001320854") :net-income)
             used (set (concepts-used series))]
@@ -68,7 +67,7 @@
 (deftest series-mixed-revenue-abt
   ;; Abbott: SalesRevenueNet, then ASC 606 contract revenue.
   (when (zip-available?)
-    (e/init! dl/identity-header)
+    (ucore/ensure-identity!)
     (with-open [zf (ZipFile. companyfacts-zip)]
       (let [series (concept-series (load-facts zf "0000001800") :revenue)
             used (set (concepts-used series))]
@@ -80,7 +79,7 @@
 
 (deftest series-mixed-cost-of-revenue-abt
   (when (zip-available?)
-    (e/init! dl/identity-header)
+    (ucore/ensure-identity!)
     (with-open [zf (ZipFile. companyfacts-zip)]
       (let [series (concept-series (load-facts zf "0000001800") :cost-of-revenue)]
         (is (switches? series :CostOfGoodsSold :CostOfGoodsAndServicesSold))))))
@@ -88,7 +87,7 @@
 (deftest series-mixed-revenue-amd
   ;; AMD: SalesRevenueGoodsNet / SalesRevenueNet, then ASC 606.
   (when (zip-available?)
-    (e/init! dl/identity-header)
+    (ucore/ensure-identity!)
     (with-open [zf (ZipFile. companyfacts-zip)]
       (let [series (concept-series (load-facts zf "0000002488") :revenue)
             used (set (concepts-used series))]
@@ -103,7 +102,7 @@
 
 (deftest series-mixed-cost-of-revenue-amd
   (when (zip-available?)
-    (e/init! dl/identity-header)
+    (ucore/ensure-identity!)
     (with-open [zf (ZipFile. companyfacts-zip)]
       (let [series (concept-series (load-facts zf "0000002488") :cost-of-revenue)]
         (is (switches? series :CostOfGoodsSold :CostOfGoodsAndServicesSold))))))

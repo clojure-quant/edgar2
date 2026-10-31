@@ -3,15 +3,11 @@
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [edgar.api :as e]
             [edgar.core :as edgar]
+            [edgar2.util.core :as ucore]
             [edgar2.download.dataset :as dataset]
             [edgar2.util.ticker-info :as ticker-info])
   (:import [java.time LocalDate]))
-
-(def identity-header
-  (or (System/getenv "EDGAR_IDENTITY")
-      "clojure-quant edgar2 research@clojure-quant.org"))
 
 (def exchange-url
   "https://www.sec.gov/files/company_tickers_exchange.json")
@@ -83,7 +79,7 @@
   Usage: clj -X:download-exchanges"
   ([] (download-exchanges {}))
   ([_]
-   (e/init! identity-header)
+   (ucore/ensure-identity!)
    (let [all (fetch-exchange-rows)
          rows (select-exchange-rows all)
          by-ex (frequencies (map :exchange rows))]

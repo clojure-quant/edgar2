@@ -3,6 +3,7 @@
   (:require [clojure.pprint :as pprint]
             [edgar.api :as e]
             [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.report.stats :as stats]))
 
 (def ticker "AAPL")
@@ -16,7 +17,7 @@
   "Load facts for one ticker, run `stats/stats-one`, print the row."
   ([] (run ticker))
   ([ticker]
-   (util/ensure-identity!)
+   (ucore/ensure-identity!)
    (let [cik (util/resolve-filer2 ticker)
          dss (load-facts ticker)
          st (stats/stats-one dss cik)]

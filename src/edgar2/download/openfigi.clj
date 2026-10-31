@@ -16,6 +16,7 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar2.download.dataset :as dataset]
+            [edgar2.util.core :as ucore]
             [jsonista.core :as json])
   (:import [java.net URI]
            [java.net.http HttpClient HttpClient$Redirect HttpRequest
@@ -31,10 +32,6 @@
 (def mapping-url "https://api.openfigi.com/v3/mapping")
 
 (def exch-code "US")
-
-(def identity-header
-  (or (System/getenv "EDGAR_IDENTITY")
-      "clojure-quant edgar2 research@clojure-quant.org"))
 
 (defn- api-key
   []
@@ -59,7 +56,7 @@
                     (-> (HttpRequest/newBuilder)
                         (.uri (URI/create url))
                         (.timeout (Duration/ofSeconds 120))
-                        (.header "User-Agent" identity-header)
+                        (.header "User-Agent" ucore/identity-header)
                         (.header "Accept" "text/plain, text/html, */*")
                         (.GET)
                         .build)

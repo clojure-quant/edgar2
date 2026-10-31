@@ -2,8 +2,8 @@
   "Closed-end fund premium/discount from companyfacts CEF taxonomy."
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
-            [edgar.api :as e]
             [edgar2.download.facts :as dl]
+            [edgar2.util.core :as ucore]
             [edgar2.db.universe :as db-universe]
             [edgar2.financials.facts-zip :as facts-zip]
             [edgar2.report.stats :as stats]
@@ -75,7 +75,7 @@
   ([] (cef {}))
   ([{:keys [limit force]
      :or {force false}}]
-   (e/init! dl/identity-header)
+   (ucore/ensure-identity!)
    (let [zip-path (dl/ensure-zip! {:force force})
          all (db-universe/load-universe)
          filers (vec (cond->> all limit (take (long limit))))

@@ -4,10 +4,6 @@
             [edgar.fsds :as dera])
   (:import [java.time LocalDate]))
 
-(def identity-header
-  (or (System/getenv "EDGAR_IDENTITY")
-      "clojure-quant edgar2 research@clojure-quant.org"))
-
 (def fsds-dir "data/fsds")
 
 (defn recent-quarters

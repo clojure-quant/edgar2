@@ -6,7 +6,8 @@
   downloaded-MB/total-MB, or a Retry-After wait in seconds.
   A 429 waits out Retry-After and sends the same request again.
   Request starts are at least 120 ms apart."
-  (:require [clojure.string :as str])
+  (:require [clojure.string :as str]
+            [edgar2.util.core :as ucore])
   (:import [java.io IOException]
            [java.net URI]
            [java.net.http HttpClient HttpClient$Redirect HttpRequest
@@ -14,10 +15,6 @@
            [java.time Duration ZonedDateTime]
            [java.time.format DateTimeFormatter]
            [java.util.concurrent Semaphore]))
-
-(def identity-header
-  (or (System/getenv "EDGAR_IDENTITY")
-      "clojure-quant edgar2 research@clojure-quant.org"))
 
 (def parallelism
   "Downloads in flight at once."
@@ -94,7 +91,7 @@
   [url {:keys [head? range timeout-seconds]}]
   (let [b (doto (HttpRequest/newBuilder)
             (.uri (URI/create url))
-            (.header "User-Agent" identity-header)
+            (.header "User-Agent" ucore/identity-header)
             (.header "Accept" "*/*")
             (.header "Accept-Encoding" "identity"))]
     (when timeout-seconds

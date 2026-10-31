@@ -12,8 +12,8 @@
   with annual earnings. Prints filers where the two figures differ by more
   than 50%."
   (:require [clojure.pprint :as pprint]
-            [edgar.api :as e]
             [edgar2.download.facts :as dl]
+            [edgar2.util.core :as ucore]
             [edgar2.download.facts-universe :as universe]
             [edgar2.db.universe :as db-universe]
             [edgar2.financials.calc.annual :as annual]
@@ -154,7 +154,7 @@
   `:limit` n checks only the first n universe rows."
   ([] (run {}))
   ([{:keys [limit]}]
-   (e/init! dl/identity-header)
+   (ucore/ensure-identity!)
    (let [zip-path (dl/ensure-zip! {})
          filers (vec (cond->> (db-universe/load-universe)
                        limit (take (long limit))))

@@ -11,6 +11,7 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.financials.ixbrl :as ixbrl]
             [tech.v3.dataset :as ds]))
@@ -100,7 +101,7 @@
   missing from companyfacts. Otherwise the table is companyfacts only."
   ([] (run {}))
   ([{:keys [ticker show ixbrl]}]
-   (util/ensure-identity!)
+   (ucore/ensure-identity!)
    (let [ticker (ticker-name ticker)
          shown (fields-for show)
          cik (util/resolve-filer2 ticker)

@@ -5,6 +5,7 @@
             [edgar.core :as ec]
             [edgar.filing :as ef]
             [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.util.filing :as ufiling]))
 
 (defn- content-type
@@ -184,7 +185,7 @@
   "Path of the latest 10-K, 20-F, or 40-F primary document.
   Downloads it into data/filings when it is not already there."
   [ticker]
-  (util/ensure-identity!)
+  (ucore/ensure-identity!)
   (let [cik (util/resolve-filer ticker)
         f (when cik (ufiling/latest-annual-filing cik))
         primary (when f (ef/primary-doc (ef/filing-index f)))]
@@ -484,7 +485,7 @@
   are stored under the issuer CIK, so that path is tried first.
   Paper filings resolve to scanned.pdf when that scan is on the index."
   [cik accession]
-  (util/ensure-identity!)
+  (ucore/ensure-identity!)
   (when-let [f (load-filing cik accession)]
     (let [issuer (padded-cik cik)
           issuer-filing (if issuer (assoc f :cik issuer) f)]
@@ -501,7 +502,7 @@
     (or (when-not (paper-filename? doc)
           (cached-doc cik accession doc))
         (do
-          (util/ensure-identity!)
+          (ucore/ensure-identity!)
           (when-let [f (load-filing cik accession)]
             (let [issuer (padded-cik cik)
                   issuer-filing (if issuer (assoc f :cik issuer) f)]
@@ -561,7 +562,7 @@
         accession (some-> (get-in req [:hyper/route :path-params :accession])
                           str str/trim not-empty)]
     (try
-      (util/ensure-identity!)
+      (ucore/ensure-identity!)
       (if-let [f (and accession (load-filing cik accession))]
         {:status 200
          :headers {"Content-Type" "text/html; charset=utf-8"}

@@ -2,8 +2,8 @@
   "Companyfacts extract joined to the primary listed ticker by CIK."
   (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [edgar.api :as e]
             [edgar.xbrl :as xbrl]
+            [edgar2.util.core :as ucore]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.financials.facts-zip :as facts-zip]
@@ -219,7 +219,7 @@
          clj -X:universe-facts :limit 20"
   ([] (universe {}))
   ([{:keys [force limit]}]
-   (e/init! dl/identity-header)
+   (ucore/ensure-identity!)
    (dl/ensure-zip! {:force force})
    (let [parsed (parse-companyfacts-zip limit)
          kept (filter keep-fact? parsed)

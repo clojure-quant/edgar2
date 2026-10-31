@@ -3,8 +3,8 @@
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [edgar.api :as e]
             [edgar2.financials.concepts :as concepts]
+            [edgar2.util.core :as ucore]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds :as dl]
             [edgar2.db.sector :as sector])
@@ -208,8 +208,8 @@
          clj -X:download-universe-fsds :limit 10"
   ([] (filer-info {}))
   ([{:keys [limit]}]
-   (e/init! dl/identity-header)
-   (e/enable-disk-cache! :dir "data/edgar-cache")
+   (ucore/ensure-identity!)
+   (ucore/enable-cache)
    (println (format "filer-info  overview from FSDS bulk files  → %s" filer-info-path))
    (println "Downloading recent FSDS quarters (cached after the first run)…")
    (let [zips (dl/ensure-quarters!)]

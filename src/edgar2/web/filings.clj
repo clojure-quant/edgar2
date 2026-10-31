@@ -4,6 +4,7 @@
             [edgar.api :as e]
             [hyper.core :as h]
             [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.util.ticker-info :as ticker-info]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
@@ -146,7 +147,7 @@
   A ticker uses the local exchange listing, the same CIK as the financials
   page. A bare CIK is used as given."
   [ticker cik]
-  (util/ensure-identity!)
+  (ucore/ensure-identity!)
   (let [id (if ticker
              (or (listed-cik ticker)
                  (throw (ex-info (str "No CIK for " ticker) {:ticker ticker})))
