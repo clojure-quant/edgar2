@@ -26,8 +26,10 @@
   (with-open [in (io/input-stream (io/file (str path)))]
     (json/read-value in json/keyword-keys-object-mapper)))
 
-(def ^:private class-axis
-  :us-gaap:StatementClassOfStockAxis)
+(def ^:private class-axes
+  "Class-of-stock axes. An IFRS filer uses its own axis, not the US-GAAP one."
+  [:us-gaap:StatementClassOfStockAxis
+   :ifrs-full:ClassesOfShareCapitalAxis])
 
 (defn- map-get
   "Value for `k` when map keys may be keywords or strings.
@@ -55,7 +57,7 @@
 (defn- class-member
   "Value of the class-of-stock axis, or nil when the row has no class."
   [row]
-  (map-get (:dimensions row) class-axis))
+  (some #(map-get (:dimensions row) %) class-axes))
 
 (defn- local-name
   "Name after the last colon. A keyword's name may already contain one,
@@ -66,15 +68,27 @@
     (if i (subs s (inc i)) s)))
 
 (defn- class-label
-  "\"Class B\" for a ClassB member. No axis, or any other member, is \"Common\"."
+  "\"Class B\" for a ClassB, OrdinarySharesB, or ClassBShares member;
+  \"Common Nonvoting\" or \"Common Voting\" for those common classes; and
+  \"Common\" for no axis or any other member."
   [member]
-  (if-let [[_ letter] (re-find #"Class([A-Z])Member$" (local-name member))]
-    (str "Class " letter)
-    "Common"))
+  (let [n (local-name member)
+        lower (str/lower-case n)
+        common? (str/includes? lower "common")
+        letter (or (second (re-find #"Class([A-Z])Member$" n))
+                   (second (re-find #"Shares([A-Z])Member$" n))
+                   (second (re-find #"([A-Z])Shares?Member$" n)))]
+    (cond
+      letter (str "Class " letter)
+      (and common? (str/includes? lower "nonvoting")) "Common Nonvoting"
+      (and common? (str/includes? lower "voting")) "Common Voting"
+      :else "Common")))
 
 (def ^:private exchange-axis-name "EntityListingsExchangeAxis")
 
-(def ^:private stock-axis-name "StatementClassOfStockAxis")
+(def ^:private stock-axis-names
+  "Either axis marks a cover context as one class of stock."
+  #{"StatementClassOfStockAxis" "ClassesOfShareCapitalAxis"})
 
 (def ^:private debt-title-re
   "A cover title for notes, bonds, or debentures is not a share class."
@@ -83,15 +97,34 @@
 (defn- share-class-context?
   "True when the cover context is a class of stock.
 
-  A statement-class axis is that class. No axes, or only the exchange
-  axis, is the single common class. Debt and any other instrument are
-  not. A title that names notes, bonds, or debentures is not a share
-  even when the filer left the debt axis off."
+  A statement-class or IFRS share-capital axis is that class. No axes, or
+  only the exchange axis, is the single common class. Debt and any other
+  instrument are not. A title that names notes, bonds, or debentures is not
+  a share even when the filer left the debt axis off."
   [dims title]
   (let [axes (into #{} (map local-name) (keys dims))]
     (and (not (re-find debt-title-re (str title)))
-         (or (contains? axes stock-axis-name)
+         (or (some axes stock-axis-names)
              (empty? (disj axes exchange-axis-name))))))
+
+(defn- title-class
+  "Class letter named in a cover title, e.g. \"Class A Common Stock\" or
+  \"American Depositary Shares (each representing one B share)\". Nil when
+  the title names no class."
+  [title]
+  (let [t (str title)]
+    (or (second (re-find #"(?i)Class\s+([A-Z])\b" t))
+        (second (re-find #"(?i)representing\s+(?:one|two|three|\d+)?\s*([A-Z])\s+share" t)))))
+
+(defn- cover-class
+  "Share class for one cover context: its class axis, else the class letter
+  in the security title, else \"Common\"."
+  [dims title]
+  (if-let [member (class-member {:dimensions dims})]
+    (class-label member)
+    (if-let [letter (title-class title)]
+      (str "Class " letter)
+      "Common")))
 
 (defn- cover-by-name
   [facts]
@@ -116,7 +149,7 @@
        (if (or (not (parent? row))
                (not (share-class-context? dims title)))
          m
-         (let [class (class-label (class-member {:dimensions dims}))
+         (let [class (cover-class dims title)
                ticker (not-empty (get by "TradingSymbol"))
                exchange (not-empty (get by "SecurityExchangeName"))]
            (if (or (contains? m class) (not (or ticker exchange)))
@@ -253,10 +286,12 @@
   `:us-gaap/WeightedAverageNumberOfSharesOutstandingBasic`, then
   `:us-gaap/WeightedAverageNumberOfSharesIssuedBasic` when that tag is
   absent, then `:ifrs-full/WeightedAverageShares`.
-  A row with no `:us-gaap:StatementClassOfStockAxis` is \"Common\". A
-  ClassA or ClassB member on that axis is \"Class A\" or \"Class B\"; any
-  other member is \"Common\". Each figure is the observation with the
-  greatest `:end`.
+  A row with no class axis (`:us-gaap:StatementClassOfStockAxis` or
+  `:ifrs-full:ClassesOfShareCapitalAxis`) is \"Common\". A ClassA, ClassB,
+  OrdinarySharesB, or ClassBShares member is \"Class A\", \"Class B\", and
+  so on; a nonvoting or voting common member is \"Common Nonvoting\" or
+  \"Common Voting\"; any other member is \"Common\". Each figure is the
+  observation with the greatest `:end`.
 
   When several entities report (`dei:LegalEntityAxis`), only the parent's
   rows are used. See `reporting-entities` for how many there are.

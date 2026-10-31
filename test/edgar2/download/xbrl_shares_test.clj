@@ -201,6 +201,71 @@
        "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"northwest\" unitRef=\"shares\" format=\"ixt:fixed-zero\">None</ix:nonFraction>"
        "</body></html>"))
 
+(deftest nonvoting-common-keeps-its-own-class
+  (let [html "<html><body>
+              <ix:nonNumeric name=\"dei:EntityRegistrantName\">HORMEL FOODS CORPORATION</ix:nonNumeric>
+              <xbrli:context id=\"voting\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000048465</xbrli:identifier>
+                  <xbrli:segment>
+                    <xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">us-gaap:CommonStockMember</xbrldi:explicitMember>
+                  </xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:instant>2025-11-30</xbrli:instant></xbrli:period>
+              </xbrli:context>
+              <xbrli:context id=\"nonvoting\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000048465</xbrli:identifier>
+                  <xbrli:segment>
+                    <xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">us-gaap:NonvotingCommonStockMember</xbrldi:explicitMember>
+                  </xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:instant>2025-11-30</xbrli:instant></xbrli:period>
+              </xbrli:context>
+              <xbrli:unit id=\"shares\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>
+              <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"voting\" unitRef=\"shares\" decimals=\"0\">550,107,295</ix:nonFraction>
+              <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"nonvoting\" unitRef=\"shares\" decimals=\"INF\">0</ix:nonFraction>
+              </body></html>"]
+    (is (= {"Common" {:weighted nil, :outstanding 550107295}
+            "Common Nonvoting" {:weighted nil, :outstanding 0}}
+           (shares/share-summary (xbrl/parse html))))))
+
+(defn- ifrs-class-context
+  [id member period]
+  (str "<xbrli:context id=\"" id "\"><xbrli:entity>"
+       "<xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000717826</xbrli:identifier>"
+       "<xbrli:segment><xbrldi:explicitMember dimension=\"ifrs-full:ClassesOfShareCapitalAxis\">"
+       member "</xbrldi:explicitMember></xbrli:segment>"
+       "</xbrli:entity>" period "</xbrli:context>"))
+
+(def ^:private instant-2025 "<xbrli:period><xbrli:instant>2025-12-31</xbrli:instant></xbrli:period>")
+
+(deftest ifrs-class-axis-splits-ordinary-share-classes
+  (let [html (str "<html><body>"
+                  "<ix:nonNumeric name=\"dei:EntityRegistrantName\">ERICSSON LM TELEPHONE CO</ix:nonNumeric>"
+                  "<xbrli:context id=\"fy\">"
+                  "<xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000717826</xbrli:identifier></xbrli:entity>"
+                  "<xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>"
+                  "</xbrli:context>"
+                  (ifrs-class-context "a" "eric:OrdinarySharesAMember" instant-2025)
+                  (ifrs-class-context "b" "eric:OrdinarySharesBMember" instant-2025)
+                  (ifrs-class-context "c" "eric:OrdinarySharesCMember" instant-2025)
+                  "<xbrli:unit id=\"shares\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>"
+                  "<ix:nonNumeric contextRef=\"fy\" name=\"dei:Security12bTitle\">American Depositary Shares (each representing one B share)</ix:nonNumeric>"
+                  "<ix:nonNumeric contextRef=\"fy\" name=\"dei:TradingSymbol\">ERIC</ix:nonNumeric>"
+                  "<ix:nonNumeric contextRef=\"fy\" name=\"dei:SecurityExchangeName\">The NASDAQ Stock Market LLC</ix:nonNumeric>"
+                  "<ix:nonFraction name=\"ifrs-full:WeightedAverageShares\" contextRef=\"fy\" unitRef=\"shares\" scale=\"6\">3,333</ix:nonFraction>"
+                  "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"a\" unitRef=\"shares\">261,755,983</ix:nonFraction>"
+                  "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"b\" unitRef=\"shares\">3,109,595,752</ix:nonFraction>"
+                  "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"c\" unitRef=\"shares\" decimals=\"INF\">0</ix:nonFraction>"
+                  "</body></html>")]
+    (is (= {"Common" {:weighted 3333000000, :outstanding nil}
+            "Class A" {:weighted nil, :outstanding 261755983}
+            "Class B" {:weighted nil
+                       :outstanding 3109595752
+                       :ticker "ERIC"
+                       :exchange "The NASDAQ Stock Market LLC"}
+            "Class C" {:weighted nil, :outstanding 0}}
+           (shares/share-summary (xbrl/parse html))))))
+
 (deftest parent-wins-when-subsidiaries-also-report
   (let [facts (xbrl/parse (combined-cover nil))]
     (is (= 3 (shares/reporting-entities facts)))
