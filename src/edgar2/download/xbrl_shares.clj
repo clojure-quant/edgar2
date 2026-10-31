@@ -194,17 +194,25 @@
       (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesIssuedBasic])
       (get-in facts [:facts :ifrs-full :WeightedAverageShares])))
 
-(defn- outstanding-concept
-  "Shares outstanding.
+(defn- preference-class?
+  "True for a preferred or preference share class, which is not common
+  equity and so is not a share count for the common stock."
+  [row]
+  (let [n (some-> (class-member row) local-name str/lower-case)]
+    (boolean (and n (re-find #"preference|preferred" n)))))
 
-  `dei:EntityCommonStockSharesOutstanding` when it has a share fact,
-  otherwise `us-gaap:SharesOutstanding`. An empty DEI concept does not
+(defn- outstanding-rows
+  "Share-count rows for the common stock.
+
+  `dei:EntityCommonStockSharesOutstanding` when it has a share fact, then
+  `us-gaap:SharesOutstanding`, then IFRS `ifrs-full:NumberOfSharesOutstanding`
+  without preference classes. An empty higher-priority concept does not
   block the fallback."
   [facts]
-  (let [dei (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding])]
-    (if (seq (share-rows dei))
-      dei
-      (get-in facts [:facts :us-gaap :SharesOutstanding]))))
+  (or (not-empty (share-rows (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding])))
+      (not-empty (share-rows (get-in facts [:facts :us-gaap :SharesOutstanding])))
+      (vec (remove preference-class?
+                   (share-rows (get-in facts [:facts :ifrs-full :NumberOfSharesOutstanding]))))))
 
 (defn- name-key
   "Lowercased letters and digits, so a DEI name can be compared with a
@@ -237,7 +245,7 @@
   one of the two still counts."
   [facts]
   (into []
-        (concat (share-rows (outstanding-concept facts))
+        (concat (outstanding-rows facts)
                 (share-rows (weighted-concept facts)))))
 
 (defn reporting-entities
@@ -281,7 +289,8 @@
 
   `facts` is a companyfacts map. Outstanding shares are
   `:dei/EntityCommonStockSharesOutstanding`, then
-  `:us-gaap/SharesOutstanding` when that tag has no share facts.
+  `:us-gaap/SharesOutstanding` when that tag has no share facts, then
+  `:ifrs-full/NumberOfSharesOutstanding` without preference classes.
   Weighted shares are
   `:us-gaap/WeightedAverageNumberOfSharesOutstandingBasic`, then
   `:us-gaap/WeightedAverageNumberOfSharesIssuedBasic` when that tag is
@@ -302,8 +311,7 @@
   [facts]
   (let [rows (share-facts facts)
         parent? (parent-row? facts rows)
-        outstanding (rows-by-class
-                     (filterv parent? (share-rows (outstanding-concept facts))))
+        outstanding (rows-by-class (filterv parent? (outstanding-rows facts)))
         weighted (rows-by-class
                   (filterv parent? (share-rows (weighted-concept facts))))
         classes (->> (concat (keys outstanding) (keys weighted))

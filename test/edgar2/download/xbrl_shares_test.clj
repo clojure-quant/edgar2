@@ -266,6 +266,49 @@
             "Class C" {:weighted nil, :outstanding 0}}
            (shares/share-summary (xbrl/parse html))))))
 
+(defn- ifrs-share-context
+  [id dims period]
+  (str "<xbrli:context id=\"" id "\"><xbrli:entity>"
+       "<xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000718940</xbrli:identifier>"
+       "<xbrli:segment>" dims "</xbrli:segment>"
+       "</xbrli:entity>" period "</xbrli:context>"))
+
+(deftest ifrs-number-of-shares-outstanding-fills-when-dei-is-absent
+  (let [html (str "<html><body>"
+                  "<ix:nonNumeric name=\"dei:EntityRegistrantName\">BCE INC.</ix:nonNumeric>"
+                  "<xbrli:context id=\"fy\">"
+                  "<xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000718940</xbrli:identifier></xbrli:entity>"
+                  "<xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>"
+                  "</xbrli:context>"
+                  (ifrs-share-context
+                   "ordinary"
+                   (str "<xbrldi:explicitMember dimension=\"ifrs-full:ClassesOfShareCapitalAxis\">ifrs-full:OrdinarySharesMember</xbrldi:explicitMember>"
+                        "<xbrldi:explicitMember dimension=\"ifrs-full:ComponentsOfEquityAxis\">ifrs-full:IssuedCapitalMember</xbrldi:explicitMember>")
+                   instant-2025)
+                  (ifrs-share-context
+                   "preferred"
+                   "<xbrldi:explicitMember dimension=\"ifrs-full:ClassesOfShareCapitalAxis\">ifrs-full:PreferenceSharesMember</xbrldi:explicitMember>"
+                   instant-2025)
+                  (ifrs-share-context
+                   "b"
+                   "<xbrldi:explicitMember dimension=\"ifrs-full:ClassesOfShareCapitalAxis\">bce:ClassBSharesMember</xbrldi:explicitMember>"
+                   instant-2025)
+                  "<xbrli:unit id=\"shares\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>"
+                  "<ix:nonFraction name=\"ifrs-full:WeightedAverageShares\" contextRef=\"fy\" unitRef=\"shares\" scale=\"6\">929.1</ix:nonFraction>"
+                  "<ix:nonFraction name=\"ifrs-full:NumberOfSharesOutstanding\" contextRef=\"ordinary\" unitRef=\"shares\">932,525,817</ix:nonFraction>"
+                  "<ix:nonFraction name=\"ifrs-full:NumberOfSharesOutstanding\" contextRef=\"preferred\" unitRef=\"shares\">131,755,879</ix:nonFraction>"
+                  "<ix:nonFraction name=\"ifrs-full:NumberOfSharesOutstanding\" contextRef=\"b\" unitRef=\"shares\" decimals=\"INF\">0</ix:nonFraction>"
+                  "</body></html>")]
+    (is (= {"Common" {:weighted 929100000, :outstanding 932525817}
+            "Class B" {:weighted nil, :outstanding 0}}
+           (shares/share-summary (xbrl/parse html))))))
+
+(deftest dei-outstanding-wins-over-ifrs-number-of-shares-outstanding
+  (is (= {"Common" {:weighted nil :outstanding 100}}
+         (shares/share-summary
+          {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 100)}
+                   :ifrs-full {:NumberOfSharesOutstanding (shares-fact 999)}}}))))
+
 (deftest parent-wins-when-subsidiaries-also-report
   (let [facts (xbrl/parse (combined-cover nil))]
     (is (= 3 (shares/reporting-entities facts)))
