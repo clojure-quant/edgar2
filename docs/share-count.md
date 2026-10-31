@@ -11,6 +11,14 @@ issues with share count:
    take quarterly
    see ADIG unit test
 
+3. multiple share classes
+  {:cik "0000317540",
+   :ticker "COKE",
+   :shares {"Common" {:weighted 73658000, :outstanding 56517334},
+            "Class B" {:weighted 10047000, :outstanding 10046960}}}
+   multiple common share classes result to no :dei shares in companyfacs.
+   the only way to do it is download annual filings, parse xbrl and 
+   extract from there. see demo/xbrl.clj that writes data/share-classes.edn
 
 
 FMCC  freddi Mac
