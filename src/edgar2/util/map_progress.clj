@@ -1,10 +1,10 @@
 (ns edgar2.util.map-progress
-  "Eager maps that print a progress line every 500 items.")
+  "Eager maps that print a progress line every 100 items.")
 
-(def ^:private progress-every 500)
+(def ^:private progress-every 100)
 
 (defn- report-progress?
-  "True on every 500th 1-based index and on the last item."
+  "True on every 100th 1-based index and on the last item."
   [i total]
   (or (zero? (mod i progress-every))
       (= i total)))
@@ -13,7 +13,7 @@
   "Apply `transform-fn` to one indexed input and maybe print progress.
   `indexed` is `[i input-data]` with `i` 0-based. `progress-fn` is called
   with the 1-based index, `total`, and that item's result when the index
-  is a multiple of 500 or is the last item. A string returned by
+  is a multiple of 100 or is the last item. A string returned by
   `progress-fn` is printed. Returns the result."
   [progress-fn transform-fn total [i input-data]]
   (let [result (transform-fn input-data)
@@ -26,7 +26,7 @@
     result))
 
 (defn map-progress
-  "Apply `transform-fn` to each item of `items`. After every 500th item
+  "Apply `transform-fn` to each item of `items`. After every 100th item
   and after the last item, `progress-fn` is called with the 1-based
   index, the total count, and that item's result. A string returned by
   `progress-fn` is printed.
@@ -44,7 +44,7 @@
 (defn pmap-progress
   "Like `map-progress`, but `transform-fn` runs in parallel via `pmap`.
   `progress-fn` runs when a finished item's 1-based input index is a
-  multiple of 500 or is the last index, so lines can appear out of input
+  multiple of 100 or is the last index, so lines can appear out of input
   order. The returned vector stays in input order."
   [progress-fn transform-fn items]
   (let [items (vec items)

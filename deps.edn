@@ -14,6 +14,7 @@
   :demo-concept {:exec-fn demo.concept/run}
   :demo-filing-xbrl {:exec-fn demo.filing-xbrl/run
                      :exec-args {:url "http://localhost:3000/filing/0000317540/0001628280-26-009057/coke-20251231.htm"}}
+  :demo-xbrl {:exec-fn demo.xbrl/run}
   :demo-table-full {:exec-fn demo.report-table-full/run
                     :exec-args {:ticker "XOM"}}
   :demo-table-full-shares {:exec-fn demo.report-table-full-shares/run

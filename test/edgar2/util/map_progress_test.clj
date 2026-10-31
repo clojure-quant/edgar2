@@ -15,16 +15,16 @@
     (is (= [3] @calls))
     (is (= "3/3 -> 6\n" out))))
 
-(deftest reports-every-500-and-the-last-item
+(deftest reports-every-100-and-the-last-item
   (let [calls (atom [])]
-    (is (= (vec (range 501))
+    (is (= (vec (range 250))
            (mp/map-progress
             (fn [i _total _result]
               (swap! calls conj i)
               nil)
             identity
-            (range 501))))
-    (is (= [500 501] @calls))))
+            (range 250))))
+    (is (= [100 200 250] @calls))))
 
 (deftest nil-progress-is-not-printed
   (is (= ""
@@ -45,16 +45,16 @@
                       [1 2 3]))))]
     (is (= "3/3 -> 6\n" out))))
 
-(deftest pmap-reports-every-500-and-the-last-item
+(deftest pmap-reports-every-100-and-the-last-item
   (let [calls (atom [])]
-    (is (= (vec (range 501))
+    (is (= (vec (range 250))
            (mp/pmap-progress
             (fn [i _total _]
               (swap! calls conj i)
               nil)
             identity
-            (range 501))))
-    (is (= [500 501] (sort @calls)))))
+            (range 250))))
+    (is (= [100 200 250] (sort @calls)))))
 
 (deftest pmap-empty-input-returns-empty-vector
   (is (= []
