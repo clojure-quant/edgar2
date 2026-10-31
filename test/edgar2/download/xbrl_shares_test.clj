@@ -171,3 +171,49 @@
                              {:units {:shares [{:end "2026-09-04"
                                                 :val 379236005
                                                 :filed "2026-09-04"}]}}}}}))))
+
+(defn- entity-context
+  [id member period]
+  (str "<xbrli:context id=\"" id "\"><xbrli:entity>"
+       "<xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000107263</xbrli:identifier>"
+       (when member
+         (str "<xbrli:segment><xbrldi:explicitMember dimension=\"dei:LegalEntityAxis\">"
+              member "</xbrldi:explicitMember></xbrli:segment>"))
+       "</xbrli:entity>" period "</xbrli:context>"))
+
+(def ^:private instant-2026 "<xbrli:period><xbrli:instant>2026-02-19</xbrli:instant></xbrli:period>")
+
+(def ^:private year-2025 "<xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>")
+
+(defn- combined-cover
+  "Parent plus two subsidiary registrants, the way a combined 10-K tags them."
+  [parent-member]
+  (str "<html><body>"
+       "<ix:nonNumeric name=\"dei:EntityRegistrantName\">The Williams Companies, Inc.</ix:nonNumeric>"
+       (entity-context "parent-out" parent-member year-2025)
+       (entity-context "parent-instant" parent-member instant-2026)
+       (entity-context "transco" "wmb:TranscontinentalGasPipeLineCompanyLLCMember" instant-2026)
+       (entity-context "northwest" "wmb:NorthwestPipelineLLCMember" instant-2026)
+       "<xbrli:unit id=\"shares\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>"
+       "<ix:nonFraction name=\"us-gaap:WeightedAverageNumberOfSharesOutstandingBasic\" contextRef=\"parent-out\" unitRef=\"shares\" scale=\"6\">1,221</ix:nonFraction>"
+       "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"parent-instant\" unitRef=\"shares\">1,221,563,111</ix:nonFraction>"
+       "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"transco\" unitRef=\"shares\" format=\"ixt:fixed-zero\">None</ix:nonFraction>"
+       "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"northwest\" unitRef=\"shares\" format=\"ixt:fixed-zero\">None</ix:nonFraction>"
+       "</body></html>"))
+
+(deftest parent-wins-when-subsidiaries-also-report
+  (let [facts (xbrl/parse (combined-cover nil))]
+    (is (= 3 (shares/reporting-entities facts)))
+    (is (= {"Common" {:weighted 1221000000, :outstanding 1221563111}}
+           (shares/share-summary facts)))))
+
+(deftest parent-member-is-recognized-when-every-row-has-an-entity-axis
+  (let [facts (xbrl/parse (combined-cover "wmb:WilliamsCompaniesIncMember"))]
+    (is (= 3 (shares/reporting-entities facts)))
+    (is (= {"Common" {:weighted 1221000000, :outstanding 1221563111}}
+           (shares/share-summary facts)))))
+
+(deftest one-entity-has-no-entity-count
+  (is (nil? (shares/reporting-entities
+             {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 100)}}}))))
+

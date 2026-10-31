@@ -42,6 +42,16 @@
                 v))
             m))))
 
+(def ^:private entity-axis
+  "A combined annual report tags each co-registrant's facts on this axis."
+  :dei:LegalEntityAxis)
+
+(defn- entity-member
+  "Legal-entity member on `row`. Nil for the primary registrant, whose rows
+  carry no entity axis."
+  [row]
+  (map-get (:dimensions row) entity-axis))
+
 (defn- class-member
   "Value of the class-of-stock axis, or nil when the row has no class."
   [row]
@@ -94,14 +104,17 @@
   "Ticker and exchange for each share class on the cover.
 
   Rows that share a context are one security. The first context for a
-  class wins. A debt instrument is omitted."
-  [cover]
+  class wins. A debt instrument, or a row that is not the parent's, is
+  omitted."
+  [cover parent?]
   (reduce
    (fn [m facts]
-     (let [dims (:dimensions (first facts))
+     (let [row (first facts)
+           dims (:dimensions row)
            by (cover-by-name facts)
            title (get by "Security12bTitle")]
-       (if-not (share-class-context? dims title)
+       (if (or (not (parent? row))
+               (not (share-class-context? dims title)))
          m
          (let [class (class-label (class-member {:dimensions dims}))
                ticker (not-empty (get by "TradingSymbol"))
@@ -116,8 +129,8 @@
 
 (defn- with-markets
   "Add :ticker and :exchange onto each class the cover lists as stock."
-  [shares cover]
-  (let [markets (class-markets cover)]
+  [shares cover parent?]
+  (let [markets (class-markets cover parent?)]
     (into {}
           (map (fn [[class row]]
                  [class (merge row (get markets class))]))
@@ -135,8 +148,8 @@
     (:val (last (sort-by (juxt #(or (:end %) "") #(or (:filed %) "")) rows)))))
 
 (defn- rows-by-class
-  [concept]
-  (group-by #(class-label (class-member %)) (share-rows concept)))
+  [rows]
+  (group-by #(class-label (class-member %)) rows))
 
 (defn- weighted-concept
   "Basic weighted-average shares.
@@ -160,6 +173,76 @@
       dei
       (get-in facts [:facts :us-gaap :SharesOutstanding]))))
 
+(defn- name-key
+  "Lowercased letters and digits, so a DEI name can be compared with a
+  member's local name."
+  [s]
+  (some-> s str str/lower-case (str/replace #"[^a-z0-9]" "") not-empty))
+
+(defn- member-name-key
+  "`wmb:TranscontinentalGasPipeLineCompanyLLCMember` → the company part,
+  without the `Member` suffix."
+  [member]
+  (some-> member local-name name-key (str/replace #"member$" "")))
+
+(defn- registrant-member?
+  "True when `member` names the registrant in `entityName`.
+
+  \"Williams Companies, Inc.\" matches `wmb:WilliamsCompaniesIncMember`, and
+  so does \"The Williams Companies, Inc.\". A short member key is rejected
+  so it cannot match everything."
+  [entity-name member]
+  (let [entity (name-key entity-name)
+        member (member-name-key member)]
+    (and entity member
+         (>= (count member) 8)
+         (or (str/includes? entity member)
+             (str/includes? member entity)))))
+
+(defn- share-facts
+  "Outstanding and weighted share rows together. An entity that reports only
+  one of the two still counts."
+  [facts]
+  (into []
+        (concat (share-rows (outstanding-concept facts))
+                (share-rows (weighted-concept facts)))))
+
+(defn reporting-entities
+  "Number of legal entities that report share facts, or nil when every row
+  belongs to one registrant.
+
+  A combined 10-K lists the parent plus its subsidiary registrants, and tags
+  the subsidiaries' rows with `dei:LegalEntityAxis`. The parent's rows have
+  no entity axis. Three entities therefore return 3. An undimensioned parent
+  and a parent-shaped member are one entity, not two."
+  [facts]
+  (let [members (distinct (map entity-member (share-facts facts)))
+        named? #(registrant-member? (:entityName facts) %)]
+    (when (some some? members)
+      (if (some nil? members)
+        (inc (count (remove named? (remove nil? members))))
+        (count members)))))
+
+(defn- parent-row?
+  "Predicate for the rows that belong to the registrant.
+
+  Rows without the axis are the parent. When every share row is dimensioned,
+  the member named like `:entityName` wins; otherwise the first member in
+  sort order, because a combined report lists the parent first. With an
+  undimensioned parent, a member that also names the registrant is kept."
+  [facts rows]
+  (let [members (distinct (map entity-member rows))
+        named? #(registrant-member? (:entityName facts) %)]
+    (if-not (some some? members)
+      (constantly true)
+      (if (some nil? members)
+        (fn [row]
+          (let [member (entity-member row)]
+            (or (nil? member) (named? member))))
+        (let [parent (or (some #(when (named? %) %) members)
+                         (first (sort-by str members)))]
+          (fn [row] (= parent (entity-member row))))))))
+
 (defn share-summary
   "Latest weighted-average and shares outstanding by common-stock class.
 
@@ -175,12 +258,19 @@
   other member is \"Common\". Each figure is the observation with the
   greatest `:end`.
 
+  When several entities report (`dei:LegalEntityAxis`), only the parent's
+  rows are used. See `reporting-entities` for how many there are.
+
   When `facts` has `:cover` (from `edgar2.filing.xbrl/parse`), each class
   the cover lists as stock also gets `:ticker` and `:exchange`. A debt
   line, such as senior notes, is not a share class and is left out."
   [facts]
-  (let [outstanding (rows-by-class (outstanding-concept facts))
-        weighted (rows-by-class (weighted-concept facts))
+  (let [rows (share-facts facts)
+        parent? (parent-row? facts rows)
+        outstanding (rows-by-class
+                     (filterv parent? (share-rows (outstanding-concept facts))))
+        weighted (rows-by-class
+                  (filterv parent? (share-rows (weighted-concept facts))))
         classes (->> (concat (keys outstanding) (keys weighted))
                      distinct
                      (sort-by #(if (= % "Common") " " %)))]
@@ -190,7 +280,8 @@
                   [class {:weighted (latest-val (get weighted class))
                           :outstanding (latest-val (get outstanding class))}]))
            classes)
-     (:cover facts))))
+     (:cover facts)
+     parent?)))
 
 (defn- ticker-name
   [ticker]
@@ -230,8 +321,11 @@
   instance (`form40f_htm.xml`) is included when SEC has one, so a cover
   fact can use a context that the inline HTML left out.
   Each share class also has the cover `:ticker` and `:exchange`. A listed
-  note or bond is not a share class and is left out.
-  Returns `{:cik :filing-date :form-type :shares}`."
+  note or bond is not a share class and is left out. When subsidiaries are
+  co-registrants (`dei:LegalEntityAxis`), only the parent's share counts are
+  used and `:entities` holds how many entities report.
+  Returns `{:cik :filing-date :form-type :shares}`, plus `:entities` when
+  the filing carries an entity axis."
   [cik]
   (ucore/ensure-identity!)
   (let [filing (ufiling/latest-annual-filing cik)]
@@ -246,11 +340,14 @@
                      vec)
           parsed (xbrl/parse-all texts {:accn (:accessionNumber filing)
                                         :filed (:filingDate filing)
-                                        :form (:form filing)})]
-      {:cik cik
-       :filing-date (:filingDate filing)
-       :form-type (:form filing)
-       :shares (share-summary parsed)})))
+                                        :form (:form filing)})
+          entities (reporting-entities parsed)]
+      (cond-> {:cik cik
+               :filing-date (:filingDate filing)
+               :form-type (:form filing)
+               :shares (share-summary parsed)}
+        entities
+        (assoc :entities entities)))))
 
 (defn share-summary-ticker
   "CIK for `ticker`, then `share-summary-cik`, with `:ticker` added."
