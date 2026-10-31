@@ -71,18 +71,27 @@
   [concept]
   (group-by #(class-label (class-member %)) (share-rows concept)))
 
+(defn- weighted-concept
+  "US-GAAP basic weighted-average shares, or IFRS weighted-average shares
+  when the US-GAAP concept is absent."
+  [facts]
+  (or (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesOutstandingBasic])
+      (get-in facts [:facts :ifrs-full :WeightedAverageShares])))
+
 (defn share-summary
   "Latest weighted-average and shares outstanding by common-stock class.
 
-  `facts` is a companyfacts map. A row with no
-  `:us-gaap:StatementClassOfStockAxis` is \"Common\". A ClassA or ClassB
-  member on that axis is \"Class A\" or \"Class B\"; any other member is
-  \"Common\". Each figure is the observation with the greatest `:end`."
+  `facts` is a companyfacts map. Weighted shares are
+  `:us-gaap/WeightedAverageNumberOfSharesOutstandingBasic`, or
+  `:ifrs-full/WeightedAverageShares` when that US-GAAP concept is absent.
+  A row with no `:us-gaap:StatementClassOfStockAxis` is \"Common\". A
+  ClassA or ClassB member on that axis is \"Class A\" or \"Class B\"; any
+  other member is \"Common\". Each figure is the observation with the
+  greatest `:end`."
   [facts]
   (let [outstanding (rows-by-class
                      (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding]))
-        weighted (rows-by-class
-                  (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesOutstandingBasic]))
+        weighted (rows-by-class (weighted-concept facts))
         classes (->> (concat (keys outstanding) (keys weighted))
                      distinct
                      (sort-by #(if (= % "Common") " " %)))]
@@ -103,9 +112,11 @@
       (when-not (str/blank? s) s))))
 
 (defn share-summary-cik
-  "Latest annual filing for `cik`, parsed with `edgar2.filing.xbrl/parse`.
+  "Latest annual filing for `cik`, parsed with `edgar2.filing.xbrl/parse-all`.
 
-  The form is 10-K, or 20-F / 40-F when that is the annual report.
+  The form is 10-K, or 20-F / 40-F when that is the annual report. When the
+  cover links an audited-statement exhibit (`_d2` or `ex99d2`), that HTML
+  is parsed with the cover so its facts can use the cover's contexts.
   Returns `{:cik cik :shares <share-summary>}`."
   [cik]
   (util/ensure-identity!)
@@ -114,9 +125,12 @@
     (when-not filing
       (throw (ex-info "no annual filing" {:cik cik :form form})))
     (let [html (e/html filing)
-          parsed (xbrl/parse html {:accn (:accessionNumber filing)
-                                   :filed (:filingDate filing)
-                                   :form (:form filing)})]
+          exhibit (xbrl/statement-exhibit-name html)
+          texts (cond-> [html]
+                  exhibit (conj (e/filing-document filing exhibit)))
+          parsed (xbrl/parse-all texts {:accn (:accessionNumber filing)
+                                        :filed (:filingDate filing)
+                                        :form (:form filing)})]
       {:cik cik
        :shares (share-summary parsed)})))
 

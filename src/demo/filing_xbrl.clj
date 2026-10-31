@@ -1,5 +1,5 @@
 (ns demo.filing-xbrl
-  "Companyfacts-shaped map from one inline XBRL filing HTML.
+  "Companyfacts-shaped map from a filing cover and its statement exhibit.
 
   clj -X:demo-filing-xbrl
   clj -X:demo-filing-xbrl :url '\"http://localhost:3000/filing/0000317540/0001628280-26-009057/coke-20251231.htm\"'
@@ -28,6 +28,24 @@
     (some? url) {:text (slurp (str url)) :where (str url)}
     :else nil))
 
+(defn- sibling
+  "Same directory as `where`, with `name` as the filename."
+  [where name]
+  (when (and where name)
+    (let [s (str where)
+          i (str/last-index-of s "/")]
+      (when i
+        (str (subs s 0 (inc i)) name)))))
+
+(defn- load-documents
+  "Cover text, plus the statement exhibit when the cover links one."
+  [{:keys [text where]}]
+  (let [exhibit (xbrl/statement-exhibit-name text)
+        exhibit-where (sibling where exhibit)]
+    (cond-> [{:text text :where where}]
+      exhibit-where
+      (conj {:text (slurp exhibit-where) :where exhibit-where}))))
+
 (defn- taxonomy-counts
   [facts]
   (mapv (fn [[taxonomy concepts]]
@@ -45,17 +63,21 @@
   (println "       clj -X:demo-filing-xbrl :file '\"filing.htm\"' :out '\"facts.json\"'"))
 
 (defn run
-  "Parse one filing and print the companyfacts header, fact counts, and
+  "Parse a filing cover and its statement exhibit, when linked.
+  Prints the companyfacts header, fact counts, and
   dei:EntityCommonStockSharesOutstanding. With `:out`, write the full map
   as JSON."
   ([] (run {}))
   ([{:keys [out] :as args}]
-   (if-let [{:keys [text where]} (load-text args)]
-     (let [accn (accession where)
-           parsed (xbrl/parse text (cond-> {} accn (assoc :accn accn)))
+   (if-let [{:keys [where] :as loaded} (load-text args)]
+     (let [docs (load-documents loaded)
+           accn (accession where)
+           parsed (xbrl/parse-all (map :text docs)
+                                  (cond-> {} accn (assoc :accn accn)))
            shares (get-in parsed [:facts :dei :EntityCommonStockSharesOutstanding])]
        (println (:entityName parsed) " cik " (:cik parsed))
-       (println "source " where)
+       (doseq [{:keys [where]} docs]
+         (println "source " where))
        (when accn
          (println "accn   " accn))
        (doseq [{:keys [taxonomy concepts facts]} (taxonomy-counts (:facts parsed))]

@@ -11,14 +11,18 @@ issues with share count:
    take quarterly
    see ADIG unit test
 
-3. multiple share classes
+3. multiple share classes - parse 40F filings directly.
   {:cik "0000317540",
    :ticker "COKE",
    :shares {"Common" {:weighted 73658000, :outstanding 56517334},
             "Class B" {:weighted 10047000, :outstanding 10046960}}}
-   multiple common share classes result to no :dei shares in companyfacs.
+   multiple common share classes result to no :dei shares in companyfacts.
    the only way to do it is download annual filings, parse xbrl and 
    extract from there. see demo/xbrl.clj that writes data/share-classes.edn
+   
+ 4. 40F filing wiht multiple documents  
+   also, some 40F filings contain a separate html file that contains the
+   xbrl statemetns, so they need to be used. 
 
 
 FMCC  freddi Mac
@@ -41,3 +45,16 @@ companyfacts misses the last 2 filings.
 clj -X:demo-table-full :ticker GP :show shares :ixbrl true
 
 HALF YEAR REPORTS ???
+
+
+
+TODO ALTX - display financial numbers with 2 digits (if below 10)
+and 1 digit if below 100.
+
+AGO
+http://localhost:3000/filing/0001273813/0001273813-26-000011/ago-20251231.htm
+filing available, but HTTP 404 from sEC API
+
+MOBI
+google finance has data
+I get on our web site 404.

@@ -88,6 +88,39 @@
     (is (= 2 (get-in parsed [:facts :us-gaap :NumberOfOperatingSegments :units "segment" 0 :val])))
     (is (nil? (get-in parsed [:facts :us-gaap :CommitmentsAndContingencies])))))
 
+(deftest statement-exhibit-name-is-ex99d2
+  (is (= "su-20251231xex99d2.htm"
+         (xbrl/statement-exhibit-name
+          "<a href=\"su-20251231xex99d1.htm\"></a><a href=\"su-20251231xex99d2.htm\"></a><a href=\"su-20251231xex99d10.htm\"></a>")))
+  (is (nil? (xbrl/statement-exhibit-name "<a href=\"su-20251231xex99d10.htm\"></a>"))))
+
+(deftest exhibit-fact-uses-cover-context
+  (let [cover "<html><body>
+               <ix:nonNumeric name=\"dei:EntityCentralIndexKey\">0000311337</ix:nonNumeric>
+               <ix:nonNumeric name=\"dei:EntityRegistrantName\">Suncor Energy Inc.</ix:nonNumeric>
+               <ix:nonNumeric name=\"dei:DocumentType\">40-F</ix:nonNumeric>
+               <ix:nonNumeric name=\"dei:DocumentFiscalYearFocus\">2025</ix:nonNumeric>
+               <ix:nonNumeric name=\"dei:DocumentFiscalPeriodFocus\">FY</ix:nonNumeric>
+               <xbrli:context id=\"c-1\">
+                 <xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>
+               </xbrli:context>
+               <xbrli:unit id=\"cad\"><xbrli:measure>iso4217:CAD</xbrli:measure></xbrli:unit>
+               </body></html>"
+        exhibit "<html><body>
+                 <ix:nonFraction name=\"ifrs-full:RevenueFromContractsWithCustomers\" contextRef=\"c-1\" unitRef=\"cad\" scale=\"6\">123</ix:nonFraction>
+                 </body></html>"
+        parsed (xbrl/parse-all [cover exhibit] {:accn "0001104659-26-020411"})]
+    (is (= 311337 (:cik parsed)))
+    (is (= "Suncor Energy Inc." (:entityName parsed)))
+    (is (= [{:start "2025-01-01"
+             :end "2025-12-31"
+             :val 123000000
+             :accn "0001104659-26-020411"
+             :fy 2025
+             :fp "FY"
+             :form "40-F"}]
+           (get-in parsed [:facts :ifrs-full :RevenueFromContractsWithCustomers :units "CAD"])))))
+
 (deftest number-words-scale-to-a-count
   (let [html "<html><body>
               <xbrli:context id=\"c\">

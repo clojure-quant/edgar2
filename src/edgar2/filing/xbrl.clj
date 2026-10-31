@@ -313,6 +313,25 @@
                    (for [[concept units] concepts]
                      [concept {:units (sorted-units units)}]))]))))
 
+(defn- companyfacts
+  "Companyfacts map from jsoup `docs`. The first document supplies DEI.
+  Contexts, units, and continuations are shared, so a fact in a later
+  document can use a context defined only in an earlier one."
+  [docs opts]
+  (let [header (header (first docs) opts)
+        contexts (reduce merge {} (map read-contexts docs))
+        units (reduce merge {} (map read-units docs))
+        continuations (reduce merge {} (map read-continuations docs))
+        facts (->> docs
+                   (mapcat #(.getElementsByTag % "ix:nonfraction"))
+                   (keep #(observation % contexts units continuations header))
+                   unique-obs
+                   nest)]
+    (-> (cond-> {}
+          (:cik header) (assoc :cik (:cik header))
+          (:entityName header) (assoc :entityName (:entityName header)))
+        (assoc :facts facts))))
+
 (defn parse
   "Companyfacts-shaped map from inline XBRL HTML `text`.
 
@@ -323,16 +342,24 @@
   per-share unit is not split into a namespaced keyword."
   ([text] (parse text {}))
   ([text opts]
-   (let [doc (Jsoup/parse (str text))
-         header (header doc opts)
-         contexts (read-contexts doc)
-         units (read-units doc)
-         continuations (read-continuations doc)
-         facts (->> (.getElementsByTag doc "ix:nonfraction")
-                    (keep #(observation % contexts units continuations header))
-                    unique-obs
-                    nest)]
-     (-> (cond-> {}
-           (:cik header) (assoc :cik (:cik header))
-           (:entityName header) (assoc :entityName (:entityName header)))
-         (assoc :facts facts)))))
+   (companyfacts [(Jsoup/parse (str text))] opts)))
+
+(defn parse-all
+  "Companyfacts map from several inline XBRL HTML documents.
+
+  The first document is the cover and supplies DEI. Contexts, units, and
+  continuations are merged before facts are read."
+  ([texts] (parse-all texts {}))
+  ([texts opts]
+   (companyfacts (mapv #(Jsoup/parse (str %)) texts) opts)))
+
+(defn statement-exhibit-name
+  "Filename of the audited-statement exhibit linked from cover HTML.
+
+  Matches `_d2.htm` and `ex99d2.htm`. Nil when the cover has no such link."
+  [html]
+  (some (fn [[_ href]]
+          (when-let [[_ name] (re-find #"(?i)([^/\"?#]+(?:_d2|ex99d2)\.html?)$"
+                                       (str href))]
+            name))
+        (re-seq #"(?i)href\s*=\s*\"([^\"]+)\"" (str html))))
