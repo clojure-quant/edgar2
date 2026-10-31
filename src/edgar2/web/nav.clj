@@ -1,6 +1,7 @@
 (ns edgar2.web.nav
   (:require [hyper.core :as h]
             [hyper.effects :as effects]
+            [edgar2.util.ticker-info :as ticker-info]
             [edgar2.web.ticker :as ticker]))
 
 (def company-routes
@@ -55,7 +56,11 @@
                        :name "ticker"
                        :value (or current "")}
                 (not current) (assoc :autofocus true))]]
-     [:button {:type "submit"} "Show"]]))
+     [:button {:type "submit"} "Show"]
+     [:label "CIK "
+      [:input.cik-box {:type "text"
+                       :readonly true
+                       :value (or (ticker-info/ticker->cik current) "")}]]]))
 
 (defn- sub-link
   [req label route-name active-names]

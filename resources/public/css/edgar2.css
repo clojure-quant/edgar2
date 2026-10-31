@@ -74,6 +74,11 @@ body {
   margin-right: 0.5rem;
 }
 
+.ticker-form input.cik-box {
+  width: 8.5rem;
+  background: #f6f6f6;
+}
+
 .table-wrap {
   overflow-x: auto;
 }

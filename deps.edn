@@ -12,9 +12,6 @@
   :test {:extra-paths ["test"]
          :main-opts ["-e" "(require '[clojure.test :as t] '[clojure.java.io :as io] '[clojure.string :as str]) (let [root (.getCanonicalFile (io/file \"test\")) prefix (str (.getPath root) \"/\") nses (->> (file-seq root) (filter #(and (.isFile %) (.endsWith (.getName %) \"_test.clj\"))) (map (fn [f] (let [rel (subs (.getPath f) (count prefix))] (-> rel (subs 0 (- (count rel) 4)) (str/replace \"/\" \".\") (str/replace \"_\" \"-\") symbol)))) (mapv #(doto % require))) r (apply t/run-tests nses)] (System/exit (+ (:fail r) (:error r))))"]}
   :demo-concept {:exec-fn demo.concept/run}
-  :demo-filing-xbrl {:exec-fn demo.filing-xbrl/run
-                     :exec-args {:url "http://localhost:3000/filing/0000317540/0001628280-26-009057/coke-20251231.htm"}}
-  :demo-xbrl {:exec-fn demo.xbrl/run}
   :demo-table-full {:exec-fn demo.report-table-full/run
                     :exec-args {:ticker "XOM"}}
   :demo-table-full-shares {:exec-fn demo.report-table-full-shares/run
@@ -41,6 +38,9 @@
   :adr-list {:exec-fn edgar2.download.adr-list/run}
   ; universe 
   :universe-facts {:exec-fn edgar2.download.facts-universe/universe}
+  :xbrl-shares {:exec-fn edgar2.download.xbrl-shares/run}
+  :xbrl-extract-filing {:exec-fn edgar2.download.xbrl-extract-filing/run
+                        :exec-args {:url "http://localhost:3000/filing/0000317540/0001628280-26-009057/coke-20251231.htm"}}
   :stats {:exec-fn edgar2.report.stats/stats}
   :stats-nippy {:exec-fn edgar2.report.stats/stats-nippy}
   :facts-nippy {:exec-fn edgar2.financials.facts-ds-converter/convert-zip-to-dataset}

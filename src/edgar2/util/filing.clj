@@ -7,17 +7,20 @@
   "Downloaded filing documents."
   "data/filings")
 
-(def ^:private annual-form-names
-  ["10-K" "20-F" "40-F"])
+(def ^:private annual-report-forms
+  #{"10-K" "20-F" "40-F"})
 
-(defn annual-form
-  "10-K, or 20-F / 40-F when that is the annual report."
+(defn pick-latest-annual
+  "First 10-K, 20-F, or 40-F in `filings`. `e/filings` is newest-first,
+  so that row is the latest annual report across those forms."
+  [filings]
+  (first (filter #(annual-report-forms (:form %)) filings)))
+
+(defn latest-annual-filing
+  "Newest 10-K, 20-F, or 40-F for `cik`. A later filing date wins across
+  forms. Amendments are excluded."
   [cik]
-  (or (some (fn [form]
-              (when (seq (e/filings cik :form form :limit 1))
-                form))
-            annual-form-names)
-      "10-K"))
+  (pick-latest-annual (e/filings cik)))
 
 (defn parse-period
   ":annual or :quarterly. Missing or unknown values are annual."

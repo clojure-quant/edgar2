@@ -1,9 +1,9 @@
-(ns demo.filing-xbrl
+(ns edgar2.download.xbrl-extract-filing
   "Companyfacts-shaped map from a filing cover and its statement exhibit.
 
-  clj -X:demo-filing-xbrl
-  clj -X:demo-filing-xbrl :url '\"http://localhost:3000/filing/0000317540/0001628280-26-009057/coke-20251231.htm\"'
-  clj -X:demo-filing-xbrl :file '\"/path/to/filing.htm\"' :out '\"/tmp/coke-facts.json\"'"
+  clj -X:xbrl-extract-filing
+  clj -X:xbrl-extract-filing :url '\"http://localhost:3000/filing/0000317540/0001628280-26-009057/coke-20251231.htm\"'
+  clj -X:xbrl-extract-filing :file '\"/path/to/filing.htm\"' :out '\"/tmp/coke-facts.json\"'"
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
@@ -59,8 +59,8 @@
 
 (defn- print-usage
   []
-  (println "Usage: clj -X:demo-filing-xbrl :url '\"http://localhost:3000/filing/...htm\"'")
-  (println "       clj -X:demo-filing-xbrl :file '\"filing.htm\"' :out '\"facts.json\"'"))
+  (println "Usage: clj -X:xbrl-extract-filing :url '\"http://localhost:3000/filing/...htm\"'")
+  (println "       clj -X:xbrl-extract-filing :file '\"filing.htm\"' :out '\"facts.json\"'"))
 
 (defn run
   "Parse a filing cover and its statement exhibit, when linked.

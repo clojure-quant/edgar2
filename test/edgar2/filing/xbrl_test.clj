@@ -92,7 +92,9 @@
   (is (= "su-20251231xex99d2.htm"
          (xbrl/statement-exhibit-name
           "<a href=\"su-20251231xex99d1.htm\"></a><a href=\"su-20251231xex99d2.htm\"></a><a href=\"su-20251231xex99d10.htm\"></a>")))
-  (is (nil? (xbrl/statement-exhibit-name "<a href=\"su-20251231xex99d10.htm\"></a>"))))
+  (is (nil? (xbrl/statement-exhibit-name "<a href=\"su-20251231xex99d10.htm\"></a>")))
+  (is (nil? (xbrl/statement-exhibit-name
+             "<a href=\"https://www.sec.gov/Archives/edgar/data/1273813/000110465909052888/a09-25104_1ex99d2.htm\"></a>"))))
 
 (deftest exhibit-fact-uses-cover-context
   (let [cover "<html><body>
@@ -120,6 +122,26 @@
              :fp "FY"
              :form "40-F"}]
            (get-in parsed [:facts :ifrs-full :RevenueFromContractsWithCustomers :units "CAD"])))))
+
+(deftest instance-context-resolves-cover-outstanding
+  (let [cover "<html><body>
+               <ix:nonNumeric name=\"dei:EntityCentralIndexKey\">0001796073</ix:nonNumeric>
+               <ix:nonNumeric name=\"dei:DocumentType\">40-F</ix:nonNumeric>
+               <ix:nonNumeric name=\"dei:DocumentFiscalYearFocus\">2026</ix:nonNumeric>
+               <ix:nonNumeric name=\"dei:DocumentFiscalPeriodFocus\">FY</ix:nonNumeric>
+               <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"C_20260430\" unitRef=\"Share\" decimals=\"INF\">351,018,130</ix:nonFraction>
+               </body></html>"
+        instance "<xbrl>
+                  <context id=\"C_20260430\"><period><instant>2026-04-30</instant></period></context>
+                  <unit id=\"Share\"><measure>shares</measure></unit>
+                  </xbrl>"
+        parsed (xbrl/parse-all [cover instance])]
+    (is (= [{:end "2026-04-30"
+             :val 351018130
+             :fy 2026
+             :fp "FY"
+             :form "40-F"}]
+           (get-in parsed [:facts :dei :EntityCommonStockSharesOutstanding :units "shares"])))))
 
 (deftest number-words-scale-to-a-count
   (let [html "<html><body>

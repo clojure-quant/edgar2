@@ -4,6 +4,7 @@
             [edgar.api :as e]
             [hyper.core :as h]
             [edgar2.util :as util]
+            [edgar2.util.ticker-info :as ticker-info]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
 
@@ -127,17 +128,32 @@
   [filings]
   (sort-by #(str (:filingDate %)) #(compare %2 %1) filings))
 
+(defn- listed-cik
+  "10-digit CIK from the local exchange listing.
+
+  XOM uses the operating filer. Every other ticker uses
+  `ticker-info/ticker->cik`. Nil when the listing has no row."
+  [ticker]
+  (let [t (some-> ticker str str/trim not-empty str/upper-case)]
+    (ticker-info/pad-cik
+     (if (= t "XOM")
+       (util/resolve-filer2 t)
+       (ticker-info/ticker->cik t)))))
+
 (defn load-filings
   "Filings for a ticker or a CIK. A ticker wins when both are set.
-  Tickers go through the same CIK resolution as the financials page."
+
+  A ticker uses the local exchange listing, the same CIK as the financials
+  page. A bare CIK is used as given."
   [ticker cik]
   (util/ensure-identity!)
   (let [id (if ticker
-             (util/resolve-filer ticker)
+             (or (listed-cik ticker)
+                 (throw (ex-info (str "No CIK for " ticker) {:ticker ticker})))
              (e/cik cik))
         filings (vec (e/filings id :include-amends? true))
         company (e/company id)]
-    {:cik (e/cik id)
+    {:cik id
      :ticker (or ticker
                   (some-> (:tickers company) first str/upper-case))
      :name (:name company)

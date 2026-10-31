@@ -2,7 +2,6 @@
   "Serve filing documents, cached under data/filings."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [edgar.api :as e]
             [edgar.core :as ec]
             [edgar.filing :as ef]
             [edgar2.util :as util]
@@ -187,8 +186,7 @@
   [ticker]
   (util/ensure-identity!)
   (let [cik (util/resolve-filer ticker)
-        form (ufiling/annual-form cik)
-        f (e/filing cik :form form)
+        f (when cik (ufiling/latest-annual-filing cik))
         primary (when f (ef/primary-doc (ef/filing-index f)))]
     (when primary
       (let [path (io/file ufiling/filing-dir

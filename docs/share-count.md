@@ -18,7 +18,7 @@ issues with share count:
             "Class B" {:weighted 10047000, :outstanding 10046960}}}
    multiple common share classes result to no :dei shares in companyfacts.
    the only way to do it is download annual filings, parse xbrl and 
-   extract from there. see demo/xbrl.clj that writes data/share-classes.edn
+   extract from there. see edgar2/download/xbrl_shares.clj that writes data/share-classes.edn
    
  4. 40F filing wiht multiple documents  
    also, some 40F filings contain a separate html file that contains the
@@ -51,9 +51,6 @@ HALF YEAR REPORTS ???
 TODO ALTX - display financial numbers with 2 digits (if below 10)
 and 1 digit if below 100.
 
-AGO
-http://localhost:3000/filing/0001273813/0001273813-26-000011/ago-20251231.htm
-filing available, but HTTP 404 from sEC API
 
 MOBI
 google finance has data

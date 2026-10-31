@@ -17,7 +17,8 @@
   ones that are not well-formed."
   (:require [clojure.string :as str])
   (:import [java.math BigDecimal]
-           [org.jsoup Jsoup]))
+           [org.jsoup Jsoup]
+           [org.jsoup.parser Parser]))
 
 (def ^:private word-value
   {"zero" 0 "no" 0 "none" 0
@@ -129,10 +130,24 @@
                (conj parts (own-text next))
                (conj seen id))))))
 
+(defn- tag-names
+  "Prefixed tag and its local name. An extracted instance uses the default
+  XBRL namespace, so `context` is the same element as `xbrli:context`."
+  [tag]
+  (let [s (str tag)
+        i (str/last-index-of s ":")]
+    (if i
+      [s (subs s (inc i))]
+      [s])))
+
+(defn- elements
+  [el tag]
+  (mapcat #(.getElementsByTag el %) (tag-names tag)))
+
 (defn- first-text
   [el tag]
   (when el
-    (when-let [child (first (.getElementsByTag el tag))]
+    (when-let [child (first (elements el tag))]
       (not-empty (str/trim (.text child))))))
 
 (defn- measure-name
@@ -184,7 +199,7 @@
 (defn- read-contexts
   [doc]
   (into {}
-        (for [ctx (.getElementsByTag doc "xbrli:context")
+        (for [ctx (elements doc "xbrli:context")
               :let [id (not-empty (.attr ctx "id"))
                     p (when id (period ctx))
                     dims (when p (dimensions ctx))]
@@ -195,7 +210,7 @@
 (defn- read-units
   [doc]
   (into {}
-        (for [unit (.getElementsByTag doc "xbrli:unit")
+        (for [unit (elements doc "xbrli:unit")
               :let [id (not-empty (.attr unit "id"))
                     label (when id (unit-name unit))]
               :when label]
@@ -245,11 +260,29 @@
    :fy (or (:fy opts) (parse-year (non-numeric doc "dei:DocumentFiscalYearFocus")))
    :fp (or (:fp opts) (non-numeric doc "dei:DocumentFiscalPeriodFocus"))})
 
+(defn- attr
+  "Attribute `k`, ignoring case. An instance keeps `contextRef`; HTML
+  lowercases it to `contextref`."
+  [el k]
+  (let [want (str/lower-case (str k))]
+    (some (fn [a]
+            (when (= want (str/lower-case (.getKey a)))
+              (not-empty (.getValue a))))
+          (.attributes el))))
+
+(defn- fact-qname
+  "Inline facts name the concept in the `name` attribute. An extracted
+  instance names it with the element itself."
+  [el]
+  (or (attr el "name")
+      (when (and (attr el "contextref") (attr el "unitref"))
+        (.tagName el))))
+
 (defn- observation
   [el contexts units continuations header]
-  (let [[taxonomy concept] (split-qname (.attr el "name"))
-        ctx (get contexts (.attr el "contextref"))
-        unit (get units (.attr el "unitref"))
+  (let [[taxonomy concept] (split-qname (fact-qname el))
+        ctx (get contexts (attr el "contextref"))
+        unit (get units (attr el "unitref"))
         val (fact-value el (continued-text el continuations))]
     (when (and taxonomy concept ctx unit (some? val) (:end ctx))
       (cond-> {:taxonomy taxonomy
@@ -323,7 +356,8 @@
         units (reduce merge {} (map read-units docs))
         continuations (reduce merge {} (map read-continuations docs))
         facts (->> docs
-                   (mapcat #(.getElementsByTag % "ix:nonfraction"))
+                   (mapcat #(.getAllElements %))
+                   (filter fact-qname)
                    (keep #(observation % contexts units continuations header))
                    unique-obs
                    nest)]
@@ -331,6 +365,15 @@
           (:cik header) (assoc :cik (:cik header))
           (:entityName header) (assoc :entityName (:entityName header)))
         (assoc :facts facts))))
+
+(defn- parse-doc
+  "HTML for a filing cover. An extracted instance (`<xbrl>`) is XML, so
+  concept tags such as `ifrs-full:WeightedAverageShares` keep their case."
+  [text]
+  (let [s (str text)]
+    (if (re-find #"(?i)<xbrl[\s>]" s)
+      (Jsoup/parse s "" (Parser/xmlParser))
+      (Jsoup/parse s))))
 
 (defn parse
   "Companyfacts-shaped map from inline XBRL HTML `text`.
@@ -342,24 +385,28 @@
   per-share unit is not split into a namespaced keyword."
   ([text] (parse text {}))
   ([text opts]
-   (companyfacts [(Jsoup/parse (str text))] opts)))
+   (companyfacts [(parse-doc text)] opts)))
 
 (defn parse-all
   "Companyfacts map from several inline XBRL HTML documents.
 
   The first document is the cover and supplies DEI. Contexts, units, and
-  continuations are merged before facts are read."
+  continuations are merged before facts are read. An extracted instance
+  contributes its own facts as well as the contexts the cover left out."
   ([texts] (parse-all texts {}))
   ([texts opts]
-   (companyfacts (mapv #(Jsoup/parse (str %)) texts) opts)))
+   (companyfacts (mapv parse-doc texts) opts)))
 
 (defn statement-exhibit-name
   "Filename of the audited-statement exhibit linked from cover HTML.
 
-  Matches `_d2.htm` and `ex99d2.htm`. Nil when the cover has no such link."
+  Matches a same-filing relative name ending in `_d2.htm` or `ex99d2.htm`.
+  An absolute archive URL is a citation of another filing, not this cover's
+  exhibit. Nil when the cover has no such link."
   [html]
   (some (fn [[_ href]]
-          (when-let [[_ name] (re-find #"(?i)([^/\"?#]+(?:_d2|ex99d2)\.html?)$"
-                                       (str href))]
-            name))
+          (when-not (str/includes? (str href) "/")
+            (when-let [[_ name] (re-find #"(?i)^([^\"?#]+(?:_d2|ex99d2)\.html?)$"
+                                         (str href))]
+              name)))
         (re-seq #"(?i)href\s*=\s*\"([^\"]+)\"" (str html))))

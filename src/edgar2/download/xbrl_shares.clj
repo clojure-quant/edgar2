@@ -1,9 +1,9 @@
-(ns demo.xbrl
+(ns edgar2.download.xbrl-shares
   "Share counts from a companyfacts file, or from the latest annual filing.
 
-  clj -X:demo-xbrl
-  clj -X:demo-xbrl :ticker '\"SONY\"'
-  clj -X:demo-xbrl :file '\"test/facts/COKE.json\"'"
+  clj -X:xbrl-shares
+  clj -X:xbrl-shares :ticker '\"SONY\"'
+  clj -X:xbrl-shares :file '\"test/facts/COKE.json\"'"
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
@@ -72,25 +72,43 @@
   (group-by #(class-label (class-member %)) (share-rows concept)))
 
 (defn- weighted-concept
-  "US-GAAP basic weighted-average shares, or IFRS weighted-average shares
-  when the US-GAAP concept is absent."
+  "Basic weighted-average shares.
+
+  US-GAAP outstanding, then US-GAAP issued when the outstanding tag is
+  absent, then IFRS weighted-average shares."
   [facts]
   (or (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesOutstandingBasic])
+      (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesIssuedBasic])
       (get-in facts [:facts :ifrs-full :WeightedAverageShares])))
+
+(defn- outstanding-concept
+  "Shares outstanding.
+
+  `dei:EntityCommonStockSharesOutstanding` when it has a share fact,
+  otherwise `us-gaap:SharesOutstanding`. An empty DEI concept does not
+  block the fallback."
+  [facts]
+  (let [dei (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding])]
+    (if (seq (share-rows dei))
+      dei
+      (get-in facts [:facts :us-gaap :SharesOutstanding]))))
 
 (defn share-summary
   "Latest weighted-average and shares outstanding by common-stock class.
 
-  `facts` is a companyfacts map. Weighted shares are
-  `:us-gaap/WeightedAverageNumberOfSharesOutstandingBasic`, or
-  `:ifrs-full/WeightedAverageShares` when that US-GAAP concept is absent.
+  `facts` is a companyfacts map. Outstanding shares are
+  `:dei/EntityCommonStockSharesOutstanding`, then
+  `:us-gaap/SharesOutstanding` when that tag has no share facts.
+  Weighted shares are
+  `:us-gaap/WeightedAverageNumberOfSharesOutstandingBasic`, then
+  `:us-gaap/WeightedAverageNumberOfSharesIssuedBasic` when that tag is
+  absent, then `:ifrs-full/WeightedAverageShares`.
   A row with no `:us-gaap:StatementClassOfStockAxis` is \"Common\". A
   ClassA or ClassB member on that axis is \"Class A\" or \"Class B\"; any
   other member is \"Common\". Each figure is the observation with the
   greatest `:end`."
   [facts]
-  (let [outstanding (rows-by-class
-                     (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding]))
+  (let [outstanding (rows-by-class (outstanding-concept facts))
         weighted (rows-by-class (weighted-concept facts))
         classes (->> (concat (keys outstanding) (keys weighted))
                      distinct
@@ -111,23 +129,46 @@
                :else (str ticker)))]
       (when-not (str/blank? s) s))))
 
+(defn- instance-name
+  "Extracted XBRL instance for a primary document.
+  `form40f.htm` is `form40f_htm.xml`."
+  [primary]
+  (when-let [[_ stem] (re-find #"(?i)^(.+)\.html?$" (str primary))]
+    (str stem "_htm.xml")))
+
+(defn- instance-text
+  "Extracted instance for `filing`, or nil when SEC has no such document.
+  Its contexts and units resolve cover facts that were left without them."
+  [filing]
+  (when-let [name (instance-name (:primaryDocument filing))]
+    (try
+      (e/filing-document filing name)
+      (catch clojure.lang.ExceptionInfo e
+        (if (= 404 (:status (ex-data e)))
+          nil
+          (throw e))))))
+
 (defn share-summary-cik
   "Latest annual filing for `cik`, parsed with `edgar2.filing.xbrl/parse-all`.
 
-  The form is 10-K, or 20-F / 40-F when that is the annual report. When the
-  cover links an audited-statement exhibit (`_d2` or `ex99d2`), that HTML
-  is parsed with the cover so its facts can use the cover's contexts.
+  The filing is the newest 10-K, 20-F, or 40-F. When the cover links an
+  audited-statement exhibit (`_d2` or `ex99d2`), that HTML is parsed with
+  the cover so its facts can use the cover's contexts. The extracted
+  instance (`form40f_htm.xml`) is included when SEC has one, so a cover
+  fact can use a context that the inline HTML left out.
   Returns `{:cik cik :shares <share-summary>}`."
   [cik]
   (util/ensure-identity!)
-  (let [form (ufiling/annual-form cik)
-        filing (e/filing cik :form form)]
+  (let [filing (ufiling/latest-annual-filing cik)]
     (when-not filing
-      (throw (ex-info "no annual filing" {:cik cik :form form})))
+      (throw (ex-info "no annual filing" {:cik cik})))
     (let [html (e/html filing)
           exhibit (xbrl/statement-exhibit-name html)
-          texts (cond-> [html]
-                  exhibit (conj (e/filing-document filing exhibit)))
+          texts (->> [html
+                      (when exhibit (e/filing-document filing exhibit))
+                      (instance-text filing)]
+                     (keep identity)
+                     vec)
           parsed (xbrl/parse-all texts {:accn (:accessionNumber filing)
                                         :filed (:filingDate filing)
                                         :form (:form filing)})]
@@ -219,55 +260,3 @@
 
      :else
      (run-universe))))
-
-
-; dei EntittyCommonStockSharesOutstanding
-; from companyfacts (test/facts/COKE.json)
-;{:filed "2014-03-14", :val 7141447, :fy 2013, :form "10-K", :accn "0001193125-14-100068", :end "2014-02-28",  :fp "FY"}
-;{:filed "2014-05-09", :frame "CY2014Q1I", :val 7141447, :fy 2014, :form "10-Q", :accn "0001193125-14-192369", :end "2014-04-30", :fp "Q1"}
-;{:filed "2014-08-08", :frame "CY2014Q2I", :val 7141447, :fy 2014, :form "10-Q", :accn "0001193125-14-303056", :end "2014-07-31", :fp "Q2"}
-;{:filed "2014-11-07", :frame "CY2014Q3I", :val 7141447, :fy 2014, :form "10-Q", :accn "0001193125-14-403014", :end "2014-10-31", :fp "Q3"}
-;{:filed "2015-03-13", :frame "CY2015Q1I", :val 7141447, :fy 2014, :form "10-K", :accn "0001193125-15-091165", :end "2015-02-27", :fp "FY"}
-;{:filed "2016-03-18", :frame "CY2016Q1I", :val 7141447, :fy 2015, :form "10-K", :accn "0001564590-16-015048", :end "2016-03-04", :fp "FY"}
-
-{:val 56517334,:fy 2025, :form "10-K", :end "2026-01-30",:fp "FY" 
- :dimensions {:us-gaap:StatementClassOfStockAxis "coke:CommonClassUndefinedMember"}}
-
-{:val 10046960,:fy 2025,:form "10-K",:end "2026-01-30",  :fp "FY"
- :dimensions {:us-gaap:StatementClassOfStockAxis "us-gaap:CommonClassBMember"}}
-
-; us-gaap WeightedAverageNumberOfSharesOutstandingBasic
-{:start "2023-01-01", :val 10047000,:fy 2025, :form "10-K",:end "2023-12-31", :fp "FY"
- :dimensions {:us-gaap:StatementClassOfStockAxis "us-gaap:CommonClassBMember"}}
-
-{:start "2024-01-01", :val 10047000,:fy 2025, :form "10-K",:end "2024-12-31", :fp "FY"
- :dimensions {:us-gaap:StatementClassOfStockAxis "us-gaap:CommonClassBMember"}}
-
-{:start "2023-01-01", :val 83690000,:fy 2025, :form "10-K",:end "2023-12-31", :fp "FY"
- :dimensions {:us-gaap:StatementClassOfStockAxis "coke:CommonClassUndefinedMember"},
- }
-  
-  {:start "2024-01-01", :val 80348000,:fy 2025, :form "10-K",:end "2024-12-31", :fp "FY"
-   :dimensions {:us-gaap:StatementClassOfStockAxis "coke:CommonClassUndefinedMember"},
-   }
-  
-  {:start "2025-01-01", :val 73658000,:fy 2025, :form "10-K",:end "2025-12-31", :fp "FY"
-   :dimensions {:us-gaap:StatementClassOfStockAxis "coke:CommonClassUndefinedMember"},
-   }
-  {:start "2025-01-01", :val 10047000,:fy 2025, :form "10-K",:end "2025-12-31", :fp "FY"
-   :dimensions {:us-gaap:StatementClassOfStockAxis "us-gaap:CommonClassBMember"},
-   }
-
-
-;<xbrli:context id="c-12">
-;  <xbrli:entity>
-;    <xbrli:identifier scheme="http://www.sec.gov/CIK">0000317540</xbrli:identifier>
-;    <xbrli:segment>
-;      <xbrldi:explicitmember dimension="us-gaap:StatementClassOfStockAxis">us-gaap:CommonClassBMember</xbrldi:explicitmember>
-;    </xbrli:segment>
-;  </xbrli:entity>
-;  <xbrli:period>
-;    <xbrli:startdate>2023-01-01</xbrli:startdate>
-;    <xbrli:enddate>2023-12-31</xbrli:enddate>
-;   </xbrli:period>
-; </xbrli:context>
