@@ -16,6 +16,7 @@
                     :exec-args {:ticker "XOM"}}
   :demo-table-full-shares {:exec-fn demo.report-table-full-shares/run
                            :exec-args {:ticker "CCBG"}}
+  :demo-share-bad {:exec-fn demo.share-bad/run}
   :description {:exec-fn edgar2.description/description
                 :exec-args {:ticker "MSFT"}}
   ; download

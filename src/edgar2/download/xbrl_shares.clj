@@ -47,15 +47,81 @@
   [row]
   (map-get (:dimensions row) class-axis))
 
+(defn- local-name
+  "Name after the last colon. A keyword's name may already contain one,
+  because `:us-gaap:CommonClassAMember` has no namespace."
+  [s]
+  (let [s (if (keyword? s) (name s) (str s))
+        i (str/last-index-of s ":")]
+    (if i (subs s (inc i)) s)))
+
 (defn- class-label
   "\"Class B\" for a ClassB member. No axis, or any other member, is \"Common\"."
   [member]
-  (let [local (let [s (str member)
-                    i (str/last-index-of s ":")]
-                (if i (subs s (inc i)) s))]
-    (if-let [[_ letter] (re-find #"Class([A-Z])Member$" local)]
-      (str "Class " letter)
-      "Common")))
+  (if-let [[_ letter] (re-find #"Class([A-Z])Member$" (local-name member))]
+    (str "Class " letter)
+    "Common"))
+
+(def ^:private exchange-axis-name "EntityListingsExchangeAxis")
+
+(def ^:private stock-axis-name "StatementClassOfStockAxis")
+
+(def ^:private debt-title-re
+  "A cover title for notes, bonds, or debentures is not a share class."
+  #"(?i)\b(?:notes?|bonds?|debentures?)\b")
+
+(defn- share-class-context?
+  "True when the cover context is a class of stock.
+
+  A statement-class axis is that class. No axes, or only the exchange
+  axis, is the single common class. Debt and any other instrument are
+  not. A title that names notes, bonds, or debentures is not a share
+  even when the filer left the debt axis off."
+  [dims title]
+  (let [axes (into #{} (map local-name) (keys dims))]
+    (and (not (re-find debt-title-re (str title)))
+         (or (contains? axes stock-axis-name)
+             (empty? (disj axes exchange-axis-name))))))
+
+(defn- cover-by-name
+  [facts]
+  (into {}
+        (map (fn [fact]
+               [(local-name (:qname fact)) (:val fact)]))
+        facts))
+
+(defn- class-markets
+  "Ticker and exchange for each share class on the cover.
+
+  Rows that share a context are one security. The first context for a
+  class wins. A debt instrument is omitted."
+  [cover]
+  (reduce
+   (fn [m facts]
+     (let [dims (:dimensions (first facts))
+           by (cover-by-name facts)
+           title (get by "Security12bTitle")]
+       (if-not (share-class-context? dims title)
+         m
+         (let [class (class-label (class-member {:dimensions dims}))
+               ticker (not-empty (get by "TradingSymbol"))
+               exchange (not-empty (get by "SecurityExchangeName"))]
+           (if (or (contains? m class) (not (or ticker exchange)))
+             m
+             (assoc m class (cond-> {}
+                              ticker (assoc :ticker ticker)
+                              exchange (assoc :exchange exchange))))))))
+   {}
+   (vals (group-by :context cover))))
+
+(defn- with-markets
+  "Add :ticker and :exchange onto each class the cover lists as stock."
+  [shares cover]
+  (let [markets (class-markets cover)]
+    (into {}
+          (map (fn [[class row]]
+                 [class (merge row (get markets class))]))
+          shares)))
 
 (defn- share-rows
   [concept]
@@ -107,18 +173,24 @@
   A row with no `:us-gaap:StatementClassOfStockAxis` is \"Common\". A
   ClassA or ClassB member on that axis is \"Class A\" or \"Class B\"; any
   other member is \"Common\". Each figure is the observation with the
-  greatest `:end`."
+  greatest `:end`.
+
+  When `facts` has `:cover` (from `edgar2.filing.xbrl/parse`), each class
+  the cover lists as stock also gets `:ticker` and `:exchange`. A debt
+  line, such as senior notes, is not a share class and is left out."
   [facts]
   (let [outstanding (rows-by-class (outstanding-concept facts))
         weighted (rows-by-class (weighted-concept facts))
         classes (->> (concat (keys outstanding) (keys weighted))
                      distinct
                      (sort-by #(if (= % "Common") " " %)))]
-    (into {}
-          (map (fn [class]
-                 [class {:weighted (latest-val (get weighted class))
-                         :outstanding (latest-val (get outstanding class))}]))
-          classes)))
+    (with-markets
+     (into {}
+           (map (fn [class]
+                  [class {:weighted (latest-val (get weighted class))
+                          :outstanding (latest-val (get outstanding class))}]))
+           classes)
+     (:cover facts))))
 
 (defn- ticker-name
   [ticker]
@@ -157,6 +229,8 @@
   the cover so its facts can use the cover's contexts. The extracted
   instance (`form40f_htm.xml`) is included when SEC has one, so a cover
   fact can use a context that the inline HTML left out.
+  Each share class also has the cover `:ticker` and `:exchange`. A listed
+  note or bond is not a share class and is left out.
   Returns `{:cik :filing-date :form-type :shares}`."
   [cik]
   (ucore/ensure-identity!)

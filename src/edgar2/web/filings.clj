@@ -243,11 +243,6 @@
                       :loading [:p (str "Loading filings for " (or ticker cik) "…")]
                       :error [:p.error message]
                       :ready [:div
-                              [:p.fin-header
-                               (format "%s  %s  CIK=%s"
-                                       (or (:ticker data) "")
-                                       (or (:name data) "")
-                                       (:cik data))]
                               (summary-table (summary-rows filings) selected cat*)
                               [:div.filings-detail
                                [:h2 (category-label selected)]

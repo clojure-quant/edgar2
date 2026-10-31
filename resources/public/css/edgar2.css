@@ -75,8 +75,16 @@ body {
 }
 
 .ticker-form input.cik-box {
-  width: 8.5rem;
-  background: #f6f6f6;
+  width: 4.25rem;
+  background: #eee;
+  border: 1px solid #ccc;
+  color: #555;
+  cursor: default;
+  pointer-events: none;
+}
+
+.ticker-form .company-name {
+  margin-left: 0.15rem;
 }
 
 .table-wrap {

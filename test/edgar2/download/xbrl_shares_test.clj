@@ -42,6 +42,127 @@
           {:facts {:dei {:EntityCommonStockSharesOutstanding {:units {}}}
                    :us-gaap {:SharesOutstanding (shares-fact 379236005)}}}))))
 
+(def tap-cover
+  "<html><body>
+   <ix:nonNumeric name=\"dei:EntityCentralIndexKey\">0000024545</ix:nonNumeric>
+   <ix:nonNumeric name=\"dei:DocumentType\">10-K</ix:nonNumeric>
+   <ix:nonNumeric name=\"dei:DocumentFiscalYearFocus\">2025</ix:nonNumeric>
+   <ix:nonNumeric name=\"dei:DocumentFiscalPeriodFocus\">FY</ix:nonNumeric>
+   <xbrli:context id=\"c-1\">
+     <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000024545</xbrli:identifier></xbrli:entity>
+     <xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>
+   </xbrli:context>
+   <xbrli:context id=\"c-3\">
+     <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000024545</xbrli:identifier>
+       <xbrli:segment>
+         <xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">us-gaap:CommonClassAMember</xbrldi:explicitMember>
+         <xbrldi:explicitMember dimension=\"dei:EntityListingsExchangeAxis\">exch:XNYS</xbrldi:explicitMember>
+       </xbrli:segment>
+     </xbrli:entity>
+     <xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>
+   </xbrli:context>
+   <xbrli:context id=\"c-4\">
+     <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000024545</xbrli:identifier>
+       <xbrli:segment>
+         <xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">us-gaap:CommonClassBMember</xbrldi:explicitMember>
+         <xbrldi:explicitMember dimension=\"dei:EntityListingsExchangeAxis\">exch:XNYS</xbrldi:explicitMember>
+       </xbrli:segment>
+     </xbrli:entity>
+     <xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>
+   </xbrli:context>
+   <xbrli:context id=\"c-5\">
+     <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000024545</xbrli:identifier>
+       <xbrli:segment>
+         <xbrldi:explicitMember dimension=\"us-gaap:DebtInstrumentAxis\">tap:A3.800SeniorNotesDue2032Member</xbrldi:explicitMember>
+         <xbrldi:explicitMember dimension=\"dei:EntityListingsExchangeAxis\">exch:XNYS</xbrldi:explicitMember>
+       </xbrli:segment>
+     </xbrli:entity>
+     <xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>
+   </xbrli:context>
+   <xbrli:context id=\"c-7\">
+     <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000024545</xbrli:identifier>
+       <xbrli:segment>
+         <xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">us-gaap:CommonClassAMember</xbrldi:explicitMember>
+       </xbrli:segment>
+     </xbrli:entity>
+     <xbrli:period><xbrli:instant>2026-02-11</xbrli:instant></xbrli:period>
+   </xbrli:context>
+   <xbrli:context id=\"c-8\">
+     <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000024545</xbrli:identifier>
+       <xbrli:segment>
+         <xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">us-gaap:CommonClassBMember</xbrldi:explicitMember>
+       </xbrli:segment>
+     </xbrli:entity>
+     <xbrli:period><xbrli:instant>2026-02-11</xbrli:instant></xbrli:period>
+   </xbrli:context>
+   <xbrli:unit id=\"shares\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>
+   <ix:nonNumeric contextRef=\"c-3\" name=\"dei:Security12bTitle\">Class A Common Stock, $0.01 par value</ix:nonNumeric>
+   <ix:nonNumeric contextRef=\"c-3\" name=\"dei:TradingSymbol\">TAP.A</ix:nonNumeric>
+   <ix:nonNumeric contextRef=\"c-3\" name=\"dei:SecurityExchangeName\">New York Stock Exchange</ix:nonNumeric>
+   <ix:nonNumeric contextRef=\"c-4\" name=\"dei:Security12bTitle\">Class B Common Stock, $0.01 par value</ix:nonNumeric>
+   <ix:nonNumeric contextRef=\"c-4\" name=\"dei:TradingSymbol\">TAP</ix:nonNumeric>
+   <ix:nonNumeric contextRef=\"c-4\" name=\"dei:SecurityExchangeName\">New York Stock Exchange</ix:nonNumeric>
+   <ix:nonNumeric contextRef=\"c-5\" name=\"dei:Security12bTitle\">3.800% Senior Notes due 2032</ix:nonNumeric>
+   <ix:nonNumeric contextRef=\"c-5\" name=\"dei:TradingSymbol\">TAP 32</ix:nonNumeric>
+   <ix:nonNumeric contextRef=\"c-5\" name=\"dei:SecurityExchangeName\">New York Stock Exchange</ix:nonNumeric>
+   <ix:nonFraction name=\"us-gaap:WeightedAverageNumberOfSharesOutstandingBasic\" contextRef=\"c-1\" unitRef=\"shares\" scale=\"0\">199100000</ix:nonFraction>
+   <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"c-7\" unitRef=\"shares\" scale=\"0\">2,563,034</ix:nonFraction>
+   <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"c-8\" unitRef=\"shares\" scale=\"0\">175,592,622</ix:nonFraction>
+   </body></html>")
+
+(deftest cover-lists-ticker-and-exchange-for-each-share-class
+  (is (= {"Common" {:weighted 199100000, :outstanding nil}
+          "Class A" {:weighted nil
+                     :outstanding 2563034
+                     :ticker "TAP.A"
+                     :exchange "New York Stock Exchange"}
+          "Class B" {:weighted nil
+                     :outstanding 175592622
+                     :ticker "TAP"
+                     :exchange "New York Stock Exchange"}}
+         (shares/share-summary (xbrl/parse tap-cover))))
+  (is (not-any? #(= "TAP 32" (:ticker %))
+                (vals (shares/share-summary (xbrl/parse tap-cover))))))
+
+(deftest common-listing-keeps-ticker-when-a-note-has-no-debt-axis
+  (let [html "<html><body>
+              <ix:nonNumeric name=\"dei:DocumentType\">10-K</ix:nonNumeric>
+              <ix:nonNumeric name=\"dei:DocumentFiscalYearFocus\">2025</ix:nonNumeric>
+              <ix:nonNumeric name=\"dei:DocumentFiscalPeriodFocus\">FY</ix:nonNumeric>
+              <xbrli:context id=\"note\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000000001</xbrli:identifier>
+                  <xbrli:segment>
+                    <xbrldi:explicitMember dimension=\"dei:EntityListingsExchangeAxis\">exch:XNYS</xbrldi:explicitMember>
+                  </xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>
+              </xbrli:context>
+              <xbrli:context id=\"common\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000000001</xbrli:identifier>
+                  <xbrli:segment>
+                    <xbrldi:explicitMember dimension=\"dei:EntityListingsExchangeAxis\">exch:XNAS</xbrldi:explicitMember>
+                  </xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>
+              </xbrli:context>
+              <xbrli:context id=\"count\">
+                <xbrli:period><xbrli:instant>2026-02-11</xbrli:instant></xbrli:period>
+              </xbrli:context>
+              <xbrli:unit id=\"shares\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>
+              <ix:nonNumeric contextRef=\"note\" name=\"dei:Security12bTitle\">3.800% Senior Notes due 2032</ix:nonNumeric>
+              <ix:nonNumeric contextRef=\"note\" name=\"dei:TradingSymbol\">TAP 32</ix:nonNumeric>
+              <ix:nonNumeric contextRef=\"note\" name=\"dei:SecurityExchangeName\">New York Stock Exchange</ix:nonNumeric>
+              <ix:nonNumeric contextRef=\"common\" name=\"dei:Security12bTitle\">Common Stock</ix:nonNumeric>
+              <ix:nonNumeric contextRef=\"common\" name=\"dei:TradingSymbol\">BSET</ix:nonNumeric>
+              <ix:nonNumeric contextRef=\"common\" name=\"dei:SecurityExchangeName\">Nasdaq</ix:nonNumeric>
+              <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"count\" unitRef=\"shares\" scale=\"0\">8654370</ix:nonFraction>
+              </body></html>"]
+    (is (= {"Common" {:weighted nil
+                      :outstanding 8654370
+                      :ticker "BSET"
+                      :exchange "Nasdaq"}}
+           (shares/share-summary (xbrl/parse html))))))
+
 (deftest dei-outstanding-wins-over-shares-outstanding
   (is (= {"Common" {:weighted nil :outstanding 100}}
          (shares/share-summary

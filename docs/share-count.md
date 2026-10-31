@@ -51,7 +51,3 @@ HALF YEAR REPORTS ???
 TODO ALTX - display financial numbers with 2 digits (if below 10)
 and 1 digit if below 100.
 
-
-MOBI
-google finance has data
-I get on our web site 404.

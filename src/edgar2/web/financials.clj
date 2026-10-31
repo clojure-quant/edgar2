@@ -83,18 +83,9 @@
        (when (seq names) (str/join " · " names))])))
 
 (defn- header-text
-  "Ticker, company name, and CIK from the stats row.
-  Ticker only when that row is missing."
-  [ticker]
-  (let [row (stats-row ticker)
-        name (some-> (:entityName row) str str/trim not-empty)
-        cik (some-> (:cik row) str str/trim not-empty)
-        ident (if row
-                (->> [(str ticker) name (when cik (str "CIK=" cik))]
-                     (keep identity)
-                     (str/join "  "))
-                (str ticker))]
-    (str ident "  ($ millions; EPS in $)")))
+  "Units note for the statement table."
+  []
+  "($ millions; EPS in $)")
 
 (def ratio-groups
   "Ratio columns, grouped from `stats-category/categories`."
@@ -326,7 +317,7 @@
                                         (view/view-label view) ")…")]
                       :error [:p.error message]
                       :ready [:div
-                              [:p.fin-header (header-text ticker)]
+                              [:p.fin-header (header-text)]
                               (sector-line ticker)
                               (ratios-table ticker)
                               (financials-table (:table data))]

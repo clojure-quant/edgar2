@@ -90,11 +90,26 @@
                      (pad-cik cik)])))
           @exchange-rows)))
 
+(def ^:private name-by-ticker
+  (delay
+    (into {}
+          (keep (fn [{:keys [ticker name]}]
+                  (when (and (not (str/blank? (str ticker)))
+                             (not (str/blank? (str name))))
+                    [(str/upper-case (str ticker)) (str/trim (str name))])))
+          @exchange-rows)))
+
 (defn ticker->cik
   "10-digit CIK for a listed ticker, or nil."
   [ticker]
   (when-let [t (some-> ticker str str/trim not-empty str/upper-case)]
     (get @cik-by-ticker t)))
+
+(defn ticker->name
+  "Registrant name for a listed ticker, or nil."
+  [ticker]
+  (when-let [t (some-> ticker str str/trim not-empty str/upper-case)]
+    (get @name-by-ticker t)))
 
 (defn- listed-rows
   "Exchange rows for `cik` in SEC file order (primary first)."

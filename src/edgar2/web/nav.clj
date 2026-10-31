@@ -60,7 +60,10 @@
      [:label "CIK "
       [:input.cik-box {:type "text"
                        :readonly true
-                       :value (or (ticker-info/ticker->cik current) "")}]]]))
+                       :tabindex -1
+                       :aria-readonly "true"
+                       :value (or (ticker-info/ticker->cik current) "")}]]
+     [:span.company-name (or (ticker-info/ticker->name current) "")]]))
 
 (defn- sub-link
   [req label route-name active-names]

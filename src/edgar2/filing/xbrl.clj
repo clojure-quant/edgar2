@@ -248,6 +248,20 @@
   (when-let [y (some->> s (re-find #"\d{4}"))]
     (parse-long y)))
 
+(def ^:private cover-qnames
+  "Inline text the cover uses for each listed security."
+  #{"dei:security12btitle"
+    "dei:tradingsymbol"
+    "dei:securityexchangename"})
+
+(defn- clean-text
+  [s]
+  (-> (str s)
+      (str/replace #"\u00a0" " ")
+      (str/replace #"\s+" " ")
+      str/trim
+      not-empty))
+
 (defn- header
   "Filing fields shared by every observation. `opts` supplies `:accn` and
   `:filed`, and overrides the DEI cover for `:form`, `:fy`, and `:fp`."
@@ -277,6 +291,32 @@
   (or (attr el "name")
       (when (and (attr el "contextref") (attr el "unitref"))
         (.tagName el))))
+
+(defn- cover-fact
+  "One dei cover string, with the context's dimensions. Nil for any other
+  non-numeric fact, or when the context is missing."
+  [el contexts continuations]
+  (let [qname (attr el "name")]
+    (when (and qname (contains? cover-qnames (str/lower-case qname)))
+      (when-let [ctx-id (attr el "contextref")]
+        (when-let [ctx (get contexts ctx-id)]
+          (when-let [val (clean-text (continued-text el continuations))]
+            (cond-> {:qname qname
+                     :context ctx-id
+                     :val val}
+              (:dimensions ctx) (assoc :dimensions (:dimensions ctx)))))))))
+
+(defn- cover-facts
+  "Security title, ticker, and exchange from the cover. A repeated tag of
+  the same value is kept once."
+  [docs contexts continuations]
+  (->> docs
+       (mapcat (fn [doc]
+                 (concat (.getElementsByTag doc "ix:nonnumeric")
+                         (.getElementsByTag doc "ix:nonNumeric"))))
+       (keep #(cover-fact % contexts continuations))
+       distinct
+       vec))
 
 (defn- observation
   [el contexts units continuations header]
@@ -360,11 +400,13 @@
                    (filter fact-qname)
                    (keep #(observation % contexts units continuations header))
                    unique-obs
-                   nest)]
+                   nest)
+        cover (cover-facts docs contexts continuations)]
     (-> (cond-> {}
           (:cik header) (assoc :cik (:cik header))
           (:entityName header) (assoc :entityName (:entityName header)))
-        (assoc :facts facts))))
+        (assoc :facts facts)
+        (cond-> (seq cover) (assoc :cover cover)))))
 
 (defn- parse-doc
   "HTML for a filing cover. An extracted instance (`<xbrl>`) is XML, so
@@ -382,7 +424,11 @@
   override the DEI cover values when passed.
 
   Units are string keys (`\"USD\"`, `\"shares\"`, `\"USD/shares\"`) so a
-  per-share unit is not split into a namespaced keyword."
+  per-share unit is not split into a namespaced keyword.
+
+  When the cover tags a listed security, `:cover` holds
+  `dei:Security12bTitle`, `dei:TradingSymbol`, and
+  `dei:SecurityExchangeName` with the context dimensions."
   ([text] (parse text {}))
   ([text opts]
    (companyfacts [(parse-doc text)] opts)))
