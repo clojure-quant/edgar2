@@ -1,22 +1,42 @@
 (ns edgar2.web.filing-panel
-  "Right-hand DEI facts panel for HTML filing documents.
+  "Right-hand XBRL facts panel for HTML filing documents.
 
   A filing carries arbitrary CSS, so the table is served as a separate
   same-origin document in an iframe. Rows come from the cached filing file
-  already resolved for the page, not from a second SEC request."
+  already resolved for the page, not from a second SEC request. The
+  taxonomy combobox submits a GET request, so switching taxonomies reuses
+  the cached rows instead of re-parsing the filing."
   (:require [clojure.string :as str]
             [edgar2.filing.xbrl :as xbrl]
             [edgar2.filing.xbrl-loader :as xbrl-loader]))
 
-(defn dei-rows
-  "DEI facts from `docs`, the vector built by `xbrl-loader/load-documents`.
+(defn fact-rows
+  "Every fact from `docs`, the vector built by `xbrl-loader/load-documents`.
 
   Keeps document order and duplicate facts, like the demo table, and keeps
   only the projected `:taxonomy`, `:concept`, and `:value` keys."
   [docs]
   (->> (:facts (xbrl/overview docs))
-       (filter #(= :dei (:taxonomy %)))
        (mapv #(select-keys % [:taxonomy :concept :value]))))
+
+(defn facts->taxonomies
+  "Distinct `:taxonomy` values in `facts`, `:dei` first, then by name.
+
+  Facts without a taxonomy are ignored: their qname has no prefix, so there
+  is nothing the combobox could select."
+  [facts]
+  (->> facts
+       (keep :taxonomy)
+       distinct
+       (sort-by (fn [t] [(if (= :dei t) 0 1) (name t)]))
+       vec))
+
+(defn rows-for-taxonomy
+  "`rows` belonging to `taxonomy`. A nil taxonomy has no rows."
+  [rows taxonomy]
+  (if taxonomy
+    (filterv #(= taxonomy (:taxonomy %)) rows)
+    []))
 
 (defn- html-escape
   [s]
@@ -36,15 +56,76 @@
     :else (let [s (str/trim (str v))]
             (if (str/blank? s) "\u2014" s))))
 
+(def ^:private max-inline-value 50)
+
+(defn- truncated-value-html
+  "Clickable shortened value plus its full text in a hidden sibling span.
+  The script copies the span's `textContent`, so nothing is re-escaped in JS."
+  [s]
+  (str "<span class=\"fact-more\" role=\"button\" tabindex=\"0\""
+       " aria-expanded=\"false\">"
+       (html-escape (str (str/trim (subs s 0 max-inline-value)) "..."))
+       "</span>"
+       "<span class=\"fact-full\" hidden>"
+       (html-escape s)
+       "</span>"))
+
+(defn- value-html
+  "Escaped value cell. Only non-numeric strings longer than
+  `max-inline-value` become a truncated, clickable trigger."
+  [value]
+  (let [s (label value)]
+    (if (and (string? value) (> (count s) max-inline-value))
+      (truncated-value-html s)
+      (html-escape s))))
+
+(defn- requested-taxonomy
+  "`:dei` from a query value such as `\"dei\"`, `\":dei\"`, or `\" dei \"`."
+  [raw]
+  (let [s (some-> raw str str/trim)]
+    (when-not (str/blank? s)
+      (keyword (str/replace s #"^:" "")))))
+
+(defn- selected-taxonomy
+  "The requested taxonomy when it exists, otherwise `:dei`, otherwise the
+  first available taxonomy.
+
+  Checking against `taxonomies` first also rejects arbitrary input from the
+  URL, which must never reach `rows-for-taxonomy` unchecked."
+  [taxonomies raw]
+  (let [requested (requested-taxonomy raw)]
+    (cond
+      (some #{requested} taxonomies) requested
+      (some #{:dei} taxonomies) :dei
+      :else (first taxonomies))))
+
 (defn rows-html
-  "Table body rows for `rows`. Every cell is escaped."
+  "Table body rows for `rows`. Every cell is escaped; a long string value
+  renders shortened with its full text in a hidden sibling span."
   [rows]
   (str/join
    (map (fn [{:keys [taxonomy concept value]}]
           (str "<tr><td>" (html-escape (label taxonomy)) "</td>"
                "<td>" (html-escape (label concept)) "</td>"
-               "<td>" (html-escape (label value)) "</td></tr>"))
+               "<td>" (value-html value) "</td></tr>"))
         rows)))
+
+(defn- taxonomy-html
+  "Combobox above the table. The browser URL-encodes the selected value."
+  [taxonomies selected]
+  (str "<form class=\"taxonomy\" method=\"get\" action=\"\">"
+       "<label for=\"taxonomy\">Taxonomy</label>"
+       "<select id=\"taxonomy\" name=\"taxonomy\""
+       " onchange=\"this.form.submit()\">"
+       (str/join
+        (map (fn [t]
+               (str "<option value=\"" (html-escape (name t)) "\""
+                    (when (= t selected) " selected")
+                    ">" (html-escape (name t)) "</option>"))
+             taxonomies))
+       "</select>"
+       "<noscript><button type=\"submit\">Show</button></noscript>"
+       "</form>"))
 
 (defonce ^:private rows-cache
   (atom {}))
@@ -54,15 +135,17 @@
   [^java.io.File f]
   [(.getPath f) (.lastModified f) (.length f)])
 
-(defn- rows-for-file
-  "DEI rows for `file`, parsed once per path/mtime/length."
+(defn- data-for-file
+  "All fact rows and their taxonomies for `file`, parsed once per
+  path/mtime/length. Filtering by taxonomy happens on the cached rows."
   [file]
   (let [k (cache-key file)]
-    (if-let [rows (get @rows-cache k)]
-      rows
-      (let [rows (dei-rows (xbrl-loader/load-documents file))]
-        (swap! rows-cache assoc k rows)
-        rows))))
+    (if-let [data (get @rows-cache k)]
+      data
+      (let [rows (fact-rows (xbrl-loader/load-documents file))
+            data {:rows rows :taxonomies (facts->taxonomies rows)}]
+        (swap! rows-cache assoc k data)
+        data))))
 
 (def ^:private page-style
   (str "<style>"
@@ -73,6 +156,9 @@
        "h1{flex:0 0 auto;margin:0;padding:10px 12px;font-size:13px;"
        "font-weight:600;border-bottom:1px solid #ddd;"
        "white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+       "form.taxonomy{flex:0 0 auto;display:flex;align-items:center;gap:6px;"
+       "padding:8px 12px;border-bottom:1px solid #ddd}"
+       "form.taxonomy select{font:inherit;max-width:100%}"
        ".table-wrap{flex:1 1 auto;overflow:auto}"
        "table{border-collapse:collapse;width:100%}"
        "th,td{border-bottom:1px solid #eee;padding:4px 8px;text-align:left;"
@@ -82,36 +168,110 @@
        "td:nth-child(2){overflow-wrap:anywhere}"
        ".empty,.error{margin:12px;color:#555}"
        ".error{color:#a00;white-space:pre-wrap}"
+       ".fact-more{cursor:pointer;color:#06c;text-decoration:underline dotted;"
+       "overflow-wrap:anywhere}"
+       ".fact-full{display:none}"
+       ".fact-popup{position:fixed;z-index:10;background:#fff;color:#111;"
+       "border:1px solid #bbb;padding:8px 10px;"
+       "box-shadow:0 2px 8px rgba(0,0,0,.25);"
+       "max-width:min(480px,calc(100vw - 16px));max-height:60vh;overflow:auto;"
+       "white-space:pre-wrap;overflow-wrap:anywhere}"
        "</style>"))
+
+(def ^:private panel-script
+  "Popup for shortened fact values. One fixed-position div is created on
+  load; content always comes from the hidden span's `textContent`."
+  (str "<script>(function(){"
+       "function init(){"
+       "var popup=document.createElement('div');"
+       "popup.id='edgar2-fact-popup';"
+       "popup.className='fact-popup';"
+       "popup.hidden=true;"
+       "popup.tabIndex=-1;"
+       "(document.body||document.documentElement).appendChild(popup);"
+       "var open=null;"
+       "function close(){"
+       "if(!open)return;"
+       "open.setAttribute('aria-expanded','false');"
+       "open=null;"
+       "popup.hidden=true;"
+       "popup.textContent='';}"
+       "function place(t){"
+       "var r=t.getBoundingClientRect();"
+       "popup.style.left='0px';popup.style.top='0px';"
+       "var pw=popup.offsetWidth,ph=popup.offsetHeight;"
+       "var vw=window.innerWidth,vh=window.innerHeight;"
+       "var left=Math.max(8,Math.min(r.left,vw-pw-8));"
+       "var top=r.bottom+6;"
+       "if(top+ph>vh-8)top=Math.max(8,r.top-ph-6);"
+       "popup.style.left=left+'px';"
+       "popup.style.top=top+'px';}"
+       "function show(t){"
+       "if(open===t){close();return;}"
+       "close();"
+       "var full=t.parentNode?"
+       "t.parentNode.querySelector('.fact-full'):null;"
+       "popup.textContent=full?full.textContent:'';"
+       "popup.hidden=false;"
+       "t.setAttribute('aria-expanded','true');"
+       "open=t;"
+       "place(t);}"
+       "document.addEventListener('click',function(e){"
+       "var t=e.target&&e.target.closest?"
+       "e.target.closest('.fact-more'):null;"
+       "if(t){e.preventDefault();show(t);return;}"
+       "if(open&&popup.contains(e.target))return;"
+       "close();});"
+       "document.addEventListener('keydown',function(e){"
+       "var t=e.target&&e.target.closest?"
+       "e.target.closest('.fact-more'):null;"
+       "if(t&&(e.key==='Enter'||e.key===' '||e.key==='Spacebar')){"
+       "e.preventDefault();show(t);return;}"
+       "if(e.key==='Escape'&&open){"
+       "var o=open;close();if(o.focus)o.focus();}});"
+       "document.addEventListener('scroll',close,true);"
+       "window.addEventListener('resize',close);}"
+       "if(document.readyState==='loading')"
+       "document.addEventListener('DOMContentLoaded',init);"
+       "else init();"
+       "})();</script>"))
 
 (defn page-html
   "Standalone HTML document for the panel iframe.
 
   A parse failure is reported inside the panel so the enclosing filing page
-  still renders. `file` is the cached filing document."
-  [file]
-  (let [result (try
-                 {:rows (rows-for-file file)}
-                 (catch Throwable e
-                   {:error (or (ex-message e) (str e))}))]
-    (str "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>"
-         "<title>XBRL DEI facts</title>" page-style "</head><body>"
-         (if-let [rows (:rows result)]
-           (str "<h1>XBRL DEI facts (" (count rows) ")</h1>"
-                "<div class=\"table-wrap\">"
-                (if (seq rows)
-                  (str "<table><thead><tr>"
-                       "<th>Taxonomy</th><th>Concept</th><th>Value</th>"
-                       "</tr></thead><tbody>"
-                       (rows-html rows)
-                       "</tbody></table>")
-                  "<p class=\"empty\">No DEI facts in this document.</p>")
-                "</div>")
-           (str "<h1>XBRL DEI facts</h1>"
-                "<div class=\"table-wrap\"><p class=\"error\">"
-                (html-escape (str "Could not read XBRL facts: " (:error result)))
-                "</p></div>"))
-         "</body></html>")))
+  still renders. `file` is the cached filing document and `requested` is the
+  raw `taxonomy` query value; an unknown value falls back to `:dei`, then to
+  the first available taxonomy."
+  ([file]
+   (page-html file nil))
+  ([file requested]
+   (let [result (try
+                  {:data (data-for-file file)}
+                  (catch Throwable e
+                    {:error (or (ex-message e) (str e))}))]
+     (str "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>"
+          "<title>XBRL facts</title>" page-style "</head><body>"
+          (if-let [{:keys [rows taxonomies]} (:data result)]
+            (let [selected (selected-taxonomy taxonomies requested)
+                  shown (rows-for-taxonomy rows selected)]
+              (str "<h1>XBRL facts (" (count shown) ")</h1>"
+                   (when (seq taxonomies)
+                     (taxonomy-html taxonomies selected))
+                   "<div class=\"table-wrap\">"
+                   (if (seq shown)
+                     (str "<table><thead><tr>"
+                          "<th>Taxonomy</th><th>Concept</th><th>Value</th>"
+                          "</tr></thead><tbody>"
+                          (rows-html shown)
+                          "</tbody></table>")
+                     "<p class=\"empty\">No XBRL facts in this document.</p>")
+                   "</div>"))
+            (str "<h1>XBRL facts</h1>"
+                 "<div class=\"table-wrap\"><p class=\"error\">"
+                 (html-escape (str "Could not read XBRL facts: " (:error result)))
+                 "</p></div>"))
+          panel-script "</body></html>"))))
 
 (defn head-snippet
   "CSS and drag script for the panel, injected into the filing's head.
@@ -172,7 +332,7 @@
   "Iframe and drag grip inserted just after the filing's opening body tag."
   [panel-url]
   (str "<iframe id=\"edgar2-xbrl-panel\" src=\"" (html-escape panel-url)
-       "\" title=\"XBRL DEI facts\"></iframe>"
+       "\" title=\"XBRL facts panel\"></iframe>"
        "<div id=\"edgar2-xbrl-resizer\" role=\"separator\""
        " aria-orientation=\"vertical\""
-       " aria-label=\"Resize XBRL DEI facts panel\"></div>"))
+       " aria-label=\"Resize XBRL facts panel\"></div>"))

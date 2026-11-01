@@ -47,8 +47,8 @@
 
 (def ^:private layout-snippet
   "Keep HTML filings in a 1200px centered column and reserve a right-hand
-  strip for the DEI panel. The width defaults to 0px so a document without
-  the panel snippet is positioned exactly as before."
+  strip for the XBRL facts panel. The width defaults to 0px so a document
+  without the panel snippet is positioned exactly as before."
   (str
    "<style id=\"edgar2-layout\">"
    ":root{--edgar2-panel-w:0px}"
@@ -135,7 +135,7 @@
       (str "/filing/" cik-name "/" acc-name "/index"))))
 
 (defn- panel-href
-  "DEI facts URL for a cached file at …/{cik}/{accession}/{doc}.
+  "XBRL facts URL for a cached file at …/{cik}/{accession}/{doc}.
   Filenames pass `safe-doc-name`, so no URL encoding is needed."
   [file]
   (let [accession (.getParentFile file)
@@ -641,13 +641,17 @@
         (text-response 502 (or (ex-message e) (str e)))))))
 
 (defn filing-xbrl-page
-  "Hyper handler. DEI facts table for one cached HTML filing document.
+  "Hyper handler. XBRL facts table for one cached HTML filing document.
 
-  Resolution failures use the same 404/502 mapping as `raw-filing-page`, but
-  a parse failure inside the panel is a 200 with an escaped message so the
-  surrounding filing view stays usable."
+  `?taxonomy=` filters the cached rows; a missing or unknown value falls back
+  to the document's default taxonomy. Resolution failures use the same
+  404/502 mapping as `raw-filing-page`, but a parse failure inside the panel
+  is a 200 with an escaped message so the surrounding filing view stays
+  usable."
   [req]
   (let [p (get-in req [:hyper/route :path-params])
+        q (get-in req [:hyper/route :query-params])
+        taxonomy (or (get q :taxonomy) (get q "taxonomy"))
         cik (:cik p)
         accession (some-> (:accession p) str str/trim not-empty)
         doc (safe-doc-name (some-> (:doc p) str str/trim not-empty))]
@@ -656,7 +660,7 @@
         (if (html-file? file)
           {:status 200
            :headers {"Content-Type" "text/html; charset=utf-8"}
-           :body (panel/page-html file)}
+           :body (panel/page-html file taxonomy)}
           (text-response 404 (str "No XBRL facts for " doc)))
         (text-response 404 (str "No document " (or doc "") " in "
                                 (or accession ""))))

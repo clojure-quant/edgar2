@@ -168,7 +168,7 @@
     (spit file "<html><body><p>x</p></body></html>")
     (try
       (with-redefs [web/filing-doc-file (fn [_ _ _] file)
-                    panel/page-html (fn [_] "PANEL")]
+                    panel/page-html (fn [_ _] "PANEL")]
         (let [resp (web/filing-xbrl-page
                     {:hyper/route {:path-params {:cik aiv-cik
                                                  :accession aiv-accession
@@ -177,6 +177,24 @@
           (is (= "PANEL" (:body resp)))
           (is (= "text/html; charset=utf-8"
                  (get-in resp [:headers "Content-Type"])))))
+      (finally (rm-r dir)))))
+
+(deftest panel-handler-forwards-the-taxonomy-query-param
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "edgar2-filing-" (System/nanoTime)))
+        file (io/file dir "10-K" aiv-cik aiv-accession aiv-doc)]
+    (.mkdirs (.getParentFile file))
+    (spit file "<html><body><p>x</p></body></html>")
+    (try
+      (with-redefs [web/filing-doc-file (fn [_ _ _] file)
+                    panel/page-html (fn [_ taxonomy] taxonomy)]
+        (let [resp (web/filing-xbrl-page
+                    {:hyper/route {:path-params {:cik aiv-cik
+                                                 :accession aiv-accession
+                                                 :doc aiv-doc}
+                                   :query-params {:taxonomy "us-gaap"}}})]
+          (is (= 200 (:status resp)))
+          (is (= "us-gaap" (:body resp)))))
       (finally (rm-r dir)))))
 
 (deftest panel-handler-404s-without-a-document
