@@ -680,17 +680,40 @@
      :context context-rows
      :dimension dimension-rows}))
 
+(defn printable-period
+  "A duration as `start-end`, an instant as its date. Nil when absent.
+
+  A context carries either a `:start`/`:end` pair or a single `:instant`,
+  so an absent (or empty) period prints nothing instead of an empty range."
+  [period]
+  (when period
+    (if (and (:start period) (:end period))
+      (str (:start period) "-" (:end period))
+      (:instant period))))
+
+(def ^:private max-printable-dimension 20)
+
+(defn printable-dimension
+  "Dimension member values joined with `\", \"`, capped at 20 characters.
+  Axis keys are not included. Nil when the map is nil or empty.
+
+  An explicit member is a keyword and keeps the leading colon `str` adds; a
+  typed member is already plain text. Contexts without axis/member pairs
+  have an empty map, which reads as a blank cell rather than as an empty
+  string."
+  [dimension]
+  (when (seq dimension)
+    (let [s (str/join ", " (map str (vals dimension)))]
+      (subs s 0 (min max-printable-dimension (count s))))))
+
 (defn- printable-context
   [row]
   (let [{:keys [period dimension value]} row
         identifier (or (:identifier row) (get-in row [:entity :identifier]))]
     (cond-> row
-      period (assoc :period (if (and (:start period) (:end period))
-                              (str (:start period) "-" (:end period))
-                              (:instant period)))
+      period (assoc :period (printable-period period))
       identifier (assoc :identifier identifier)
-      dimension (assoc :dimension (let [s (str/join ", " (map str (vals dimension)))]
-                                    (subs s 0 (min 20 (count s)))))
+      (seq dimension) (assoc :dimension (printable-dimension dimension))
       value (assoc :value (if (string? value)
                             (subs value 0 (min 10 (count value)))
                             value)))))

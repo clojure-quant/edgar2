@@ -38,13 +38,54 @@
        "<ix:nonNumeric name=\"dei:DocumentDescription\">" value "</ix:nonNumeric>"
        "</body></html>"))
 
+(def ^:private context-cover
+  "A duration context with an explicit member, an instant context, and a
+  fact whose context does not resolve."
+  (str "<html><body>"
+       "<xbrli:context id=\"duration\">"
+       "<xbrli:entity>"
+       "<xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000000001</xbrli:identifier>"
+       "<xbrli:segment>"
+       "<xbrldi:explicitMember dimension=\"us-gaap:StatementBusinessSegmentsAxis\">"
+       "us-gaap:RetailMember</xbrldi:explicitMember>"
+       "</xbrli:segment>"
+       "</xbrli:entity>"
+       "<xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate>"
+       "<xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>"
+       "</xbrli:context>"
+       "<xbrli:context id=\"instant\">"
+       "<xbrli:period><xbrli:instant>2026-01-30</xbrli:instant></xbrli:period>"
+       "</xbrli:context>"
+       "<xbrli:unit id=\"usd\"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>"
+       "<ix:nonFraction name=\"us-gaap:Revenue\" contextRef=\"duration\""
+       " unitRef=\"usd\">10</ix:nonFraction>"
+       "<ix:nonFraction name=\"us-gaap:Assets\" contextRef=\"instant\""
+       " unitRef=\"usd\">20</ix:nonFraction>"
+       "<ix:nonFraction name=\"us-gaap:Liabilities\" contextRef=\"missing\""
+       " unitRef=\"usd\">30</ix:nonFraction>"
+       "</body></html>"))
+
+(deftest fact-rows-joins-period-and-dimension
+  (let [rows (panel/fact-rows [{:text context-cover :where "cover"}])
+        by-concept (into {} (map (juxt :concept identity)) rows)]
+    (is (= {:start "2025-01-01" :end "2025-12-31"}
+           (:period (:Revenue by-concept))))
+    (is (= {:us-gaap/StatementBusinessSegmentsAxis :us-gaap/RetailMember}
+           (:dimension (:Revenue by-concept))))
+    (is (= {:instant "2026-01-30"} (:period (:Assets by-concept))))
+    (is (= {} (:dimension (:Assets by-concept))))
+    (is (nil? (:period (:Liabilities by-concept))))
+    (is (nil? (:dimension (:Liabilities by-concept))))))
+
 (deftest fact-rows-keeps-every-fact-in-document-order
   (let [rows (panel/fact-rows [{:text cover :where "cover"}])]
     (is (= 4 (count rows)))
     (is (= [:DocumentType :Assets :DocumentType :EntityRegistrantName]
            (mapv :concept rows)))
     (is (= [:dei :us-gaap :dei :dei] (mapv :taxonomy rows)))
-    (is (every? #(= #{:taxonomy :concept :value} (set (keys %))) rows))))
+    (is (every? #(= #{:taxonomy :concept :value :period :dimension}
+                    (set (keys %)))
+                rows))))
 
 (deftest facts->taxonomies-puts-dei-first-and-skips-nil
   (is (= [:dei :srt :us-gaap]
@@ -67,6 +108,33 @@
                                 :concept :DocumentType
                                 :value "<script>alert(1)</script>"}])]
     (is (str/includes? html "&lt;script&gt;alert(1)&lt;/script&gt;"))
+    (is (not (str/includes? html "<script>")))))
+
+(deftest rows-html-renders-duration-and-dimension
+  (let [html (panel/rows-html [{:taxonomy :us-gaap
+                                :concept :Revenue
+                                :value 10
+                                :period {:start "2025-01-01" :end "2025-12-31"}
+                                :dimension {:us-gaap/Axis :us-gaap/Member}}])]
+    (is (str/includes? html "<td class=\"period\">2025-01-01-2025-12-31</td>"))
+    (is (str/includes? html "title=\"us-gaap:Axis = us-gaap:Member\""))
+    (is (str/includes? html ">:us-gaap/Member</span>"))))
+
+(deftest rows-html-uses-em-dashes-for-absent-period-and-dimension
+  (let [html (panel/rows-html [{:taxonomy :dei
+                                :concept :DocumentType
+                                :value "10-K"}])]
+    (is (= 2 (count (re-seq #"\u2014" html))))
+    (is (not (str/includes? html "title=")))))
+
+(deftest rows-html-caps-and-escapes-a-long-dimension
+  (let [member (keyword "b" "<script>alert(1)</script>tail")
+        html (panel/rows-html [{:taxonomy :us-gaap
+                                :concept :Assets
+                                :value 1
+                                :dimension {:a/Axis member}}])]
+    (is (str/includes? html ">:b/&lt;script&gt;alert(1)&lt;</span>"))
+    (is (str/includes? html "b:&lt;script&gt;alert(1)&lt;/script&gt;tail"))
     (is (not (str/includes? html "<script>")))))
 
 (deftest rows-html-renders-blank-values-as-an-em-dash
@@ -120,6 +188,22 @@
     (is (not (str/includes? html "<script>")))
     (is (= 2 (count (re-seq #"&lt;script&gt;" html))))
     (is (str/includes? html "&lt;/script&gt;"))))
+
+(deftest page-html-shows-period-and-dimension-cells
+  (let [[dir file] (temp-file context-cover)]
+    (try
+      (let [html (panel/page-html file)]
+        (is (str/includes? html
+                           (str "<th>Taxonomy</th><th>Concept</th><th>Period</th>"
+                                "<th>Value</th><th>Dimension</th>")))
+        (is (str/includes? html ">2025-01-01-2025-12-31</td>"))
+        (is (str/includes? html ">2026-01-30</td>"))
+        (is (= 1 (count (re-seq #"class=\"dimension\"" html))))
+        (is (str/includes?
+             html
+             "title=\"us-gaap:StatementBusinessSegmentsAxis = us-gaap:RetailMember\""))
+        (is (str/includes? html ">:us-gaap/RetailMembe</span>")))
+      (finally (rm-r dir)))))
 
 (deftest page-html-defaults-to-dei-and-lists-every-taxonomy
   (let [[dir file] (temp-file cover)]

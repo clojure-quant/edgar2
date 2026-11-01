@@ -303,6 +303,22 @@
     (is (= [] (:dimensions dangling)))
     (is (= "missing" (:context-id dangling)))))
 
+(deftest printable-period-renders-durations-and-instants
+  (is (= "2025-01-01-2025-12-31"
+         (xbrl/printable-period {:start "2025-01-01" :end "2025-12-31"})))
+  (is (= "2026-01-30" (xbrl/printable-period {:instant "2026-01-30"})))
+  (is (nil? (xbrl/printable-period nil)))
+  (is (nil? (xbrl/printable-period {}))))
+
+(deftest printable-dimension-joins-members-without-axes-and-caps
+  (is (= ":a/X, date"
+         (xbrl/printable-dimension
+          (array-map :a/Axis :a/X :b/TypedAxis "date"))))
+  (let [member (keyword "us-gaap" (apply str (repeat 30 "x")))]
+    (is (= 20 (count (xbrl/printable-dimension {:us-gaap/Axis member})))))
+  (is (nil? (xbrl/printable-dimension nil)))
+  (is (nil? (xbrl/printable-dimension {}))))
+
 (defn- rm-r
   [^java.io.File f]
   (when (.isDirectory f)

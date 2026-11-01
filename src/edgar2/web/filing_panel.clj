@@ -14,10 +14,12 @@
   "Every fact from `docs`, the vector built by `xbrl-loader/load-documents`.
 
   Keeps document order and duplicate facts, like the demo table, and keeps
-  only the projected `:taxonomy`, `:concept`, and `:value` keys."
+  only the projected `:taxonomy`, `:concept`, `:value`, `:period`, and
+  `:dimension` keys. Facts whose context does not resolve have nil
+  period/dimension."
   [docs]
-  (->> (:facts (xbrl/overview docs))
-       (mapv #(select-keys % [:taxonomy :concept :value]))))
+  (->> (xbrl/facts-with-concepts (xbrl/overview docs))
+       (mapv #(select-keys % [:taxonomy :concept :value :period :dimension]))))
 
 (defn facts->taxonomies
   "Distinct `:taxonomy` values in `facts`, `:dei` first, then by name.
@@ -79,6 +81,42 @@
       (truncated-value-html s)
       (html-escape s))))
 
+(defn- period-html
+  "Escaped duration `start-end` or instant date; an absent period becomes
+  the shared em dash so the fact stays visible."
+  [period]
+  (html-escape (label (xbrl/printable-period period))))
+
+(defn- qname
+  "Keyword as `prefix:name`, without the leading colon `str` would add.
+  A typed member is already a plain string."
+  [v]
+  (if (keyword? v)
+    (if-let [ns (namespace v)]
+      (str ns ":" (name v))
+      (name v))
+    (str v)))
+
+(defn- dimension-title
+  "Axis/member pairs for the hover title, e.g.
+  `us-gaap:SegmentsAxis = us-gaap:RetailMember`."
+  [dimension]
+  (str/join ", " (map (fn [[axis member]]
+                        (str (qname axis) " = " (qname member)))
+                      dimension)))
+
+(defn- dimension-html
+  "Visible member text from `xbrl/printable-dimension`, with the axis/member
+  pairs in a `title`. An absent dimension is an em dash with no title, and
+  both the text and the title are escaped."
+  [dimension]
+  (let [s (xbrl/printable-dimension dimension)]
+    (if s
+      (str "<span class=\"dimension\" title=\""
+           (html-escape (dimension-title dimension)) "\">"
+           (html-escape s) "</span>")
+      (html-escape (label nil)))))
+
 (defn- requested-taxonomy
   "`:dei` from a query value such as `\"dei\"`, `\":dei\"`, or `\" dei \"`."
   [raw]
@@ -104,10 +142,12 @@
   renders shortened with its full text in a hidden sibling span."
   [rows]
   (str/join
-   (map (fn [{:keys [taxonomy concept value]}]
+   (map (fn [{:keys [taxonomy concept period value dimension]}]
           (str "<tr><td>" (html-escape (label taxonomy)) "</td>"
-               "<td>" (html-escape (label concept)) "</td>"
-               "<td>" (value-html value) "</td></tr>"))
+               "<td class=\"concept\">" (html-escape (label concept)) "</td>"
+               "<td class=\"period\">" (period-html period) "</td>"
+               "<td>" (value-html value) "</td>"
+               "<td>" (dimension-html dimension) "</td></tr>"))
         rows)))
 
 (defn- taxonomy-html
@@ -165,7 +205,10 @@
        "vertical-align:top}"
        "th{position:sticky;top:0;background:#f4f4f4;font-weight:600;z-index:1}"
        "td:first-child{color:#555;white-space:nowrap}"
-       "td:nth-child(2){overflow-wrap:anywhere}"
+       "td.concept{overflow-wrap:anywhere}"
+       "td.period{white-space:nowrap}"
+       ".dimension{display:inline-block;max-width:8em;overflow:hidden;"
+       "text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}"
        ".empty,.error{margin:12px;color:#555}"
        ".error{color:#a00;white-space:pre-wrap}"
        ".fact-more{cursor:pointer;color:#06c;text-decoration:underline dotted;"
@@ -260,9 +303,10 @@
                      (taxonomy-html taxonomies selected))
                    "<div class=\"table-wrap\">"
                    (if (seq shown)
-                     (str "<table><thead><tr>"
-                          "<th>Taxonomy</th><th>Concept</th><th>Value</th>"
-                          "</tr></thead><tbody>"
+                      (str "<table><thead><tr>"
+                           "<th>Taxonomy</th><th>Concept</th><th>Period</th>"
+                           "<th>Value</th><th>Dimension</th>"
+                           "</tr></thead><tbody>"
                           (rows-html shown)
                           "</tbody></table>")
                      "<p class=\"empty\">No XBRL facts in this document.</p>")
