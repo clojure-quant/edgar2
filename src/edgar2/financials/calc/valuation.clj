@@ -2,6 +2,7 @@
   "Market-cap and valuation ratios from stats fundamentals."
   (:require [clojure.string :as str]
             [edgar2.db.adr :as adr]
+            [edgar2.db.price :as db-price]
             [edgar2.download.fx :as fx]))
 
 (defn usd-unit?
@@ -40,15 +41,16 @@
 (defn calculate-marketcap
   "Listing price × shares, plus adjusted / valuation market cap.
 
-  `universe-row` supplies `:ticker` and `:report-currency`. Looks up
+  `universe-row` supplies `:ticker` and `:report-currency`; its listing price
+  comes from data/prices.edn through `db.price/get-price`. Looks up
   `:adr-ratio` from `data/adr-list.edn` when known. Returns a map with present
   keys among `:adr-ratio`, `:shares`, `:price`, `:marketcap`,
   `:market-cap-adjusted`, and `:vmcap` (the cap later passed to
   `calculate-valuation` — adjusted when `needs-mcap-adjust?`)."
-  [price-by-ticker shares universe-row]
+  [shares universe-row]
   (let [ticker (:ticker universe-row)
         report-currency (:report-currency universe-row)
-        price (get price-by-ticker (str/upper-case (str ticker)))
+        price (db-price/get-price ticker)
         mcap (when (and price (number? shares))
                (* (double price) (double shares)))
         ratio (adr/get-ratio ticker)

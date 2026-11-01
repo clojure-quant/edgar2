@@ -23,7 +23,7 @@
   :download-exchanges {:exec-fn edgar2.download.ticker-exchange/download-exchanges}
   :download-openfigi {:exec-fn edgar2.download.openfigi/download-openfigi}
   :download-prices {:extra-deps {org.duckdb/duckdb_jdbc {:mvn/version "1.3.1.0"}}
-                    :exec-fn edgar2.download.price/download-prices}
+                    :exec-fn edgar2.download.marketparquet/download-prices}
   :download-universe-fsds {:exec-fn edgar2.download.fsds-universe/filer-info}
   :download-fx {:exec-fn edgar2.download.fx/download-fx}
   :download-eodhd-mapping {:exec-fn edgar2.download.eodhd-mapping/download-eodhd-mapping}

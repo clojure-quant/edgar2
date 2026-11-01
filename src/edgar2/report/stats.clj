@@ -5,7 +5,6 @@
             [clojure.string :as str]
             [edgar2.download.facts :as dl]
             [edgar2.util.core :as ucore]
-            [edgar2.download.price :as price]
             [edgar2.db.price-change :as db-price-change]
             [edgar2.db.shares :as db-shares]
             [edgar2.db.sic :as db-sic]
@@ -27,14 +26,6 @@
   "Identity / reporting-currency fields from a universe-facts `row`."
   [row]
   (select-keys row [:ticker :exchange :cik :entityName :report-currency]))
-
-(defn load-price-by-ticker
-  "ticker → close from data/prices.edn."
-  []
-  (into {}
-        (map (fn [{:keys [ticker close]}]
-               [(str/upper-case (str ticker)) (double close)])
-             (price/load-prices))))
 
 (def stats-field-order
   [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
@@ -122,16 +113,15 @@
   Runs `annual/calculate-annual` (when `dss` is present), market valuation
   (including ADR ratio), SIC enrichment, and the cached price changes
   for the ticker. Looks up the universe row by `cik` unless `:row` is
-  passed.   Optional opts for the batch path: `:row`, `:prices`, `:sic-db`,
+  passed.   Optional opts for the batch path: `:row`, `:sic-db`,
   `:shares`. When `:shares` is omitted, the count is `:outstanding` from
   `edgar2.db.shares/get-shares-cik` (data/share-classes.edn sums every share
   class). When `:annual-map` is passed, it is used instead of
   `calculate-annual`."
   ([dss cik]
    (stats-one dss cik {}))
-  ([dss cik {:keys [row prices sic-db shares annual-map] :as opts}]
+  ([dss cik {:keys [row sic-db shares annual-map] :as opts}]
    (let [row (or row (db-universe/universe-row-by-cik cik) {:cik (str cik)})
-         prices (or prices (load-price-by-ticker))
          sic-db (or sic-db (db-sic/load-sic-index))
          shares (or shares
                     (:outstanding (db-shares/get-shares-cik cik)))
@@ -140,7 +130,7 @@
        (let [annual-map (if (contains? opts :annual-map)
                           (or annual-map {})
                           (if dss (annual/calculate-annual dss) {}))
-             mc-map (valuation/calculate-marketcap prices shares row)
+             mc-map (valuation/calculate-marketcap shares row)
              valuation-map (valuation/calculate-valuation annual-map (:vmcap mc-map))]
          (merge annual-map
                 (universe-data row)
@@ -202,7 +192,6 @@
    (ucore/ensure-identity!)
    (let [zip-path (dl/ensure-zip! {:force force})
          all (db-universe/load-universe)
-         prices (load-price-by-ticker)
          sic-db (db-sic/load-sic-index)
          filers (vec (cond->> all limit (take (long limit))))
          total (count filers)]
@@ -225,7 +214,6 @@
                           t1 (System/nanoTime)
                           st (stats-one dss (:cik row)
                                         {:row row
-                                         :prices prices
                                          :sic-db sic-db})
                           t2 (System/nanoTime)]
                       (vswap! dataset-ns + (- t1 t0))
@@ -309,7 +297,6 @@
          facts (facts-nippy/load-facts)
          load-ns (- (System/nanoTime) t0)
          all (db-universe/load-universe)
-         prices (load-price-by-ticker)
          sic-db (db-sic/load-sic-index)
          filers (vec all)
          total (count filers)
@@ -334,7 +321,6 @@
                                    (:shares-outstanding row))]
                     (stats-one nil (:cik row)
                                {:row row
-                                :prices prices
                                 :sic-db sic-db
                                 :shares shares
                                 :annual-map annual-map})))

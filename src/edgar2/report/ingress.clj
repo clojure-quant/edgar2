@@ -5,7 +5,7 @@
             [edgar2.download.facts-universe :as facts-universe]
             [edgar2.download.fsds-universe :as fsds]
             [edgar2.download.fx :as fx]
-            [edgar2.download.price :as price]
+            [edgar2.download.marketparquet :as marketparquet]
             [edgar2.download.ticker-exchange :as exchanges]
             [edgar2.report.stats :as stats])
   (:import [java.time LocalDate]
@@ -63,11 +63,11 @@
   []
   (let [prices (merge {:id :prices
                        :label "Prices"
-                       :path price/prices-path
+                       :path marketparquet/prices-path
                        :max-days price-max-days
                        :as-of-label "session"
-                       :run #(price/download-prices {})}
-                      (file-status price/prices-path price-max-days))
+                       :run #(marketparquet/download-prices {})}
+                      (file-status marketparquet/prices-path price-max-days))
         listings (merge {:id :exchanges
                          :label "Ticker exchange"
                          :path exchanges/exchanges-path

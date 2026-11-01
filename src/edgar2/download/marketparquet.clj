@@ -1,4 +1,4 @@
-(ns edgar2.download.price
+(ns edgar2.download.marketparquet
   "US stock session closes from MarketParquet daily bars → data/prices.edn.
 
   Without MARKETPARQUET_API_KEY this uses the public latest stock_daily file
@@ -213,13 +213,6 @@
     (dataset/write-dataset! prices-path
                             {:download-date (latest-session-in rows)}
                             rows)))
-
-(defn load-prices
-  "Rows from data/prices.edn."
-  []
-  (or (dataset/read-rows prices-path)
-      (throw (ex-info "Missing prices file; run clj -X:download-prices first"
-                      {:path prices-path}))))
 
 (defn normalize-date
   [date]
