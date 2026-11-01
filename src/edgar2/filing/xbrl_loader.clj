@@ -16,15 +16,21 @@
 
 (defn load-documents
   "Slurp `file-or-url` (a path or a URL), then add the statement exhibit
-  when the cover links one. Returns a vector of {:text :where} maps."
+  when the cover links one and that exhibit can be read. A cover often links
+  an exhibit that was never downloaded, so an unreadable sibling is skipped
+  rather than thrown. Returns a vector of {:text :where} maps."
   [file-or-url]
   (let [text (slurp file-or-url)
         where (str file-or-url)
         exhibit (xbrl/statement-exhibit-name text)
-        exhibit-where (sibling where exhibit)]
+        exhibit-where (sibling where exhibit)
+        exhibit-text (when exhibit-where
+                       (try
+                         (slurp exhibit-where)
+                         (catch java.io.IOException _ nil)))]
     (cond-> [{:text text :where where}]
-      exhibit-where
-      (conj {:text (slurp exhibit-where) :where exhibit-where}))))
+      exhibit-text
+      (conj {:text exhibit-text :where exhibit-where}))))
 
 (comment
   ;; Test in the REPL (send to nREPL via Calva):

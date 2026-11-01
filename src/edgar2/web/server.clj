@@ -4,7 +4,8 @@
             [edgar2.web.chart :refer [chart-page]]
             [edgar2.web.chart-nearby :refer [chart-nearby-page]]
             [edgar2.web.company :refer [current-annual-page description-page google-page]]
-            [edgar2.web.filing :refer [annual-report-page raw-filing-page]]
+            [edgar2.web.filing :refer [annual-report-page filing-xbrl-page
+                                       raw-filing-page]]
             [edgar2.web.filings :refer [filings-page]]
             [edgar2.web.financials :refer [financials-page]]
             [edgar2.web.ingress :refer [ingress-page]]
@@ -113,8 +114,11 @@
                                :title "Filing"
                                :get #'raw-filing-page}]
    ["/filing/:cik/:accession/:doc" {:name :filing-doc
-                                    :title "Filing"
-                                    :get #'raw-filing-page}]])
+                                     :title "Filing"
+                                     :get #'raw-filing-page}]
+   ["/filing/:cik/:accession/:doc/xbrl-facts" {:name :filing-xbrl-facts
+                                                :title "Filing XBRL facts"
+                                                :get #'filing-xbrl-page}]])
 
 (defn web
   "Start the Hyper UI and block until the process stops.

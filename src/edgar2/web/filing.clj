@@ -6,7 +6,8 @@
             [edgar.filing :as ef]
             [edgar2.util :as util]
             [edgar2.util.core :as ucore]
-            [edgar2.util.filing :as ufiling]))
+            [edgar2.util.filing :as ufiling]
+            [edgar2.web.filing-panel :as panel]))
 
 (defn- content-type
   [file]
@@ -45,10 +46,16 @@
   "http://www.xbrl.org/2013/inlineXBRL")
 
 (def ^:private layout-snippet
-  "Cap HTML filings at 1200px and center them in the viewport."
+  "Keep HTML filings in a 1200px centered column and reserve a right-hand
+  strip for the DEI panel. The width defaults to 0px so a document without
+  the panel snippet is positioned exactly as before."
   (str
    "<style id=\"edgar2-layout\">"
-   "html,body{max-width:1200px;margin-left:auto;margin-right:auto}"
+   ":root{--edgar2-panel-w:0px}"
+   "html{max-width:none!important;margin:0!important}"
+   "body{max-width:none!important;"
+   "margin-left:max(0px,calc((100% - var(--edgar2-panel-w) - 1200px)/2))!important;"
+   "margin-right:calc(var(--edgar2-panel-w) + max(0px,calc((100% - var(--edgar2-panel-w) - 1200px)/2)))!important}"
    "</style>"))
 
 (def ^:private ix-highlight-snippet
@@ -127,6 +134,18 @@
     (when (and cik-name acc-name)
       (str "/filing/" cik-name "/" acc-name "/index"))))
 
+(defn- panel-href
+  "DEI facts URL for a cached file at …/{cik}/{accession}/{doc}.
+  Filenames pass `safe-doc-name`, so no URL encoding is needed."
+  [file]
+  (let [accession (.getParentFile file)
+        cik (when accession (.getParentFile accession))
+        cik-name (some-> cik .getName not-empty)
+        acc-name (some-> accession .getName not-empty)
+        doc-name (some-> file .getName not-empty)]
+    (when (and cik-name acc-name doc-name)
+      (str "/filing/" cik-name "/" acc-name "/" doc-name "/xbrl-facts"))))
+
 (defn- index-link-snippet
   [href]
   (str "<a id=\"edgar2-index\" href=\"" (html-escape href) "\" "
@@ -135,12 +154,12 @@
        "font:12px/1.3 sans-serif;text-decoration:none\">"
        "Filing index</a>"))
 
-(defn- inject-index-link
-  "Insert the index link just after the opening body tag.
-  An absolute href stays on this server when the filing sets a base URL."
-  [html href]
-  (let [snippet (index-link-snippet href)
-        replaced (str/replace-first html #"(?i)<body\b[^>]*>"
+(defn- inject-body
+  "Insert `snippet` just after the opening body tag, or at the top if the
+  tag is missing. Chrome uses absolute URLs, so a filing `<base>` does not
+  redirect the links."
+  [html snippet]
+  (let [replaced (str/replace-first html #"(?i)<body\b[^>]*>"
                                     #(str % snippet))]
     (if (= replaced html)
       (str snippet html)
@@ -150,9 +169,14 @@
   [html file]
   (let [html (-> html
                  (inject-head layout-snippet)
-                 inject-ix-highlight)]
+                 inject-ix-highlight)
+        html (if-let [panel-url (panel-href file)]
+               (-> html
+                   (inject-head (panel/head-snippet))
+                   (inject-body (panel/body-snippet panel-url)))
+               html)]
     (if-let [href (index-href file)]
-      (inject-index-link html href)
+      (inject-body html (index-link-snippet href))
       html)))
 
 (defn- file-response
@@ -609,6 +633,33 @@
 
         :else
         (text-response 404 "No filing"))
+      (catch clojure.lang.ExceptionInfo e
+        (if (= :edgar.filing/not-found (:type (ex-data e)))
+          (text-response 404 (or (ex-message e) "Filing not found"))
+          (text-response 502 (or (ex-message e) (str e)))))
+      (catch Throwable e
+        (text-response 502 (or (ex-message e) (str e)))))))
+
+(defn filing-xbrl-page
+  "Hyper handler. DEI facts table for one cached HTML filing document.
+
+  Resolution failures use the same 404/502 mapping as `raw-filing-page`, but
+  a parse failure inside the panel is a 200 with an escaped message so the
+  surrounding filing view stays usable."
+  [req]
+  (let [p (get-in req [:hyper/route :path-params])
+        cik (:cik p)
+        accession (some-> (:accession p) str str/trim not-empty)
+        doc (safe-doc-name (some-> (:doc p) str str/trim not-empty))]
+    (try
+      (if-let [file (and accession doc (filing-doc-file cik accession doc))]
+        (if (html-file? file)
+          {:status 200
+           :headers {"Content-Type" "text/html; charset=utf-8"}
+           :body (panel/page-html file)}
+          (text-response 404 (str "No XBRL facts for " doc)))
+        (text-response 404 (str "No document " (or doc "") " in "
+                                (or accession ""))))
       (catch clojure.lang.ExceptionInfo e
         (if (= :edgar.filing/not-found (:type (ex-data e)))
           (text-response 404 (or (ex-message e) "Filing not found"))

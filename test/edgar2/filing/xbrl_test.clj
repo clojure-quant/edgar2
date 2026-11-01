@@ -1,6 +1,8 @@
 (ns edgar2.filing.xbrl-test
-  (:require [clojure.test :refer [deftest is]]
-            [edgar2.filing.xbrl :as xbrl]))
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer [deftest is]]
+            [edgar2.filing.xbrl :as xbrl]
+            [edgar2.filing.xbrl-loader :as xbrl-loader]))
 
 (def coke-cover
   "<html><body>
@@ -303,3 +305,22 @@
     (is (= "missing" (:context-id dangling)))
     (is (some #(and (= "c-t" (:context-id %)) (= :scenario (:type %)))
               (:context o)))))
+
+(defn- rm-r
+  [^java.io.File f]
+  (when (.isDirectory f)
+    (doseq [c (.listFiles f)]
+      (rm-r c)))
+  (.delete f))
+
+(deftest missing-statement-exhibit-is-skipped
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "edgar2-xbrl-" (System/nanoTime)))
+        file (io/file dir "cover.htm")]
+    (.mkdirs dir)
+    (spit file "<html><body><a href=\"ex99d2.htm\">exhibit</a></body></html>")
+    (try
+      (let [docs (xbrl-loader/load-documents file)]
+        (is (= 1 (count docs)))
+        (is (= (str file) (:where (first docs)))))
+      (finally (rm-r dir)))))

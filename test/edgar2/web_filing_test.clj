@@ -7,8 +7,10 @@
             [clojure.test :refer [deftest is]]
             [edgar.core]
             [edgar.filing :as ef]
+            [edgar2.filing.xbrl-loader :as xbrl-loader]
             [edgar2.util.filing :as ufiling]
-            [edgar2.web.filing :as web]))
+            [edgar2.web.filing :as web]
+            [edgar2.web.filing-panel :as panel]))
 
 (def aiv-cik "0000922864")
 (def aiv-accession "0001193125-26-338545")
@@ -135,7 +137,81 @@
     (try
       (let [body (:body (#'web/file-response file))]
         (is (str/includes? body (str "/filing/" aiv-cik "/" aiv-accession "/index")))
-        (is (str/includes? body "id=\"edgar2-index\"")))
+        (is (str/includes? body "id=\"edgar2-index\""))
+        (is (str/includes? body "id=\"edgar2-xbrl-panel\""))
+        (is (str/includes? body "id=\"edgar2-xbrl-resizer\""))
+        (is (str/includes? body
+                           (str "/filing/" aiv-cik "/" aiv-accession
+                                "/doc.htm/xbrl-facts")))
+        (is (str/includes? body "--edgar2-panel-w:320px"))
+        (is (> (str/index-of body "--edgar2-panel-w:320px")
+               (str/index-of body "--edgar2-panel-w:0px"))))
+      (finally (rm-r dir)))))
+
+(deftest pdf-filing-has-no-panel-markup
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "edgar2-filing-" (System/nanoTime)))
+        file (io/file dir "10-K" aiv-cik aiv-accession "doc.pdf")]
+    (.mkdirs (.getParentFile file))
+    (spit file "%PDF-1.4")
+    (try
+      (let [resp (#'web/file-response file)]
+        (is (instance? java.io.File (:body resp)))
+        (is (not (str/includes? (str (:body resp)) "edgar2-xbrl-panel"))))
+      (finally (rm-r dir)))))
+
+(deftest panel-handler-renders-html-documents
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "edgar2-filing-" (System/nanoTime)))
+        file (io/file dir "10-K" aiv-cik aiv-accession aiv-doc)]
+    (.mkdirs (.getParentFile file))
+    (spit file "<html><body><p>x</p></body></html>")
+    (try
+      (with-redefs [web/filing-doc-file (fn [_ _ _] file)
+                    panel/page-html (fn [_] "PANEL")]
+        (let [resp (web/filing-xbrl-page
+                    {:hyper/route {:path-params {:cik aiv-cik
+                                                 :accession aiv-accession
+                                                 :doc aiv-doc}}})]
+          (is (= 200 (:status resp)))
+          (is (= "PANEL" (:body resp)))
+          (is (= "text/html; charset=utf-8"
+                 (get-in resp [:headers "Content-Type"])))))
+      (finally (rm-r dir)))))
+
+(deftest panel-handler-404s-without-a-document
+  (with-redefs [web/filing-doc-file (fn [_ _ _] nil)]
+    (is (= 404
+           (:status (web/filing-xbrl-page
+                     {:hyper/route {:path-params {:cik aiv-cik
+                                                  :accession aiv-accession
+                                                  :doc "nope.htm"}}}))))))
+
+(deftest panel-handler-rejects-non-html-documents
+  (let [pdf (io/file (System/getProperty "java.io.tmpdir") "doc.pdf")]
+    (with-redefs [web/filing-doc-file (fn [_ _ _] pdf)]
+      (is (= 404
+             (:status (web/filing-xbrl-page
+                       {:hyper/route {:path-params {:cik aiv-cik
+                                                    :accession aiv-accession
+                                                    :doc "doc.pdf"}}})))))))
+
+(deftest panel-handler-reports-a-parse-failure-with-200
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "edgar2-filing-" (System/nanoTime)))
+        file (io/file dir "10-K" aiv-cik aiv-accession aiv-doc)]
+    (.mkdirs (.getParentFile file))
+    (spit file "<html><body></body></html>")
+    (try
+      (with-redefs [web/filing-doc-file (fn [_ _ _] file)
+                    xbrl-loader/load-documents
+                    (fn [_] (throw (ex-info "boom" {})))]
+        (let [resp (web/filing-xbrl-page
+                    {:hyper/route {:path-params {:cik aiv-cik
+                                                 :accession aiv-accession
+                                                 :doc aiv-doc}}})]
+          (is (= 200 (:status resp)))
+          (is (str/includes? (:body resp) "Could not read XBRL facts: boom"))))
       (finally (rm-r dir)))))
 
 (deftest index-page-links-html-and-xml
