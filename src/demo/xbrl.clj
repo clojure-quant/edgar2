@@ -3,8 +3,8 @@
    [clojure.java.io :as io]
    [clojure.pprint :as pprint]
    [clojure.string :as str]
-   [edgar2.filing.xbrl :as xbrl]
-   [edgar2.filing.xbrl-loader :as xbrl-loader]))
+   [edgar2.filing.xbrl-loader :as xbrl-loader]
+   [edgar2.filing.xbrl :as xbrl]))
 
 
 

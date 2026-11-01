@@ -243,3 +243,63 @@
               </body></html>"
         parsed (xbrl/parse html)]
     (is (= 105 (get-in parsed [:facts :us-gaap :NumberOfReportingUnits :units "pure" 0 :val])))))
+
+(deftest overview-flattens-facts-contexts-dimensions
+  (let [o (xbrl/overview [{:text coke-cover :where "cover"}])
+        facts (:facts o)
+        shares (filterv #(and (= :dei (:taxonomy %))
+                              (= :EntityCommonStockSharesOutstanding (:concept %))
+                              (= "c-3" (:context-id %)))
+                        facts)
+        name (first (filter #(= :EntityRegistrantName (:concept %)) facts))
+        periods (filter #(= :period (:type %)) (:context o))
+        entities (filter #(= :entity (:type %)) (:context o))
+        segments (filter #(= :segment (:type %)) (:context o))]
+    (is (= 2 (count shares)))
+    (is (every? #(= "shares" (:unit %)) shares))
+    (is (= #{56517334} (set (map :value shares))))
+    (is (= [{:axis-taxonomy :us-gaap
+             :axis-concept :StatementClassOfStockAxis
+             :member-taxonomy :coke
+             :member-concept :CommonClassUndefinedMember}]
+           (:dimensions (first shares))))
+    (is (= "COCA-COLA CONSOLIDATED, INC." (:value name)))
+    (is (nil? (:unit name)))
+    (is (some #(and (= "c-3" (:context-id %))
+                    (= {:scheme "http://www.sec.gov/CIK"
+                        :identifier "0000317540"}
+                       (:values %)))
+              entities))
+    (is (= {:instant "2026-01-30"}
+           (->> periods (filter #(= "c-3" (:context-id %))) first :values)))
+    (is (= {:start "2025-01-01" :end "2025-12-31"}
+           (->> periods (filter #(= "c-1" (:context-id %))) first :values)))
+    (is (= {} (->> segments (filter #(= "c-3" (:context-id %))) first :values)))
+    (is (= 2 (count (:dimension o))))))
+
+(def typed-cover
+  "<html><body>
+   <xbrli:context id=\"c-t\">
+     <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0000000001</xbrli:identifier></xbrli:entity>
+     <xbrli:period><xbrli:instant>2025-12-31</xbrli:instant></xbrli:period>
+     <xbrli:scenario>
+       <xbrldi:typedMember dimension=\"us-gaap:SomeTypedAxis\"><xbrldi:domain>2025-01-01</xbrldi:domain></xbrldi:typedMember>
+     </xbrli:scenario>
+   </xbrli:context>
+   <xbrli:unit id=\"usd\"><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>
+   <ix:nonFraction name=\"us-gaap:Revenue\" contextRef=\"c-t\" unitRef=\"usd\">10</ix:nonFraction>
+   <ix:nonFraction name=\"us-gaap:Assets\" contextRef=\"missing\" unitRef=\"usd\">20</ix:nonFraction>
+   </body></html>")
+
+(deftest overview-keeps-typed-members-and-dangling-contexts
+  (let [o (xbrl/overview [{:text typed-cover :where "x"}])
+        typed (first (filter #(= :SomeTypedAxis (:axis-concept %)) (:dimension o)))
+        dangling (first (filter #(= :Assets (:concept %)) (:facts o)))]
+    (is (= :us-gaap (:axis-taxonomy typed)))
+    (is (nil? (:member-taxonomy typed)))
+    (is (nil? (:member-concept typed)))
+    (is (= "2025-01-01" (:member-value typed)))
+    (is (= [] (:dimensions dangling)))
+    (is (= "missing" (:context-id dangling)))
+    (is (some #(and (= "c-t" (:context-id %)) (= :scenario (:type %)))
+              (:context o)))))

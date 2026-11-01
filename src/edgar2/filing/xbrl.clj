@@ -512,6 +512,151 @@
   ([texts opts]
    (companyfacts (mapv parse-doc texts) opts)))
 
+(defn- qname-pair
+  "Taxonomy and concept keywords from a QName. A name with no prefix keeps
+  the whole name as the concept and a nil taxonomy."
+  [qname]
+  (or (split-qname qname)
+      (let [s (str/trim (str qname))]
+        [nil (when-not (str/blank? s) (keyword s))])))
+
+(defn- context-dimension-rows
+  "`:dimension` rows for one context. An explicit member splits axis and
+  member into taxonomy/concept keywords. A typed member has no member
+  QName, so its trimmed text goes in `:member-value`."
+  [ctx context-id]
+  (vec
+   (keep (fn [mem]
+           (when-let [ax (attr mem "dimension")]
+             (let [[at ac] (qname-pair ax)]
+               (if (= "typedmember" (local-tag mem))
+                 {:context-id context-id
+                  :axis-taxonomy at
+                  :axis-concept ac
+                  :member-taxonomy nil
+                  :member-concept nil
+                  :member-value (str/trim (.text mem))}
+                 (let [[mt mc] (qname-pair (str/trim (.text mem)))]
+                   {:context-id context-id
+                    :axis-taxonomy at
+                    :axis-concept ac
+                    :member-taxonomy mt
+                    :member-concept mc})))))
+         (concat (elements ctx "xbrldi:explicitmember")
+                 (elements ctx "xbrldi:typedmember")))))
+
+(defn- context-facet-rows
+  "`:context` rows for one context: a period facet, an entity facet, and
+  presence markers for segment and scenario."
+  [ctx context-id]
+  (let [p (period ctx)
+        entity (first (elements ctx "xbrli:entity"))
+        identifier (when entity (first (elements entity "xbrli:identifier")))]
+    (cond-> []
+      p (conj {:context-id context-id
+               :type :period
+               :values (if (:start p)
+                         {:start (:start p) :end (:end p)}
+                         {:instant (:end p)})})
+      entity (conj {:context-id context-id
+                    :type :entity
+                    :values {:scheme (when identifier (attr identifier "scheme"))
+                             :identifier (first-text entity "xbrli:identifier")}})
+      (seq (elements ctx "xbrli:segment"))
+      (conj {:context-id context-id :type :segment :values {}})
+      (seq (elements ctx "xbrli:scenario"))
+      (conj {:context-id context-id :type :scenario :values {}}))))
+
+(defn- ordered-contexts
+  "`[id element]` pairs in first-seen order across `documents`. A repeated
+  id keeps its first definition."
+  [documents]
+  (let [[out _]
+        (reduce (fn [[out seen] doc]
+                  (reduce (fn [[out seen] ctx]
+                            (let [id (not-empty (or (attr ctx "id") (.id ctx)))]
+                              (if (and id (not (contains? seen id)))
+                                [(conj out [id ctx]) (conj seen id)]
+                                [out seen])))
+                          [out seen]
+                          (elements doc "xbrli:context")))
+                [[] #{}]
+                documents)]
+    out))
+
+(defn- fact-element?
+  "True for an inline fact (`name` attribute) or an extracted-instance fact
+  (a prefixed, non-structural element with a context reference)."
+  [el]
+  (or (some? (attr el "name"))
+      (and (some? (attr el "contextref"))
+           (let [tag (.tagName el)]
+             (and (str/includes? tag ":")
+                  (not (re-find #"(?i)^(xbrli|ix|xbrldi|link):" tag)))))))
+
+(defn- numeric-fact?
+  "Inline nonFraction, or an extracted-instance fact carrying a unit reference."
+  [el]
+  (or (= "nonfraction" (local-tag el))
+      (some? (attr el "unitref"))))
+
+(defn- overview-fact
+  "One `:facts` row. A numeric fact is parsed to a number; a non-numeric
+  fact keeps its trimmed text. `dims-by-context` maps a context id to its
+  dimension rows without `:context-id`."
+  [el dims-by-context continuations]
+  (let [qname (or (attr el "name") (.tagName el))
+        [taxonomy concept] (qname-pair qname)
+        context-id (attr el "contextref")
+        text (continued-text el continuations)
+        numeric? (numeric-fact? el)]
+    {:taxonomy taxonomy
+     :concept concept
+     :fact-id (attr el "id")
+     :context-id context-id
+     :dimensions (get dims-by-context context-id [])
+     :value (if numeric? (fact-value el text) (clean-text text))
+     :unit (attr el "unitref")}))
+
+(defn overview
+  "Flat facts/contexts/dimensions view of filing `docs`.
+
+  `docs` is the vector from `edgar2.filing.xbrl-loader/load-documents`, each
+  entry `{:text ... :where ...}`. Returns:
+
+  - `:facts` — every fact occurrence, numeric and non-numeric, with
+    `:taxonomy`, `:concept`, `:fact-id`, `:context-id`, `:dimensions`,
+    `:value`, and `:unit` (the raw instance unit id, nil for non-numeric).
+  - `:context` — one row per context facet: `:context-id`, `:type`
+    (`:period`, `:entity`, `:segment`, or `:scenario`), and `:values`.
+  - `:dimension` — one row per axis/member with `:context-id`,
+    `:axis-taxonomy`, `:axis-concept`, `:member-taxonomy`, and
+    `:member-concept`. A typed member also has `:member-value`.
+
+  Unlike `parse`, a context is kept even if no fact uses it, repeated facts
+  are kept, and a fact whose context id does not resolve keeps its raw
+  `:context-id` with no dimensions."
+  [docs]
+  (let [documents (mapv #(parse-doc (:text %)) docs)
+        continuations (reduce merge {} (map read-continuations documents))
+        contexts (ordered-contexts documents)
+        context-rows (vec (mapcat (fn [[id ctx]] (context-facet-rows ctx id))
+                                  contexts))
+        dimension-rows (vec (mapcat (fn [[id ctx]] (context-dimension-rows ctx id))
+                                    contexts))
+        dims-by-context (into {}
+                              (map (fn [rows]
+                                     [(-> rows first :context-id)
+                                      (mapv #(dissoc % :context-id) rows)]))
+                              (vals (group-by :context-id dimension-rows)))
+        facts (vec (->> documents
+                        (mapcat #(.getAllElements %))
+                        (filter fact-element?)
+                        (map #(overview-fact % dims-by-context continuations))))]
+    {:facts facts
+     :context context-rows
+     :dimension dimension-rows}))
+
 (defn- statement-exhibit?
   "True for the names an audited-statement exhibit takes beside the cover:
   `_d2.htm`, `ex99d2.htm`, `ex99-2.htm`, `ex-99.2.htm`, `exhibit99-2.htm`,
