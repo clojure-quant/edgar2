@@ -162,6 +162,18 @@
     (is (= "2025-12-31" (:end shares)))
     (is (= 1234000 (:val eps)))))
 
+(deftest prefixed-xbrl-root-is-parsed-as-xml
+  (let [instance "<xbrli:xbrl xmlns:xbrli=\"http://www.xbrl.org/2003/instance\"
+                              xmlns:us-gaap=\"http://fasb.org/us-gaap/2013\">
+     <xbrli:context id=\"c\"><xbrli:period><xbrli:instant>2013-12-31</xbrli:instant></xbrli:period></xbrli:context>
+     <xbrli:unit id=\"s\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>
+     <us-gaap:CommonStockSharesOutstanding contextRef=\"c\" unitRef=\"s\">99,000,000</us-gaap:CommonStockSharesOutstanding>
+   </xbrli:xbrl>"]
+    (is (true? (xbrl/instance-document? instance)))
+    (is (= 99000000
+           (get-in (xbrl/parse instance)
+                   [:facts :us-gaap :CommonStockSharesOutstanding :units "shares" 0 :val])))))
+
 (deftest instance-unit-keeps-its-divide
   (let [instance "<xbrl xmlns=\"http://www.xbrl.org/2003/instance\">
      <context id=\"c\"><period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period></context>

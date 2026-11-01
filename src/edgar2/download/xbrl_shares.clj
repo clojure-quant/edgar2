@@ -207,11 +207,28 @@
   "Basic weighted-average shares.
 
   US-GAAP outstanding, then US-GAAP issued when the outstanding tag is
-  absent, then IFRS weighted-average shares."
+  absent, then IFRS weighted-average shares, then limited-partnership
+  units. The unit count is last because an MLP's units are not shares;
+  it is the same income-statement denominator for those filers."
   [facts]
   (or (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesOutstandingBasic])
       (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesIssuedBasic])
-      (get-in facts [:facts :ifrs-full :WeightedAverageShares])))
+      (get-in facts [:facts :ifrs-full :WeightedAverageShares])
+      (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstanding])))
+
+(defn- diluted-concept
+  "Diluted weighted-average shares.
+
+  `us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding` is the diluted
+  EPS denominator. The limited-partnership units variant, the IFRS adjusted
+  average, and the US-GAAP adjustment to the count are fallbacks for
+  filers that tag no diluted total. The adjustment is not a total on its
+  own, so it is the last resort."
+  [facts]
+  (or (get-in facts [:facts :us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding])
+      (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstandingDiluted])
+      (get-in facts [:facts :ifrs-full :AdjustedWeightedAverageShares])
+      (get-in facts [:facts :us-gaap :WeightedAverageNumberDilutedSharesOutstandingAdjustment])))
 
 (defn- preference-class?
   "True for a preferred or preference share class, which is not common
@@ -226,15 +243,23 @@
   `dei:EntityCommonStockSharesOutstanding` when it has a share fact, then
   `us-gaap:SharesOutstanding`, then `us-gaap:CommonStockSharesOutstanding`,
   then IFRS `ifrs-full:NumberOfSharesOutstanding` without preference
-  classes. An empty higher-priority concept does not block the fallback.
-  A filer that tags no DEI cover count often still tags the common shares
-  on the statement of equity."
+  classes, then partnership units. An empty higher-priority concept does
+  not block the fallback. A filer that tags no DEI cover count often still
+  tags the common shares on the statement of equity.
+
+  Partnership units are the last resort and are taken one at a time, never
+  summed: a fund reports limited-partner units and a near-zero general-
+  partner count, and the first tag with a share fact wins."
   [facts]
   (or (not-empty (share-rows (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding])))
       (not-empty (share-rows (get-in facts [:facts :us-gaap :SharesOutstanding])))
       (not-empty (share-rows (get-in facts [:facts :us-gaap :CommonStockSharesOutstanding])))
-      (vec (remove preference-class?
-                   (share-rows (get-in facts [:facts :ifrs-full :NumberOfSharesOutstanding]))))))
+      (not-empty (vec (remove preference-class?
+                              (share-rows (get-in facts [:facts :ifrs-full :NumberOfSharesOutstanding])))))
+      (not-empty (share-rows (get-in facts [:facts :us-gaap :LimitedPartnersCapitalAccountUnitsOutstanding])))
+      (not-empty (share-rows (get-in facts [:facts :us-gaap :GeneralPartnersCapitalAccountUnitsOutstanding])))
+      (not-empty (share-rows (get-in facts [:facts :us-gaap :CapitalUnitsOutstanding])))
+      (not-empty (share-rows (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstanding])))))
 
 (defn- name-key
   "Lowercased letters and digits, so a DEI name can be compared with a
@@ -312,11 +337,16 @@
   `facts` is a companyfacts map. Outstanding shares are
   `:dei/EntityCommonStockSharesOutstanding`, then
   `:us-gaap/SharesOutstanding`, then `:us-gaap/CommonStockSharesOutstanding`,
-  then `:ifrs-full/NumberOfSharesOutstanding` without preference classes.
+  then `:ifrs-full/NumberOfSharesOutstanding` without preference classes,
+  then partnership units.
   Weighted shares are
   `:us-gaap/WeightedAverageNumberOfSharesOutstandingBasic`, then
   `:us-gaap/WeightedAverageNumberOfSharesIssuedBasic` when that tag is
-  absent, then `:ifrs-full/WeightedAverageShares`.
+  absent, then `:ifrs-full/WeightedAverageShares`, then limited-partnership
+  units. `:weighted-diluted` is
+  `:us-gaap/WeightedAverageNumberOfDilutedSharesOutstanding`, then the
+  units-diluted, IFRS adjusted-average, and adjustment-to-the-count
+  fallbacks, or nil when the filing tags no diluted count.
   A row with no class axis (`:us-gaap:StatementClassOfStockAxis` or
   `:ifrs-full:ClassesOfShareCapitalAxis`) is \"Common\". A ClassA, ClassB,
   OrdinarySharesB, or ClassBShares member is \"Class A\", \"Class B\", and
@@ -336,13 +366,16 @@
         outstanding (rows-by-class (filterv parent? (outstanding-rows facts)))
         weighted (rows-by-class
                   (filterv parent? (share-rows (weighted-concept facts))))
-        classes (->> (concat (keys outstanding) (keys weighted))
+        diluted (rows-by-class
+                 (filterv parent? (share-rows (diluted-concept facts))))
+        classes (->> (concat (keys outstanding) (keys weighted) (keys diluted))
                      distinct
                      (sort-by #(if (= % "Common") " " %)))]
     (with-markets
      (into {}
            (map (fn [class]
                   [class {:weighted (latest-val (get weighted class))
+                          :weighted-diluted (latest-val (get diluted class))
                           :outstanding (latest-val (get outstanding class))}]))
            classes)
      (:cover facts)
@@ -381,9 +414,7 @@
   or a plain HTML page. The root element is `xbrl`, with or without a
   namespace prefix."
   [text]
-  (let [s (str text)]
-    (boolean (re-find #"(?i)<(?:[a-z0-9_-]+:)?xbrl[\s>]"
-                      (subs s 0 (min 4000 (count s)))))))
+  (xbrl/instance-document? text))
 
 (def ^:private linkbase-name-re
   "A linkbase shares the instance's `.xml` extension but holds no facts."
@@ -426,9 +457,10 @@
               (indexed-instances filing)))))
 
 (def ^:private xbrl-text-re
-  "Inline facts, or an XBRL instance root. A document with neither carries
-  no machine-readable number."
-  #"(?i)<ix:(?:nonfraction|nonnumeric|header|hidden)\b|<xbrl[\s>]")
+  "Inline facts, or an XBRL instance root (with or without a prefix, as in
+  `<xbrli:xbrl>`). A document with neither carries no machine-readable
+  number."
+  #"(?i)<ix:(?:nonfraction|nonnumeric|header|hidden)\b|<(?:[a-z0-9_-]+:)?xbrl[\s>]")
 
 (defn xbrl-text?
   "True when one filing document carries machine-readable XBRL: inline

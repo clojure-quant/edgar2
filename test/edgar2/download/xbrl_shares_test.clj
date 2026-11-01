@@ -9,7 +9,7 @@
   {:units {:shares [{:end "2025-12-31" :val val :filed "2026-03-10"}]}})
 
 (deftest issued-basic-is-weighted-when-outstanding-is-absent
-  (is (= {"Common" {:weighted 26038125 :outstanding nil}}
+  (is (= {"Common" {:weighted-diluted nil :weighted 26038125 :outstanding nil}}
          (shares/share-summary
           {:facts {:us-gaap {:WeightedAverageNumberOfSharesIssuedBasic
                              (shares-fact 26038125)}}}))))
@@ -26,11 +26,11 @@
                   <ifrs-full:WeightedAverageShares contextRef=\"C_20250501to20260430\" unitRef=\"Share\" decimals=\"INF\">338886497</ifrs-full:WeightedAverageShares>
                   <ifrs-full:WeightedAverageShares contextRef=\"C_20240501to20250430\" unitRef=\"Share\" decimals=\"INF\">267326705</ifrs-full:WeightedAverageShares>
                   </xbrl>"]
-    (is (= {"Common" {:weighted 338886497, :outstanding 351018130}}
+    (is (= {"Common" {:weighted-diluted nil :weighted 338886497, :outstanding 351018130}}
            (shares/share-summary (xbrl/parse-all [cover instance]))))))
 
 (deftest outstanding-basic-wins-when-issued-is-also-present
-  (is (= {"Common" {:weighted 100 :outstanding nil}}
+  (is (= {"Common" {:weighted-diluted nil :weighted 100 :outstanding nil}}
          (shares/share-summary
           {:facts {:us-gaap {:WeightedAverageNumberOfSharesOutstandingBasic
                              (shares-fact 100)
@@ -38,13 +38,13 @@
                              (shares-fact 26038125)}}}))))
 
 (deftest shares-outstanding-fills-when-dei-has-no-facts
-  (is (= {"Common" {:weighted nil :outstanding 379236005}}
+  (is (= {"Common" {:weighted-diluted nil :weighted nil :outstanding 379236005}}
          (shares/share-summary
           {:facts {:dei {:EntityCommonStockSharesOutstanding {:units {}}}
                    :us-gaap {:SharesOutstanding (shares-fact 379236005)}}}))))
 
 (deftest common-stock-shares-outstanding-fills-when-dei-has-no-facts
-  (is (= {"Common" {:weighted 42976024 :outstanding 49335551}}
+  (is (= {"Common" {:weighted-diluted nil :weighted 42976024 :outstanding 49335551}}
          (shares/share-summary
           {:facts {:us-gaap {:WeightedAverageNumberOfSharesOutstandingBasic
                              (shares-fact 42976024)
@@ -70,8 +70,8 @@
               <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"a\" unitRef=\"shares\">16,778,631</ix:nonFraction>
               <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"b\" unitRef=\"shares\">355,040</ix:nonFraction>
               </body></html>"]
-    (is (= {"Class A" {:weighted nil :outstanding 16778631}
-            "Class B" {:weighted nil :outstanding 355040}}
+    (is (= {"Class A" {:weighted-diluted nil :weighted nil :outstanding 16778631}
+            "Class B" {:weighted-diluted nil :weighted nil :outstanding 355040}}
            (shares/share-summary (xbrl/parse html))))))
 
 (deftest voting-share-classes-stay-distinct
@@ -105,10 +105,10 @@
               <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"mult\" unitRef=\"shares\">23,226,386</ix:nonFraction>
               <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"super\" unitRef=\"shares\">0</ix:nonFraction>
               </body></html>"]
-    (is (= {"Common" {:weighted 191323791 :outstanding nil}
-            "Subordinate Voting" {:weighted nil :outstanding 169080759}
-            "Multiple Voting" {:weighted nil :outstanding 23226386}
-            "Super Voting" {:weighted nil :outstanding 0}}
+    (is (= {"Common" {:weighted-diluted nil :weighted 191323791 :outstanding nil}
+            "Subordinate Voting" {:weighted-diluted nil :weighted nil :outstanding 169080759}
+            "Multiple Voting" {:weighted-diluted nil :weighted nil :outstanding 23226386}
+            "Super Voting" {:weighted-diluted nil :weighted nil :outstanding 0}}
            (shares/share-summary (xbrl/parse html))))))
 
 (def tap-cover
@@ -180,12 +180,12 @@
    </body></html>")
 
 (deftest cover-lists-ticker-and-exchange-for-each-share-class
-  (is (= {"Common" {:weighted 199100000, :outstanding nil}
-          "Class A" {:weighted nil
+  (is (= {"Common" {:weighted-diluted nil :weighted 199100000, :outstanding nil}
+          "Class A" {:weighted-diluted nil :weighted nil
                      :outstanding 2563034
                      :ticker "TAP.A"
                      :exchange "New York Stock Exchange"}
-          "Class B" {:weighted nil
+          "Class B" {:weighted-diluted nil :weighted nil
                      :outstanding 175592622
                      :ticker "TAP"
                      :exchange "New York Stock Exchange"}}
@@ -226,14 +226,14 @@
               <ix:nonNumeric contextRef=\"common\" name=\"dei:SecurityExchangeName\">Nasdaq</ix:nonNumeric>
               <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"count\" unitRef=\"shares\" scale=\"0\">8654370</ix:nonFraction>
               </body></html>"]
-    (is (= {"Common" {:weighted nil
+    (is (= {"Common" {:weighted-diluted nil :weighted nil
                       :outstanding 8654370
                       :ticker "BSET"
                       :exchange "Nasdaq"}}
            (shares/share-summary (xbrl/parse html))))))
 
 (deftest dei-outstanding-wins-over-shares-outstanding
-  (is (= {"Common" {:weighted nil :outstanding 100}}
+  (is (= {"Common" {:weighted-diluted nil :weighted nil :outstanding 100}}
          (shares/share-summary
           {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 100)}
                    :us-gaap {:SharesOutstanding
@@ -293,8 +293,8 @@
               <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"voting\" unitRef=\"shares\" decimals=\"0\">550,107,295</ix:nonFraction>
               <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"nonvoting\" unitRef=\"shares\" decimals=\"INF\">0</ix:nonFraction>
               </body></html>"]
-    (is (= {"Common" {:weighted nil, :outstanding 550107295}
-            "Common Nonvoting" {:weighted nil, :outstanding 0}}
+    (is (= {"Common" {:weighted-diluted nil :weighted nil, :outstanding 550107295}
+            "Common Nonvoting" {:weighted-diluted nil :weighted nil, :outstanding 0}}
            (shares/share-summary (xbrl/parse html))))))
 
 (defn- ifrs-class-context
@@ -326,13 +326,13 @@
                   "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"b\" unitRef=\"shares\">3,109,595,752</ix:nonFraction>"
                   "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"c\" unitRef=\"shares\" decimals=\"INF\">0</ix:nonFraction>"
                   "</body></html>")]
-    (is (= {"Common" {:weighted 3333000000, :outstanding nil}
-            "Class A" {:weighted nil, :outstanding 261755983}
-            "Class B" {:weighted nil
+    (is (= {"Common" {:weighted-diluted nil :weighted 3333000000, :outstanding nil}
+            "Class A" {:weighted-diluted nil :weighted nil, :outstanding 261755983}
+            "Class B" {:weighted-diluted nil :weighted nil
                        :outstanding 3109595752
                        :ticker "ERIC"
                        :exchange "The NASDAQ Stock Market LLC"}
-            "Class C" {:weighted nil, :outstanding 0}}
+            "Class C" {:weighted-diluted nil :weighted nil, :outstanding 0}}
            (shares/share-summary (xbrl/parse html))))))
 
 (defn- ifrs-share-context
@@ -368,12 +368,12 @@
                   "<ix:nonFraction name=\"ifrs-full:NumberOfSharesOutstanding\" contextRef=\"preferred\" unitRef=\"shares\">131,755,879</ix:nonFraction>"
                   "<ix:nonFraction name=\"ifrs-full:NumberOfSharesOutstanding\" contextRef=\"b\" unitRef=\"shares\" decimals=\"INF\">0</ix:nonFraction>"
                   "</body></html>")]
-    (is (= {"Common" {:weighted 929100000, :outstanding 932525817}
-            "Class B" {:weighted nil, :outstanding 0}}
+    (is (= {"Common" {:weighted-diluted nil :weighted 929100000, :outstanding 932525817}
+            "Class B" {:weighted-diluted nil :weighted nil, :outstanding 0}}
            (shares/share-summary (xbrl/parse html))))))
 
 (deftest dei-outstanding-wins-over-ifrs-number-of-shares-outstanding
-  (is (= {"Common" {:weighted nil :outstanding 100}}
+  (is (= {"Common" {:weighted-diluted nil :weighted nil :outstanding 100}}
          (shares/share-summary
           {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 100)}
                    :ifrs-full {:NumberOfSharesOutstanding (shares-fact 999)}}}))))
@@ -381,14 +381,88 @@
 (deftest parent-wins-when-subsidiaries-also-report
   (let [facts (xbrl/parse (combined-cover nil))]
     (is (= 3 (shares/reporting-entities facts)))
-    (is (= {"Common" {:weighted 1221000000, :outstanding 1221563111}}
+    (is (= {"Common" {:weighted-diluted nil :weighted 1221000000, :outstanding 1221563111}}
            (shares/share-summary facts)))))
 
 (deftest parent-member-is-recognized-when-every-row-has-an-entity-axis
   (let [facts (xbrl/parse (combined-cover "wmb:WilliamsCompaniesIncMember"))]
     (is (= 3 (shares/reporting-entities facts)))
-    (is (= {"Common" {:weighted 1221000000, :outstanding 1221563111}}
+    (is (= {"Common" {:weighted-diluted nil :weighted 1221000000, :outstanding 1221563111}}
            (shares/share-summary facts)))))
+
+(deftest diluted-weighted-shares-are-reported-separately
+  (is (= {"Common" {:weighted-diluted 120 :weighted 100 :outstanding nil}}
+         (shares/share-summary
+          {:facts {:us-gaap {:WeightedAverageNumberOfSharesOutstandingBasic
+                             (shares-fact 100)
+                             :WeightedAverageNumberOfDilutedSharesOutstanding
+                             (shares-fact 120)}}}))))
+
+(deftest diluted-falls-back-through-units-ifrs-and-adjustment
+  (is (= 120 (:weighted-diluted
+              (get (shares/share-summary
+                    {:facts {:us-gaap {:WeightedAverageLimitedPartnershipUnitsOutstandingDiluted
+                                       (shares-fact 120)}}})
+                   "Common"))))
+  (is (= 130 (:weighted-diluted
+              (get (shares/share-summary
+                    {:facts {:ifrs-full {:AdjustedWeightedAverageShares
+                                         (shares-fact 130)}}})
+                   "Common"))))
+  (is (= 5 (:weighted-diluted
+            (get (shares/share-summary
+                  {:facts {:us-gaap {:WeightedAverageNumberDilutedSharesOutstandingAdjustment
+                                     (shares-fact 5)}}})
+                 "Common")))))
+
+(deftest limited-partnership-units-fill-weighted-last
+  (is (= {"Common" {:weighted-diluted nil :weighted 1000 :outstanding 1000}}
+         (shares/share-summary
+          {:facts {:us-gaap {:WeightedAverageLimitedPartnershipUnitsOutstanding
+                             (shares-fact 1000)}}})))
+  (is (= 10 (:weighted
+             (get (shares/share-summary
+                   {:facts {:us-gaap
+                            {:WeightedAverageNumberOfSharesOutstandingBasic (shares-fact 10)
+                             :WeightedAverageLimitedPartnershipUnitsOutstanding (shares-fact 999)}}})
+                  "Common")))))
+
+(deftest partnership-units-fill-outstanding-last
+  (is (= 8500000 (:outstanding
+                  (get (shares/share-summary
+                        {:facts {:us-gaap {:LimitedPartnersCapitalAccountUnitsOutstanding
+                                           (shares-fact 8500000)}}})
+                       "Common"))))
+  (is (= 40 (:outstanding
+             (get (shares/share-summary
+                   {:facts {:us-gaap {:GeneralPartnersCapitalAccountUnitsOutstanding
+                                      (shares-fact 40)}}})
+                  "Common"))))
+  (is (= 500 (:outstanding
+              (get (shares/share-summary
+                    {:facts {:us-gaap {:CapitalUnitsOutstanding (shares-fact 500)}}})
+                   "Common"))))
+  (is (= 777 (:outstanding
+              (get (shares/share-summary
+                    {:facts {:us-gaap {:WeightedAverageLimitedPartnershipUnitsOutstanding
+                                       (shares-fact 777)}}})
+                   "Common"))))
+  (is (= 100 (:outstanding
+              (get (shares/share-summary
+                    {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 100)}
+                             :us-gaap {:GeneralPartnersCapitalAccountUnitsOutstanding
+                                       (shares-fact 40)}}})
+                   "Common")))))
+
+(deftest limited-partner-units-win-over-general-partner-units
+  (is (= 8500000
+         (:outstanding
+          (get (shares/share-summary
+                {:facts {:us-gaap {:LimitedPartnersCapitalAccountUnitsOutstanding
+                                   (shares-fact 8500000)
+                                   :GeneralPartnersCapitalAccountUnitsOutstanding
+                                   (shares-fact 40)}}})
+               "Common")))))
 
 (deftest one-entity-has-no-entity-count
   (is (nil? (shares/reporting-entities

@@ -466,14 +466,25 @@
         (assoc :facts facts)
         (cond-> (seq cover) (assoc :cover cover)))))
 
+(defn instance-document?
+  "True when `text` is an XBRL instance rather than a linkbase, a schema,
+  or a plain HTML page.
+
+  SEC's older EX-101 instances write the root as `<xbrli:xbrl>`, not
+  `<xbrl>`. Parsing one of those as HTML lowercases every tag name, which
+  turns `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` into a
+  different concept and silently drops the share count."
+  [text]
+  (let [s (str text)]
+    (boolean (re-find #"(?i)<(?:[a-z0-9_-]+:)?xbrl[\s>]" s))))
+
 (defn- parse-doc
   "HTML for a filing cover. An extracted instance (`<xbrl>`) is XML, so
   concept tags such as `ifrs-full:WeightedAverageShares` keep their case."
   [text]
-  (let [s (str text)]
-    (if (re-find #"(?i)<xbrl[\s>]" s)
-      (Jsoup/parse s "" (Parser/xmlParser))
-      (Jsoup/parse s))))
+  (if (instance-document? text)
+    (Jsoup/parse (str text) "" (Parser/xmlParser))
+    (Jsoup/parse (str text))))
 
 (defn parse
   "Companyfacts-shaped map from inline XBRL HTML `text`.
