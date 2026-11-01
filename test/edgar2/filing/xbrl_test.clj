@@ -254,9 +254,7 @@
                               (= "c-3" (:context-id %)))
                         facts)
         name (first (filter #(= :EntityRegistrantName (:concept %)) facts))
-        periods (filter #(= :period (:type %)) (:context o))
-        entities (filter #(= :entity (:type %)) (:context o))
-        segments (filter #(= :segment (:type %)) (:context o))]
+        contexts (into {} (map (juxt :context-id identity)) (:context o))]
     (is (= 2 (count shares)))
     (is (every? #(= "shares" (:unit %)) shares))
     (is (= #{56517334} (set (map :value shares))))
@@ -267,16 +265,15 @@
            (:dimensions (first shares))))
     (is (= "COCA-COLA CONSOLIDATED, INC." (:value name)))
     (is (nil? (:unit name)))
-    (is (some #(and (= "c-3" (:context-id %))
-                    (= {:scheme "http://www.sec.gov/CIK"
-                        :identifier "0000317540"}
-                       (:values %)))
-              entities))
-    (is (= {:instant "2026-01-30"}
-           (->> periods (filter #(= "c-3" (:context-id %))) first :values)))
+    (is (= {:scheme "http://www.sec.gov/CIK"
+            :identifier "0000317540"}
+           (:entity (get contexts "c-3"))))
+    (is (= {:instant "2026-01-30"} (:period (get contexts "c-3"))))
+    (is (= {:us-gaap/StatementClassOfStockAxis :coke/CommonClassUndefinedMember}
+           (:dimension (get contexts "c-3"))))
     (is (= {:start "2025-01-01" :end "2025-12-31"}
-           (->> periods (filter #(= "c-1" (:context-id %))) first :values)))
-    (is (= {} (->> segments (filter #(= "c-3" (:context-id %))) first :values)))
+           (:period (get contexts "c-1"))))
+    (is (= {} (:dimension (get contexts "c-1"))))
     (is (= 2 (count (:dimension o))))))
 
 (def typed-cover
@@ -296,15 +293,15 @@
 (deftest overview-keeps-typed-members-and-dangling-contexts
   (let [o (xbrl/overview [{:text typed-cover :where "x"}])
         typed (first (filter #(= :SomeTypedAxis (:axis-concept %)) (:dimension o)))
-        dangling (first (filter #(= :Assets (:concept %)) (:facts o)))]
+        dangling (first (filter #(= :Assets (:concept %)) (:facts o)))
+        context (first (filter #(= "c-t" (:context-id %)) (:context o)))]
     (is (= :us-gaap (:axis-taxonomy typed)))
     (is (nil? (:member-taxonomy typed)))
     (is (nil? (:member-concept typed)))
     (is (= "2025-01-01" (:member-value typed)))
+    (is (= {:us-gaap/SomeTypedAxis "2025-01-01"} (:dimension context)))
     (is (= [] (:dimensions dangling)))
-    (is (= "missing" (:context-id dangling)))
-    (is (some #(and (= "c-t" (:context-id %)) (= :scenario (:type %)))
-              (:context o)))))
+    (is (= "missing" (:context-id dangling)))))
 
 (defn- rm-r
   [^java.io.File f]

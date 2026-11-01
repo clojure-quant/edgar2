@@ -520,6 +520,18 @@
       (let [s (str/trim (str qname))]
         [nil (when-not (str/blank? s) (keyword s))])))
 
+(defn- qname-keyword
+  "One QName as a keyword. `us-gaap:Statement...` becomes
+  `:us-gaap/Statement...`; a name with no prefix stays unprefixed."
+  [qname]
+  (let [s (str/trim (str qname))
+        i (str/last-index-of s ":")]
+    (cond
+      (str/blank? s) nil
+      (and i (pos? i) (< i (dec (count s))))
+      (keyword (subs s 0 i) (subs s (inc i)))
+      :else (keyword s))))
+
 (defn- context-dimension-rows
   "`:dimension` rows for one context. An explicit member splits axis and
   member into taxonomy/concept keywords. A typed member has no member
@@ -545,27 +557,38 @@
          (concat (elements ctx "xbrldi:explicitmember")
                  (elements ctx "xbrldi:typedmember")))))
 
-(defn- context-facet-rows
-  "`:context` rows for one context: a period facet, an entity facet, and
-  presence markers for segment and scenario."
+(defn- context-dimensions
+  "Axis to member for one context's explicit and typed members. An explicit
+  member is a namespaced keyword; a typed member keeps its trimmed text as a
+  string. A repeated axis keeps the last member."
+  [ctx]
+  (into (sorted-map)
+        (keep (fn [mem]
+                (when-let [ax (not-empty (attr mem "dimension"))]
+                  (let [v (not-empty (str/trim (.text mem)))]
+                    (when v
+                      [(qname-keyword ax)
+                       (if (= "typedmember" (local-tag mem))
+                         v
+                         (qname-keyword v))])))))
+        (concat (elements ctx "xbrldi:explicitmember")
+                (elements ctx "xbrldi:typedmember"))))
+
+(defn- context-row
+  "One `:context` row: period, entity, and axis→member dimensions. Nil when
+  the context has no usable period."
   [ctx context-id]
-  (let [p (period ctx)
-        entity (first (elements ctx "xbrli:entity"))
-        identifier (when entity (first (elements entity "xbrli:identifier")))]
-    (cond-> []
-      p (conj {:context-id context-id
-               :type :period
-               :values (if (:start p)
+  (when-let [p (period ctx)]
+    (let [entity (first (elements ctx "xbrli:entity"))
+          identifier (when entity (first (elements entity "xbrli:identifier")))]
+      (cond-> {:context-id context-id
+               :period (if (:start p)
                          {:start (:start p) :end (:end p)}
-                         {:instant (:end p)})})
-      entity (conj {:context-id context-id
-                    :type :entity
-                    :values {:scheme (when identifier (attr identifier "scheme"))
-                             :identifier (first-text entity "xbrli:identifier")}})
-      (seq (elements ctx "xbrli:segment"))
-      (conj {:context-id context-id :type :segment :values {}})
-      (seq (elements ctx "xbrli:scenario"))
-      (conj {:context-id context-id :type :scenario :values {}}))))
+                         {:instant (:end p)})
+               :dimension (context-dimensions ctx)}
+        entity (assoc :entity
+                      {:scheme (when identifier (attr identifier "scheme"))
+                       :identifier (first-text entity "xbrli:identifier")})))))
 
 (defn- ordered-contexts
   "`[id element]` pairs in first-seen order across `documents`. A repeated
@@ -627,8 +650,8 @@
   - `:facts` — every fact occurrence, numeric and non-numeric, with
     `:taxonomy`, `:concept`, `:fact-id`, `:context-id`, `:dimensions`,
     `:value`, and `:unit` (the raw instance unit id, nil for non-numeric).
-  - `:context` — one row per context facet: `:context-id`, `:type`
-    (`:period`, `:entity`, `:segment`, or `:scenario`), and `:values`.
+  - `:context` — one row per context: `:context-id`, `:period`, `:entity`
+    (when the context has one), and `:dimension`, an axis→member map.
   - `:dimension` — one row per axis/member with `:context-id`,
     `:axis-taxonomy`, `:axis-concept`, `:member-taxonomy`, and
     `:member-concept`. A typed member also has `:member-value`.
@@ -640,8 +663,7 @@
   (let [documents (mapv #(parse-doc (:text %)) docs)
         continuations (reduce merge {} (map read-continuations documents))
         contexts (ordered-contexts documents)
-        context-rows (vec (mapcat (fn [[id ctx]] (context-facet-rows ctx id))
-                                  contexts))
+        context-rows (vec (keep (fn [[id ctx]] (context-row ctx id)) contexts))
         dimension-rows (vec (mapcat (fn [[id ctx]] (context-dimension-rows ctx id))
                                     contexts))
         dims-by-context (into {}
