@@ -1,4 +1,10 @@
-Counts from `data/companyfacts.zip` published 2026-10-17. The zip has 20,472 CIK files; 18,001 of them report at least one taxonomy. `demo.facts-taxonomies` counts a filer once for each key under `facts`. Companyfacts keeps standard-taxonomy tags and leaves custom extension tags out.
+Counts from `data/companyfacts.zip` published 2026-10-17. 
+The zip has 20,472 CIK files; 18,001 of them report at least one taxonomy.
+ `demo.facts-taxonomies` counts a filer once for each key under `facts`. 
+ Companyfacts keeps standard-taxonomy tags and leaves custom extension tags out.
+
+
+
 
 A closed-end fund is a filer with `:cef`. An ADR has no taxonomy of its own. ADR facts are under `:us-gaap` or `:ifrs-full`.
 

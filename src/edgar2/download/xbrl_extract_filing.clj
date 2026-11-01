@@ -8,8 +8,8 @@
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar2.filing.xbrl :as xbrl]
+            [edgar2.filing.xbrl-loader :as xbrl-loader]
             [jsonista.core :as json]))
-
 (def ^:private json-mapper
   (json/object-mapper
    {:pretty true
@@ -20,31 +20,6 @@
   [s]
   (second (re-find #"(\d{10}-\d{2}-\d{6})" (str s))))
 
-(defn- load-text
-  "`:file` wins when both are set, so a path overrides the alias's default url."
-  [{:keys [url file]}]
-  (cond
-    (some? file) {:text (slurp (io/file (str file))) :where (str file)}
-    (some? url) {:text (slurp (str url)) :where (str url)}
-    :else nil))
-
-(defn- sibling
-  "Same directory as `where`, with `name` as the filename."
-  [where name]
-  (when (and where name)
-    (let [s (str where)
-          i (str/last-index-of s "/")]
-      (when i
-        (str (subs s 0 (inc i)) name)))))
-
-(defn- load-documents
-  "Cover text, plus the statement exhibit when the cover links one."
-  [{:keys [text where]}]
-  (let [exhibit (xbrl/statement-exhibit-name text)
-        exhibit-where (sibling where exhibit)]
-    (cond-> [{:text text :where where}]
-      exhibit-where
-      (conj {:text (slurp exhibit-where) :where exhibit-where}))))
 
 (defn- taxonomy-counts
   [facts]
@@ -69,9 +44,9 @@
   as JSON."
   ([] (run {}))
   ([{:keys [out] :as args}]
-   (if-let [{:keys [where] :as loaded} (load-text args)]
-     (let [docs (load-documents loaded)
-           accn (accession where)
+   (if-let [docs (xbrl-loader/load-documents (or (:file args) (:url args)))]
+     (let [where (-> docs first :where)
+          accn (accession where)
            parsed (xbrl/parse-all (map :text docs)
                                   (cond-> {} accn (assoc :accn accn)))
            shares (get-in parsed [:facts :dei :EntityCommonStockSharesOutstanding])]
