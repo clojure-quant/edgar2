@@ -24,6 +24,13 @@ issues with share count:
    also, some 40F filings contain a separate html file that contains the
    xbrl statemetns, so they need to be used. 
 
+5. some filers have different entities, 
+   for example WMB has 3 different filers.
+   We take only the main entity from the dei filing.
+
+6. some filings dont have xbrl inline tags.
+   ZTEKF	40-F	no XBRL at all (0 facts, all 9 docs untagged); counts only in prose: 107,792,002 / weighted 105,919,553	genuine data gap, not a parser bug
+
 
 FMCC  freddi Mac
 - 10 classes of preferrence shares.

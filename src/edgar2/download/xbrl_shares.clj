@@ -67,19 +67,34 @@
         i (str/last-index-of s ":")]
     (if i (subs s (inc i)) s)))
 
+(def ^:private voting-class-re
+  "A class named for its voting rights, as a Canadian filer tags
+  `SuperVotingSharesMember`, `MultipleVotingSharesMember`, or
+  `SubordinateVotingSharesMember`. These are distinct classes, not one
+  common class, and a zero super-voting class must not stand for the total."
+  #"(?i)(subordinate|multiple|super)\s*voting")
+
 (defn- class-label
-  "\"Class B\" for a ClassB, OrdinarySharesB, or ClassBShares member;
-  \"Common Nonvoting\" or \"Common Voting\" for those common classes; and
-  \"Common\" for no axis or any other member."
+  "\"Class B\" for a ClassB, ClassBCommonShare, OrdinarySharesB, or
+  ClassBShares member; \"Subordinate Voting\", \"Multiple Voting\", or
+  \"Super Voting\" for those classes; \"Common Nonvoting\" or \"Common
+  Voting\" for those other common classes; and \"Common\" for no axis or
+  any other member.
+
+  The letter is any capital after `Class` that does not start a lowercase
+  word, so `ClassACommonShareMember` and `CommonClassAMember` both read as
+  Class A while `ClassifiedBoardMember` does not."
   [member]
   (let [n (local-name member)
         lower (str/lower-case n)
         common? (str/includes? lower "common")
-        letter (or (second (re-find #"Class([A-Z])Member$" n))
+        letter (or (second (re-find #"Class([A-Z])(?![a-z])" n))
                    (second (re-find #"Shares([A-Z])Member$" n))
-                   (second (re-find #"([A-Z])Shares?Member$" n)))]
+                   (second (re-find #"([A-Z])Shares?Member$" n)))
+        voting (second (re-find voting-class-re n))]
     (cond
       letter (str "Class " letter)
+      voting (str (str/capitalize (str/lower-case voting)) " Voting")
       (and common? (str/includes? lower "nonvoting")) "Common Nonvoting"
       (and common? (str/includes? lower "voting")) "Common Voting"
       :else "Common")))
@@ -175,10 +190,14 @@
       []))
 
 (defn- latest-val
-  "Value on the greatest :end. A later :filed breaks a tie."
+  "Value on the greatest :end. A later :filed breaks a tie, then the larger
+  value, so two tags of the same fact resolve the same way on every run."
   [rows]
   (when (seq rows)
-    (:val (last (sort-by (juxt #(or (:end %) "") #(or (:filed %) "")) rows)))))
+    (:val (last (sort-by (juxt #(or (:end %) "")
+                               #(or (:filed %) "")
+                               #(or (:val %) 0))
+                          rows)))))
 
 (defn- rows-by-class
   [rows]
@@ -205,12 +224,15 @@
   "Share-count rows for the common stock.
 
   `dei:EntityCommonStockSharesOutstanding` when it has a share fact, then
-  `us-gaap:SharesOutstanding`, then IFRS `ifrs-full:NumberOfSharesOutstanding`
-  without preference classes. An empty higher-priority concept does not
-  block the fallback."
+  `us-gaap:SharesOutstanding`, then `us-gaap:CommonStockSharesOutstanding`,
+  then IFRS `ifrs-full:NumberOfSharesOutstanding` without preference
+  classes. An empty higher-priority concept does not block the fallback.
+  A filer that tags no DEI cover count often still tags the common shares
+  on the statement of equity."
   [facts]
   (or (not-empty (share-rows (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding])))
       (not-empty (share-rows (get-in facts [:facts :us-gaap :SharesOutstanding])))
+      (not-empty (share-rows (get-in facts [:facts :us-gaap :CommonStockSharesOutstanding])))
       (vec (remove preference-class?
                    (share-rows (get-in facts [:facts :ifrs-full :NumberOfSharesOutstanding]))))))
 
@@ -289,8 +311,8 @@
 
   `facts` is a companyfacts map. Outstanding shares are
   `:dei/EntityCommonStockSharesOutstanding`, then
-  `:us-gaap/SharesOutstanding` when that tag has no share facts, then
-  `:ifrs-full/NumberOfSharesOutstanding` without preference classes.
+  `:us-gaap/SharesOutstanding`, then `:us-gaap/CommonStockSharesOutstanding`,
+  then `:ifrs-full/NumberOfSharesOutstanding` without preference classes.
   Weighted shares are
   `:us-gaap/WeightedAverageNumberOfSharesOutstandingBasic`, then
   `:us-gaap/WeightedAverageNumberOfSharesIssuedBasic` when that tag is
@@ -343,11 +365,10 @@
   (when-let [[_ stem] (re-find #"(?i)^(.+)\.html?$" (str primary))]
     (str stem "_htm.xml")))
 
-(defn- instance-text
-  "Extracted instance for `filing`, or nil when SEC has no such document.
-  Its contexts and units resolve cover facts that were left without them."
-  [filing]
-  (when-let [name (instance-name (:primaryDocument filing))]
+(defn- fetch-document
+  "Text of `name` in `filing`, or nil when SEC has no such document."
+  [filing name]
+  (when name
     (try
       (e/filing-document filing name)
       (catch clojure.lang.ExceptionInfo e
@@ -355,20 +376,106 @@
           nil
           (throw e))))))
 
+(defn instance-root?
+  "True when `text` is an XBRL instance rather than a linkbase, a schema,
+  or a plain HTML page. The root element is `xbrl`, with or without a
+  namespace prefix."
+  [text]
+  (let [s (str text)]
+    (boolean (re-find #"(?i)<(?:[a-z0-9_-]+:)?xbrl[\s>]"
+                      (subs s 0 (min 4000 (count s)))))))
+
+(def ^:private linkbase-name-re
+  "A linkbase shares the instance's `.xml` extension but holds no facts."
+  #"(?i)[_-](?:cal|def|lab|pre|ref)\.xml$")
+
+(defn indexed-instances
+  "Instance documents listed in `filing`'s index, EX-101.INS first, then
+  any other `.xml` that is not a linkbase or a schema.
+
+  A pre-inline filing has no extracted instance, and its instance is not
+  named after the cover: SCDA's 2016 10-K keeps 27,243,414 outstanding
+  shares in `scda-20151031.xml`. `instance-name` cannot guess that name,
+  so the filing index supplies it."
+  [filing]
+  (let [docs (e/xbrl-docs filing)
+        xml? #(re-find #"(?i)\.xml$" (str (:name %)))
+        ins? #(= "EX-101.INS" (str/upper-case (str (:type %))))]
+    (->> docs
+         (filter xml?)
+         (remove #(re-find linkbase-name-re (str (:name %))))
+         (sort-by #(if (ins? %) 0 1))
+         (keep :name)
+         distinct
+         vec)))
+
+(defn- instance-text
+  "XBRL instance for `filing`, or nil when there is none.
+
+  The post-inline extracted instance (`form40f_htm.xml`) is tried first.
+  A pre-inline filing has no such document and keeps its instance in the
+  filing index as EX-101.INS, so that is tried next. Both are checked for
+  an `<xbrl>` root, so a linkbase or an HTML page is never read as facts.
+  Its contexts and units resolve cover facts left without them."
+  [filing]
+  (let [extracted (fetch-document filing (instance-name (:primaryDocument filing)))]
+    (or (when (and extracted (instance-root? extracted)) extracted)
+        (some (fn [name]
+                (let [text (fetch-document filing name)]
+                  (when (and text (instance-root? text)) text)))
+              (indexed-instances filing)))))
+
+(def ^:private xbrl-text-re
+  "Inline facts, or an XBRL instance root. A document with neither carries
+  no machine-readable number."
+  #"(?i)<ix:(?:nonfraction|nonnumeric|header|hidden)\b|<xbrl[\s>]")
+
+(defn xbrl-text?
+  "True when one filing document carries machine-readable XBRL: inline
+  facts in HTML, or an XBRL instance."
+  [text]
+  (boolean (when text (re-find xbrl-text-re (str text)))))
+
+(defn- xbrl-flag?
+  "True for a submissions-API XBRL flag: 1, \"1\", or true."
+  [v]
+  (try
+    (pos? (long v))
+    (catch Throwable _
+      false)))
+
+(defn filing-xbrl?
+  "True when `filing` carries XBRL anywhere.
+
+  Inline facts in one of `texts` count, as does a parsed `:facts` map, an
+  instance or linkbase in the filing index, or the submission's own XBRL
+  flag. A filing whose primary document, statement exhibit, and instance
+  are all plain or untagged has none: nothing is machine-readable even
+  when the page prints a share count."
+  [filing texts parsed]
+  (boolean
+   (or (xbrl-flag? (:isXBRL filing))
+       (xbrl-flag? (:isInlineXBRL filing))
+       (seq (:facts parsed))
+       (some xbrl-text? texts)
+       (seq (e/xbrl-docs filing)))))
+
 (defn share-summary-cik
   "Latest annual filing for `cik`, parsed with `edgar2.filing.xbrl/parse-all`.
 
   The filing is the newest 10-K, 20-F, or 40-F. When the cover links an
-  audited-statement exhibit (`_d2` or `ex99d2`), that HTML is parsed with
-  the cover so its facts can use the cover's contexts. The extracted
-  instance (`form40f_htm.xml`) is included when SEC has one, so a cover
-  fact can use a context that the inline HTML left out.
+  audited-statement exhibit (`_d2`, `ex99d2`, or an `ex99-2` variant), that
+  HTML is parsed with the cover so its facts can use the cover's contexts.
+  The extracted instance (`form40f_htm.xml`) is included when SEC has one,
+  and a pre-inline filing's EX-101 instance from the index when it does
+  not, so a cover fact can use a context that the inline HTML left out.
   Each share class also has the cover `:ticker` and `:exchange`. A listed
   note or bond is not a share class and is left out. When subsidiaries are
   co-registrants (`dei:LegalEntityAxis`), only the parent's share counts are
   used and `:entities` holds how many entities report.
   Returns `{:cik :filing-date :form-type :shares}`, plus `:entities` when
-  the filing carries an entity axis."
+  the filing carries an entity axis, and `:xbrl false` when the filing has
+  no XBRL at all, the way a 40-F with an untagged cover does."
   [cik]
   (ucore/ensure-identity!)
   (let [filing (ufiling/latest-annual-filing cik)]
@@ -376,9 +483,10 @@
       (throw (ex-info "no annual filing" {:cik cik})))
     (let [html (e/html filing)
           exhibit (xbrl/statement-exhibit-name html)
+          instance (instance-text filing)
           texts (->> [html
                       (when exhibit (e/filing-document filing exhibit))
-                      (instance-text filing)]
+                      instance]
                      (keep identity)
                      vec)
           parsed (xbrl/parse-all texts {:accn (:accessionNumber filing)
@@ -390,7 +498,10 @@
                :form-type (:form filing)
                :shares (share-summary parsed)}
         entities
-        (assoc :entities entities)))))
+        (assoc :entities entities)
+
+        (not (filing-xbrl? filing texts parsed))
+        (assoc :xbrl false)))))
 
 (defn share-summary-ticker
   "CIK for `ticker`, then `share-summary-cik`, with `:ticker` added."

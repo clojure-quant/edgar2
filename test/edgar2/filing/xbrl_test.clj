@@ -96,6 +96,84 @@
   (is (nil? (xbrl/statement-exhibit-name
              "<a href=\"https://www.sec.gov/Archives/edgar/data/1273813/000110465909052888/a09-25104_1ex99d2.htm\"></a>"))))
 
+(deftest statement-exhibit-name-matches-dashed-variants
+  (is (= "exhibit99-2.htm"
+         (xbrl/statement-exhibit-name "<a href=\"exhibit99-1.htm\"></a><a href=\"exhibit99-2.htm\"></a>")))
+  (is (= "ex-99.2.htm"
+         (xbrl/statement-exhibit-name "<a href=\"ex-99.2.htm\"></a>")))
+  (is (= "ex99-2.htm"
+         (xbrl/statement-exhibit-name "<a href=\"ex99-2.htm\"></a>")))
+  (is (= "su-20251231x_d2.htm"
+         (xbrl/statement-exhibit-name "<a href=\"su-20251231x_d2.htm\"></a>")))
+  (is (nil? (xbrl/statement-exhibit-name "<a href=\"form1992.htm\"></a>"))))
+
+(deftest numeric-formats-and-scales
+  (let [html "<html><body>
+   <xbrli:context id=\"fy\"><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context>
+   <xbrli:unit id=\"eur\"><xbrli:measure>iso4217:EUR</xbrli:measure></xbrli:unit>
+   <ix:nonFraction name=\"ifrs-full:Revenue\" contextRef=\"fy\" unitRef=\"eur\" scale=\"3\" format=\"ixt:num-comma-decimal\">1.234,5</ix:nonFraction>
+   <ix:nonFraction name=\"ifrs-full:Assets\" contextRef=\"fy\" unitRef=\"eur\" scale=\"0\" format=\"ixt:num-dot-decimal\">1 234.5</ix:nonFraction>
+   <ix:nonFraction name=\"ifrs-full:Liabilities\" contextRef=\"fy\" unitRef=\"eur\" scale=\"0\" format=\"ixt:numspacecomma\">1 234,5</ix:nonFraction>
+   <ix:nonFraction name=\"ifrs-full:Equity\" contextRef=\"fy\" unitRef=\"eur\" scale=\"0\" format=\"ixt:numdash\">&#8212;</ix:nonFraction>
+   <ix:nonFraction name=\"ifrs-full:ProfitLoss\" contextRef=\"fy\" unitRef=\"eur\" scale=\"0\" format=\"ixt:zerodash\">42</ix:nonFraction>
+   <ix:nonFraction name=\"ifrs-full:Goodwill\" contextRef=\"fy\" unitRef=\"eur\" scale=\"-2\" format=\"ixt:num-dot-decimal\">5</ix:nonFraction>
+   <ix:nonFraction name=\"ifrs-full:IntangibleAssetsOtherThanGoodwill\" contextRef=\"fy\" unitRef=\"eur\" scale=\"6\" sign=\"-\" format=\"ixt:num-dot-decimal\">1.5</ix:nonFraction>
+   </body></html>"
+        parsed (xbrl/parse html)
+        val #(get-in parsed [:facts :ifrs-full % :units "EUR" 0 :val])]
+    (is (= 1234500 (val :Revenue)))
+    (is (= 1234.5 (val :Assets)))
+    (is (= 1234.5 (val :Liabilities)))
+    (is (= 0 (val :Equity)))
+    (is (= 42 (val :ProfitLoss)))
+    (is (= 0.05 (val :Goodwill)))
+    (is (= -1500000 (val :IntangibleAssetsOtherThanGoodwill)))))
+
+(deftest nested-fact-outer-takes-no-value
+  (let [html "<html><body>
+   <xbrli:context id=\"fy\"><xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period></xbrli:context>
+   <xbrli:unit id=\"segment\"><xbrli:measure>segment</xbrli:measure></xbrli:unit>
+   <ix:nonFraction name=\"us-gaap:NumberOfReportableSegments\" contextRef=\"fy\" unitRef=\"segment\" decimals=\"INF\" format=\"ixt-sec:numwordsen\"><ix:nonFraction name=\"us-gaap:NumberOfReportableSegments\" contextRef=\"fy\" unitRef=\"segment\" scale=\"0\">1</ix:nonFraction></ix:nonFraction>
+   </body></html>"
+        rows (:units (get-in (xbrl/parse html)
+                             [:facts :us-gaap :NumberOfReportableSegments]))
+        facts (mapcat val rows)]
+    (is (= [1] (mapv :val facts)))))
+
+(deftest prefixed-instance-namespace-is-read
+  (let [html "<html><body>
+   <i:context id=\"fy\"><i:period><i:startDate>2025-01-01</i:startDate><i:endDate>2025-12-31</i:endDate></i:period></i:context>
+   <i:context id=\"instant\"><i:entity><i:segment>
+       <xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">us-gaap:CommonStockMember</xbrldi:explicitMember>
+     </i:segment></i:entity>
+     <i:period><i:instant>2025-12-31</i:instant></i:period></i:context>
+   <i:unit id=\"usd\"><i:divide><i:unitNumerator><i:measure>iso4217:USD</i:measure></i:unitNumerator>
+     <i:unitDenominator><i:measure>xbrli:shares</i:measure></i:unitDenominator></i:divide></i:unit>
+   <i:unit id=\"shares\"><i:measure>xbrli:shares</i:measure></i:unit>
+   <ix:nonFraction name=\"us-gaap:EarningsPerShareBasic\" contextRef=\"fy\" unitRef=\"usd\" scale=\"3\">1,234</ix:nonFraction>
+   <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"instant\" unitRef=\"shares\">100</ix:nonFraction>
+   </body></html>"
+        parsed (xbrl/parse html)
+        shares (get-in parsed [:facts :dei :EntityCommonStockSharesOutstanding :units "shares" 0])
+        eps (get-in parsed [:facts :us-gaap :EarningsPerShareBasic :units "USD/shares" 0])]
+    (is (= 100 (:val shares)))
+    (is (= {"us-gaap:StatementClassOfStockAxis" "us-gaap:CommonStockMember"}
+           (:dimensions shares)))
+    (is (= "2025-12-31" (:end shares)))
+    (is (= 1234000 (:val eps)))))
+
+(deftest instance-unit-keeps-its-divide
+  (let [instance "<xbrl xmlns=\"http://www.xbrl.org/2003/instance\">
+     <context id=\"c\"><period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period></context>
+     <unit id=\"u\"><divide>
+       <unitNumerator><measure>iso4217:USD</measure></unitNumerator>
+       <unitDenominator><measure>xbrli:shares</measure></unitDenominator>
+     </divide></unit>
+     <us-gaap:EarningsPerShareBasic contextRef=\"c\" unitRef=\"u\">1.25</us-gaap:EarningsPerShareBasic>
+   </xbrl>"]
+    (is (= 1.25 (get-in (xbrl/parse instance)
+                        [:facts :us-gaap :EarningsPerShareBasic :units "USD/shares" 0 :val])))))
+
 (deftest exhibit-fact-uses-cover-context
   (let [cover "<html><body>
                <ix:nonNumeric name=\"dei:EntityCentralIndexKey\">0000311337</ix:nonNumeric>

@@ -18,6 +18,7 @@
   (:require [clojure.string :as str])
   (:import [java.math BigDecimal]
            [org.jsoup Jsoup]
+           [org.jsoup.nodes Element]
            [org.jsoup.parser Parser]))
 
 (def ^:private word-value
@@ -31,7 +32,8 @@
    "sixty" 60 "seventy" 70 "eighty" 80 "ninety" 90})
 
 (defn- parse-words
-  "ixt-sec:numwordsen. Nil when a word is not a number."
+  "ixt-sec:numwordsen. Nil when the text has no number word, so an outer
+  tag that only wraps a nested fact is not read as zero."
   [text]
   (let [words (->> (-> (str/lower-case (str text))
                        (str/replace #"," "")
@@ -39,37 +41,67 @@
                        (str/split #"\s+"))
                    (remove str/blank?)
                    (remove #{"and"}))]
-    (loop [words words acc 0 current 0]
-      (if-let [w (first words)]
-        (case w
-          "hundred" (recur (rest words) acc (* (if (zero? current) 1 current) 100))
-          "thousand" (recur (rest words) (+ acc (* (if (zero? current) 1 current) 1000)) 0)
-          "million" (recur (rest words) (+ acc (* (if (zero? current) 1 current) 1000000)) 0)
-          (if-let [n (get word-value w)]
-            (recur (rest words) acc (+ current n))
-            nil))
-        (bigdec (+ acc current))))))
+    (when (seq words)
+      (loop [words words acc 0 current 0]
+        (if-let [w (first words)]
+          (case w
+            "hundred" (recur (rest words) acc (* (if (zero? current) 1 current) 100))
+            "thousand" (recur (rest words) (+ acc (* (if (zero? current) 1 current) 1000)) 0)
+            "million" (recur (rest words) (+ acc (* (if (zero? current) 1 current) 1000000)) 0)
+            (if-let [n (get word-value w)]
+              (recur (rest words) acc (+ current n))
+              nil))
+          (bigdec (+ acc current)))))))
+
+(defn- comma-decimal?
+  "True when the ixt format puts the decimal mark on the comma, as
+  `ixt:num-comma-decimal` and `ixt:numspacecomma` do. A format's last
+  mention of `dot` or `comma` is the decimal mark, because a group
+  separator is named first (`num-dot-comma` is a comma decimal)."
+  [fmt]
+  (let [f (str/lower-case (str fmt))
+        dot (str/last-index-of f "dot")
+        comma (str/last-index-of f "comma")]
+    (boolean (and comma (or (nil? dot) (> comma dot))))))
 
 (defn- parse-decimal
-  "Displayed number. Commas and spaces are grouping. Parentheses are a
-  minus sign."
+  "Displayed number in an ixt numeric format.
+
+  `ixt:num-dot-decimal` groups thousands with commas; a comma-decimal
+  format, such as `ixt:num-comma-decimal`, `ixt:numspacecomma`, or
+  `ixt:numdotcomma`, groups with dots. Spaces and non-breaking spaces are
+  always grouping. Parentheses are a minus sign. Nil when the text is not
+  a number, so a dash that `fixed-zero` did not claim is dropped."
+  ([text] (parse-decimal text nil))
+  ([text fmt]
+   (let [s (-> (str text)
+               (str/replace #"[\u00a0\u2007\u202f]" " ")
+               str/trim)
+         neg? (boolean (re-matches #"\(\s*.*\s*\)" s))
+         s (if neg? (subs s 1 (dec (count s))) s)
+         s (str/replace s #"\s" "")
+         s (if (comma-decimal? fmt)
+             (-> s (str/replace #"\." "") (str/replace "," "."))
+             (str/replace s "," ""))]
+     (when (re-matches #"-?\d+(?:\.\d+)?" s)
+       (cond-> (bigdec s) neg? (.negate))))))
+
+(defn- dash-text?
+  "True when the displayed amount is only a dash or a minus sign, which a
+  `dash` format uses for zero."
   [text]
-  (let [s (-> (str text)
-              (str/replace #"\u00a0" "")
-              (str/replace #"[\s,]" ""))]
-    (cond
-      (re-matches #"-?\d+(?:\.\d+)?" s) (bigdec s)
-      (re-matches #"\(\d+(?:\.\d+)?\)" s)
-      (.negate (bigdec (subs s 1 (dec (count s)))))
-      :else nil)))
+  (boolean (re-matches #"[\s\u2010-\u2015\u2212-]*" (str text))))
 
 (defn- format-kind
   [fmt]
-  (cond
-    (or (= fmt "ixt:fixed-zero")
-        (str/ends-with? (str fmt) ":zero-dash")) :zero
-    (str/ends-with? (str fmt) "numwordsen") :words
-    :else :number))
+  (let [f (str/lower-case (str fmt))]
+    (cond
+      (= f "ixt:fixed-zero") :zero
+      (str/ends-with? f "numwordsen") :words
+      (or (str/ends-with? f "zero-dash")
+          (str/ends-with? f "zerodash")
+          (str/ends-with? f "numdash")) :dash
+      :else :number)))
 
 (defn- long-attr
   [el k default]
@@ -93,28 +125,62 @@
 
 (defn- fact-value
   "Scaled number for one ix:nonFraction, or nil when it is nil or not a
-  number. `fixed-zero` is a dash on the page and means zero. The sign
-  attribute negates the displayed amount. `scale` is the power of ten
-  applied after that."
+  number. `fixed-zero` is zero whatever the page shows, and a `dash`
+  format is zero when the page shows only a dash. The sign attribute
+  negates the displayed amount. `scale` is the power of ten applied after
+  that, and may be negative."
   [el text]
-  (when-not (= "true" (.attr el "xsi:nil"))
-    (when-let [base (case (format-kind (.attr el "format"))
-                      :zero (bigdec 0)
-                      :words (parse-words text)
-                      :number (parse-decimal text))]
-      (bd->num (.movePointRight (apply-sign base (.attr el "sign"))
-                                (int (long-attr el "scale" 0)))))))
+  (let [fmt (.attr el "format")]
+    (when-not (= "true" (.attr el "xsi:nil"))
+      (when-let [base (case (format-kind fmt)
+                        :zero (bigdec 0)
+                        :words (parse-words text)
+                        :dash (if (dash-text? text) (bigdec 0) (parse-decimal text fmt))
+                        :number (parse-decimal text fmt))]
+        (bd->num (.movePointRight (apply-sign base (.attr el "sign"))
+                                  (int (long-attr el "scale" 0))))))))
+
+;; Element lookup ignores the namespace prefix and case.
+;;
+;; The XBRL instance namespace may be bound to any prefix: SEC's extracted
+;; instances use the default namespace (`<context>`), an inline document
+;; writes `<xbrli:context>`, and ZENA's 2026 20-F/A declares `xmlns:i` and
+;; writes `<i:context>` / `<i:unit>`. Matching only the `xbrli:` spelling or
+;; the bare local name found no contexts there, so every one of that
+;; filing's 963 facts was dropped: a fact whose context cannot be found is
+;; never read. Only the local part of the tag is compared.
+;;
+;; The concept name keeps its own prefix. A filer that rebinds the us-gaap
+;; prefix (rather than the instance prefix) would still need a namespace
+;; map, which this reader does not build.
+
+(defn- local-tag
+  "Lowercased tag name without its namespace prefix."
+  [^Element el]
+  (let [n (str/lower-case (.tagName el))
+        i (str/last-index-of n ":")]
+    (if i (subs n (inc i)) n)))
+
+(defn- elements
+  "Descendants of `el` whose local tag name is the local part of `tag`.
+  `tag` may be written with any prefix, or none, and in any case."
+  [^Element el tag]
+  (let [s (str tag)
+        i (str/last-index-of s ":")
+        want (str/lower-case (if i (subs s (inc i)) s))]
+    (filter #(= want (local-tag %)) (.getAllElements el))))
 
 (defn- own-text
   "Text of `el`, without a nested fact, an ix:exclude, or a footnote."
   [el]
   (let [copy (.clone el)]
-    (doseq [nested (.getElementsByTag copy "ix:nonfraction")]
+    (doseq [nested (elements copy "ix:nonfraction")]
       (when-not (identical? nested copy)
         (.remove nested)))
-    (doseq [tag ["ix:exclude" "ix:footnote"]]
-      (doseq [x (.getElementsByTag copy tag)]
-        (.remove x)))
+    (doseq [x (elements copy "ix:exclude")]
+      (.remove x))
+    (doseq [x (elements copy "ix:footnote")]
+      (.remove x))
     (.text copy)))
 
 (defn- continued-text
@@ -129,20 +195,6 @@
         (recur (.attr next "continuedat")
                (conj parts (own-text next))
                (conj seen id))))))
-
-(defn- tag-names
-  "Prefixed tag and its local name. An extracted instance uses the default
-  XBRL namespace, so `context` is the same element as `xbrli:context`."
-  [tag]
-  (let [s (str tag)
-        i (str/last-index-of s ":")]
-    (if i
-      [s (subs s (inc i))]
-      [s])))
-
-(defn- elements
-  [el tag]
-  (mapcat #(.getElementsByTag el %) (tag-names tag)))
 
 (defn- first-text
   [el tag]
@@ -162,11 +214,19 @@
       :else (let [i (str/index-of m ":")]
               (if i (subs m (inc i)) m)))))
 
+(defn- child-element
+  "First descendant of `el` whose local tag name is `local`, ignoring case
+  and prefix. An inline document writes `xbrli:unitNumerator`; an
+  extracted instance uses the default namespace and writes
+  `unitNumerator`."
+  [^Element el local]
+  (first (elements el local)))
+
 (defn- unit-name
   [el]
-  (if-let [div (first (.getElementsByTag el "xbrli:divide"))]
-    (let [num (measure-name (first (.getElementsByTag div "xbrli:unitnumerator")))
-          den (measure-name (first (.getElementsByTag div "xbrli:unitdenominator")))]
+  (if-let [div (child-element el "divide")]
+    (let [num (measure-name (child-element div "unitnumerator"))
+          den (measure-name (child-element div "unitdenominator"))]
       (when (and num den)
         (str num "/" den)))
     (measure-name el)))
@@ -175,8 +235,8 @@
   "Axis to member for an explicit or typed dimension. Nil when the context
   has none."
   [ctx]
-  (let [members (concat (.getElementsByTag ctx "xbrldi:explicitmember")
-                        (.getElementsByTag ctx "xbrldi:typedmember"))]
+  (let [members (concat (elements ctx "xbrldi:explicitmember")
+                        (elements ctx "xbrldi:typedmember"))]
     (when (seq members)
       (not-empty
        (into (sorted-map)
@@ -219,7 +279,7 @@
 (defn- read-continuations
   [doc]
   (into {}
-        (for [el (.getElementsByTag doc "ix:continuation")
+        (for [el (elements doc "ix:continuation")
               :let [id (not-empty (.id el))]
               :when id]
           [id el])))
@@ -236,7 +296,7 @@
   (some (fn [el]
           (when (= qname (.attr el "name"))
             (not-empty (str/trim (.text el)))))
-        (.getElementsByTag doc "ix:nonnumeric")))
+        (elements doc "ix:nonnumeric")))
 
 (defn- parse-cik
   [s]
@@ -311,9 +371,7 @@
   the same value is kept once."
   [docs contexts continuations]
   (->> docs
-       (mapcat (fn [doc]
-                 (concat (.getElementsByTag doc "ix:nonnumeric")
-                         (.getElementsByTag doc "ix:nonNumeric"))))
+       (mapcat (fn [doc] (elements doc "ix:nonnumeric")))
        (keep #(cover-fact % contexts continuations))
        distinct
        vec))
@@ -443,16 +501,28 @@
   ([texts opts]
    (companyfacts (mapv parse-doc texts) opts)))
 
+(defn- statement-exhibit?
+  "True for the names an audited-statement exhibit takes beside the cover:
+  `_d2.htm`, `ex99d2.htm`, `ex99-2.htm`, `ex-99.2.htm`, `exhibit99-2.htm`,
+  and `exhibit992.htm`."
+  [name]
+  (let [n (str/lower-case (str name))]
+    (boolean
+     (or (re-find #"[-_]d2\.html?$" n)
+         (re-find #"ex(?:hibit)?[-_]?99[-_.]?2\.html?$" n)
+         (re-find #"ex99d2\.html?$" n)))))
+
 (defn statement-exhibit-name
   "Filename of the audited-statement exhibit linked from cover HTML.
 
-  Matches a same-filing relative name ending in `_d2.htm` or `ex99d2.htm`.
-  An absolute archive URL is a citation of another filing, not this cover's
-  exhibit. Nil when the cover has no such link."
+  Matches a same-filing relative name: `_d2.htm`, `ex99d2.htm`, or an
+  `ex99-2` / `exhibit99-2` variant. An absolute archive URL is a citation
+  of another filing, not this cover's exhibit. Nil when the cover has no
+  such link."
   [html]
   (some (fn [[_ href]]
           (when-not (str/includes? (str href) "/")
-            (when-let [[_ name] (re-find #"(?i)^([^\"?#]+(?:_d2|ex99d2)\.html?)$"
-                                         (str href))]
-              name)))
+            (let [name (str href)]
+              (when (statement-exhibit? name)
+                name))))
         (re-seq #"(?i)href\s*=\s*\"([^\"]+)\"" (str html))))

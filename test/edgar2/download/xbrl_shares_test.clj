@@ -1,5 +1,6 @@
 (ns edgar2.download.xbrl-shares-test
   (:require [clojure.test :refer [deftest is]]
+            [edgar.api :as e]
             [edgar2.download.xbrl-shares :as shares]
             [edgar2.filing.xbrl :as xbrl]))
 
@@ -41,6 +42,74 @@
          (shares/share-summary
           {:facts {:dei {:EntityCommonStockSharesOutstanding {:units {}}}
                    :us-gaap {:SharesOutstanding (shares-fact 379236005)}}}))))
+
+(deftest common-stock-shares-outstanding-fills-when-dei-has-no-facts
+  (is (= {"Common" {:weighted 42976024 :outstanding 49335551}}
+         (shares/share-summary
+          {:facts {:us-gaap {:WeightedAverageNumberOfSharesOutstandingBasic
+                             (shares-fact 42976024)
+                             :CommonStockSharesOutstanding
+                             (shares-fact 49335551)}}}))))
+
+(deftest class-label-reads-a-before-a-class-description
+  (let [html "<html><body>
+              <ix:nonNumeric name=\"dei:EntityRegistrantName\">WEBULL CORP</ix:nonNumeric>
+              <xbrli:context id=\"a\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0001866501</xbrli:identifier>
+                  <xbrli:segment><xbrldi:explicitMember dimension=\"ifrs-full:ClassesOfShareCapitalAxis\">wbx:ClassACommonShareMember</xbrldi:explicitMember></xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:instant>2025-12-31</xbrli:instant></xbrli:period>
+              </xbrli:context>
+              <xbrli:context id=\"b\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0001866501</xbrli:identifier>
+                  <xbrli:segment><xbrldi:explicitMember dimension=\"ifrs-full:ClassesOfShareCapitalAxis\">wbx:ClassBCommonShareMember</xbrldi:explicitMember></xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:instant>2025-12-31</xbrli:instant></xbrli:period>
+              </xbrli:context>
+              <xbrli:unit id=\"shares\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>
+              <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"a\" unitRef=\"shares\">16,778,631</ix:nonFraction>
+              <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"b\" unitRef=\"shares\">355,040</ix:nonFraction>
+              </body></html>"]
+    (is (= {"Class A" {:weighted nil :outstanding 16778631}
+            "Class B" {:weighted nil :outstanding 355040}}
+           (shares/share-summary (xbrl/parse html))))))
+
+(deftest voting-share-classes-stay-distinct
+  (let [html "<html><body>
+              <ix:nonNumeric name=\"dei:EntityRegistrantName\">TILRAY BRANDS, INC.</ix:nonNumeric>
+              <xbrli:context id=\"fy\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0001754195</xbrli:identifier></xbrli:entity>
+                <xbrli:period><xbrli:startDate>2025-01-01</xbrli:startDate><xbrli:endDate>2025-12-31</xbrli:endDate></xbrli:period>
+              </xbrli:context>
+              <xbrli:context id=\"sub\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0001754195</xbrli:identifier>
+                  <xbrli:segment><xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">trlv:SubordinateVotingSharesMember</xbrldi:explicitMember></xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:instant>2026-02-19</xbrli:instant></xbrli:period>
+              </xbrli:context>
+              <xbrli:context id=\"mult\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0001754195</xbrli:identifier>
+                  <xbrli:segment><xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">trlv:MultipleVotingSharesMember</xbrldi:explicitMember></xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:instant>2026-02-19</xbrli:instant></xbrli:period>
+              </xbrli:context>
+              <xbrli:context id=\"super\">
+                <xbrli:entity><xbrli:identifier scheme=\"http://www.sec.gov/CIK\">0001754195</xbrli:identifier>
+                  <xbrli:segment><xbrldi:explicitMember dimension=\"us-gaap:StatementClassOfStockAxis\">trlv:SuperVotingSharesMember</xbrldi:explicitMember></xbrli:segment>
+                </xbrli:entity>
+                <xbrli:period><xbrli:instant>2026-02-19</xbrli:instant></xbrli:period>
+              </xbrli:context>
+              <xbrli:unit id=\"shares\"><xbrli:measure>xbrli:shares</xbrli:measure></xbrli:unit>
+              <ix:nonFraction name=\"us-gaap:WeightedAverageNumberOfSharesOutstandingBasic\" contextRef=\"fy\" unitRef=\"shares\">191,323,791</ix:nonFraction>
+              <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"sub\" unitRef=\"shares\">169,080,759</ix:nonFraction>
+              <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"mult\" unitRef=\"shares\">23,226,386</ix:nonFraction>
+              <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"super\" unitRef=\"shares\">0</ix:nonFraction>
+              </body></html>"]
+    (is (= {"Common" {:weighted 191323791 :outstanding nil}
+            "Subordinate Voting" {:weighted nil :outstanding 169080759}
+            "Multiple Voting" {:weighted nil :outstanding 23226386}
+            "Super Voting" {:weighted nil :outstanding 0}}
+           (shares/share-summary (xbrl/parse html))))))
 
 (def tap-cover
   "<html><body>
@@ -324,4 +393,54 @@
 (deftest one-entity-has-no-entity-count
   (is (nil? (shares/reporting-entities
              {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 100)}}}))))
+
+(deftest xbrl-text-detects-inline-and-instance
+  (is (true? (shares/xbrl-text?
+              "<ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"c\">1</ix:nonFraction>")))
+  (is (true? (shares/xbrl-text? "<xbrl xmlns=\"http://www.xbrl.org/2003/instance\"></xbrl>")))
+  (is (false? (shares/xbrl-text?
+               "<html><body>107,792,002 shares outstanding as of March 31, 2026</body></html>")))
+  (is (false? (shares/xbrl-text? nil))))
+
+(deftest instance-root-recognizes-an-instance-not-a-linkbase
+  (is (true? (shares/instance-root?
+              "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<xbrl xmlns=\"http://www.xbrl.org/2003/instance\"></xbrl>")))
+  (is (true? (shares/instance-root?
+              "<xbrli:xbrl xmlns:xbrli=\"http://www.xbrl.org/2003/instance\"></xbrli:xbrl>")))
+  (is (false? (shares/instance-root?
+               "<?xml version=\"1.0\"?><link:linkbase xmlns:link=\"http://www.xbrl.org/2003/linkbase\"></link:linkbase>")))
+  (is (false? (shares/instance-root? "<html><body>no facts</body></html>"))))
+
+(deftest indexed-instances-prefer-ex-101-ins
+  (with-redefs [e/xbrl-docs
+                (constantly
+                 [{:type "EX-101.SCH" :name "scda-20151031.xsd"}
+                  {:type "EX-101.CAL" :name "scda-20151031_cal.xml"}
+                  {:type "EX-101.LAB" :name "scda-20151031_lab.xml"}
+                  {:type "EX-101.INS" :name "scda-20151031.xml"}
+                  {:type "EX-99.2" :name "exhibit99-2.htm"}
+                  {:type "EX-99.3" :name "other.xml"}])]
+    (is (= ["scda-20151031.xml" "other.xml"]
+           (shares/indexed-instances {:cik "1341878"})))))
+
+(deftest filing-xbrl-false-when-nothing-is-tagged
+  (with-redefs [e/xbrl-docs (constantly ())]
+    (is (false? (shares/filing-xbrl?
+                 {:isXBRL 0 :isInlineXBRL 0}
+                 ["<html><body>107,792,002 shares outstanding</body></html>"]
+                 {})))
+    (is (true? (shares/filing-xbrl? {:isXBRL 1} [] {})))
+    (is (true? (shares/filing-xbrl? {:isInlineXBRL 1} [] {})))
+    (is (true? (shares/filing-xbrl? {:isXBRL 0} [] {:facts {:dei {}}})))
+    (is (true? (shares/filing-xbrl?
+                {:isXBRL 0}
+                ["<ix:nonFraction name=\"dei:EntityCentralIndexKey\">1</ix:nonFraction>"]
+                {})))))
+
+(deftest filing-xbrl-true-when-the-index-lists-an-instance
+  (with-redefs [e/xbrl-docs (constantly [{:type "EX-101.INS" :name "ztek-20250331.xml"}])]
+    (is (true? (shares/filing-xbrl?
+                {:isXBRL 0 :isInlineXBRL 0}
+                ["<html><body>no tags</body></html>"]
+                {})))))
 

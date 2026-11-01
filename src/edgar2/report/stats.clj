@@ -6,8 +6,8 @@
             [edgar2.download.facts :as dl]
             [edgar2.util.core :as ucore]
             [edgar2.download.price :as price]
-            [edgar2.download.facts-universe :as universe]
             [edgar2.db.price-change :as db-price-change]
+            [edgar2.db.shares :as db-shares]
             [edgar2.db.sic :as db-sic]
             [edgar2.db.universe :as db-universe]
             [edgar2.financials.calc.annual :as annual]
@@ -123,9 +123,9 @@
   (including ADR ratio), SIC enrichment, and the cached price changes
   for the ticker. Looks up the universe row by `cik` unless `:row` is
   passed.   Optional opts for the batch path: `:row`, `:prices`, `:sic-db`,
-  `:shares`. When `:shares` is omitted and `dss` is present, the count
-  is `facts-universe/shares-outstanding` (report tables plus
-  `calc-concept`). When `:annual-map` is passed, it is used instead of
+  `:shares`. When `:shares` is omitted, the count is `:outstanding` from
+  `edgar2.db.shares/get-shares-cik` (data/share-classes.edn sums every share
+  class). When `:annual-map` is passed, it is used instead of
   `calculate-annual`."
   ([dss cik]
    (stats-one dss cik {}))
@@ -134,8 +134,7 @@
          prices (or prices (load-price-by-ticker))
          sic-db (or sic-db (db-sic/load-sic-index))
          shares (or shares
-                    (when dss (universe/shares-outstanding dss))
-                    (:shares-outstanding row))
+                    (:outstanding (db-shares/get-shares-cik cik)))
          changes (db-price-change/get-change (:ticker row))]
      (try
        (let [annual-map (if (contains? opts :annual-map)

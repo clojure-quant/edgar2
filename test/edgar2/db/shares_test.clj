@@ -34,6 +34,24 @@
                 shares/shares-index (delay (shares/load-shares-index))]
     (f)))
 
+(deftest no-xbrl-flags-the-share-row
+  (with-redefs [dataset/read-rows
+                (fn [_]
+                  [{:cik "0000009999"
+                    :ticker "NOX"
+                    :filing-date "2026-06-25"
+                    :form-type "40-F"
+                    :shares {}
+                    :xbrl false}])
+                shares/shares-index (delay (shares/load-shares-index))]
+    (is (= {:cik "0000009999"
+            :filing-date "2026-06-25"
+            :form-type "40-F"
+            :weighted 0
+            :outstanding 0
+            :xbrl false}
+           (shares/get-shares-ticker "NOX")))))
+
 (deftest share-info-by-cik-and-ticker
   (with-sample
     (fn []

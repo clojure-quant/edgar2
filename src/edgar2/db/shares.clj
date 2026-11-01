@@ -18,15 +18,16 @@
 
 (defn- share-info
   "Totals across every share class, plus the filing identity.
-  {:cik :filing-date :form-type :weighted :outstanding}.
-  A nil class value counts as 0."
+  {:cik :filing-date :form-type :weighted :outstanding}, and `:xbrl false`
+  when the filing carried no XBRL. A nil class value counts as 0."
   [row]
   (let [classes (vals (:shares row))]
-    {:cik (:cik row)
-     :filing-date (:filing-date row)
-     :form-type (:form-type row)
-     :weighted (sum-key classes :weighted)
-     :outstanding (sum-key classes :outstanding)}))
+    (cond-> {:cik (:cik row)
+             :filing-date (:filing-date row)
+             :form-type (:form-type row)
+             :weighted (sum-key classes :weighted)
+             :outstanding (sum-key classes :outstanding)}
+      (contains? row :xbrl) (assoc :xbrl (:xbrl row)))))
 
 (defn- index-rows
   "CIK and ticker → share totals, plus the set of tickers in the file."
