@@ -15,7 +15,8 @@
 
   Parsed with jsoup. A filing is HTML, and a strict XML read rejects the
   ones that are not well-formed."
-  (:require [clojure.string :as str])
+  (:require [clojure.pprint :as pprint]
+            [clojure.string :as str])
   (:import [java.math BigDecimal]
            [org.jsoup Jsoup]
            [org.jsoup.nodes Element]
@@ -678,6 +679,48 @@
     {:facts facts
      :context context-rows
      :dimension dimension-rows}))
+
+(defn- printable-context
+  [row]
+  (let [{:keys [period dimension value]} row
+        identifier (or (:identifier row) (get-in row [:entity :identifier]))]
+    (cond-> row
+      period (assoc :period (if (and (:start period) (:end period))
+                              (str (:start period) "-" (:end period))
+                              (:instant period)))
+      identifier (assoc :identifier identifier)
+      dimension (assoc :dimension (let [s (str/join ", " (map str (vals dimension)))]
+                                    (subs s 0 (min 20 (count s)))))
+      value (assoc :value (if (string? value)
+                            (subs value 0 (min 10 (count value)))
+                            value)))))
+
+(defn facts-with-concepts
+  "Facts joined to their context's period, entity identifier, and
+  dimension by :context-id. A fact whose context does not resolve keeps
+  its raw :context-id and gets nil joined fields."
+  [data]
+  (let [contexts (into {} (map (juxt :context-id identity)) (:context data))]
+    (mapv (fn [fact]
+            (let [ctx (get contexts (:context-id fact))]
+              (assoc fact
+                     :period (:period ctx)
+                     :identifier (get-in ctx [:entity :identifier])
+                     :dimension (:dimension ctx))))
+          (:facts data))))
+
+(defn print-concepts
+  [summary]
+  (->> (facts-with-concepts summary)
+       (map printable-context)
+       (map #(select-keys % [:taxonomy :concept :period :value :entity :dimension]))
+       (pprint/print-table)))
+
+(defn print-context
+  "Print context rows as a table: a duration as a start-end range, the
+  entity identifier, and the dimension members without their axes."
+  [contexts]
+  (pprint/print-table (map printable-context contexts)))
 
 (defn- statement-exhibit?
   "True for the names an audited-statement exhibit takes beside the cover:
