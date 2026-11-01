@@ -203,21 +203,41 @@
   [rows]
   (group-by #(class-label (class-member %)) rows))
 
-(defn- weighted-concept
-  "Basic weighted-average shares.
+(defn- positive-count?
+  "True when a share row carries a positive count."
+  [row]
+  (let [v (:val row)]
+    (and (number? v) (pos? v))))
+
+(defn- choose-rows
+  "Rows from the first candidate with a positive count, else the first
+  candidate with any row.
+
+  A zero-valued higher-priority fact is usually a cover placeholder — an
+  `ixt:fixed-zero` dash, a blank line, or the word \"no\" — and must not
+  block a real count on a lower-priority tag. When every candidate is
+  zero the first non-empty one is kept, so a genuinely shareless filer
+  still reads as zero and a real per-class zero survives."
+  [candidates]
+  (or (some (fn [rows] (when (some positive-count? rows) rows)) candidates)
+      (some not-empty candidates)))
+
+(defn- weighted-rows
+  "Basic weighted-average share rows.
 
   US-GAAP outstanding, then US-GAAP issued when the outstanding tag is
   absent, then IFRS weighted-average shares, then limited-partnership
   units. The unit count is last because an MLP's units are not shares;
   it is the same income-statement denominator for those filers."
   [facts]
-  (or (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesOutstandingBasic])
-      (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesIssuedBasic])
-      (get-in facts [:facts :ifrs-full :WeightedAverageShares])
-      (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstanding])))
+  (choose-rows
+   [(share-rows (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesOutstandingBasic]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesIssuedBasic]))
+    (share-rows (get-in facts [:facts :ifrs-full :WeightedAverageShares]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstanding]))]))
 
-(defn- diluted-concept
-  "Diluted weighted-average shares.
+(defn- diluted-rows
+  "Diluted weighted-average share rows.
 
   `us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding` is the diluted
   EPS denominator. The limited-partnership units variant, the IFRS adjusted
@@ -225,10 +245,11 @@
   filers that tag no diluted total. The adjustment is not a total on its
   own, so it is the last resort."
   [facts]
-  (or (get-in facts [:facts :us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding])
-      (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstandingDiluted])
-      (get-in facts [:facts :ifrs-full :AdjustedWeightedAverageShares])
-      (get-in facts [:facts :us-gaap :WeightedAverageNumberDilutedSharesOutstandingAdjustment])))
+  (choose-rows
+   [(share-rows (get-in facts [:facts :us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstandingDiluted]))
+    (share-rows (get-in facts [:facts :ifrs-full :AdjustedWeightedAverageShares]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageNumberDilutedSharesOutstandingAdjustment]))]))
 
 (defn- preference-class?
   "True for a preferred or preference share class, which is not common
@@ -244,22 +265,24 @@
   `us-gaap:SharesOutstanding`, then `us-gaap:CommonStockSharesOutstanding`,
   then IFRS `ifrs-full:NumberOfSharesOutstanding` without preference
   classes, then partnership units. An empty higher-priority concept does
-  not block the fallback. A filer that tags no DEI cover count often still
-  tags the common shares on the statement of equity.
+  not block the fallback, and neither does an all-zero one. A filer that
+  tags no DEI cover count often still tags the common shares on the
+  statement of equity.
 
   Partnership units are the last resort and are taken one at a time, never
   summed: a fund reports limited-partner units and a near-zero general-
-  partner count, and the first tag with a share fact wins."
+  partner count, and the first tag with a positive share fact wins."
   [facts]
-  (or (not-empty (share-rows (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding])))
-      (not-empty (share-rows (get-in facts [:facts :us-gaap :SharesOutstanding])))
-      (not-empty (share-rows (get-in facts [:facts :us-gaap :CommonStockSharesOutstanding])))
-      (not-empty (vec (remove preference-class?
-                              (share-rows (get-in facts [:facts :ifrs-full :NumberOfSharesOutstanding])))))
-      (not-empty (share-rows (get-in facts [:facts :us-gaap :LimitedPartnersCapitalAccountUnitsOutstanding])))
-      (not-empty (share-rows (get-in facts [:facts :us-gaap :GeneralPartnersCapitalAccountUnitsOutstanding])))
-      (not-empty (share-rows (get-in facts [:facts :us-gaap :CapitalUnitsOutstanding])))
-      (not-empty (share-rows (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstanding])))))
+  (choose-rows
+   [(share-rows (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :SharesOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :CommonStockSharesOutstanding]))
+    (remove preference-class?
+            (share-rows (get-in facts [:facts :ifrs-full :NumberOfSharesOutstanding])))
+    (share-rows (get-in facts [:facts :us-gaap :LimitedPartnersCapitalAccountUnitsOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :GeneralPartnersCapitalAccountUnitsOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :CapitalUnitsOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstanding]))]))
 
 (defn- name-key
   "Lowercased letters and digits, so a DEI name can be compared with a
@@ -293,7 +316,7 @@
   [facts]
   (into []
         (concat (outstanding-rows facts)
-                (share-rows (weighted-concept facts)))))
+                (weighted-rows facts))))
 
 (defn reporting-entities
   "Number of legal entities that report share facts, or nil when every row
@@ -365,9 +388,9 @@
         parent? (parent-row? facts rows)
         outstanding (rows-by-class (filterv parent? (outstanding-rows facts)))
         weighted (rows-by-class
-                  (filterv parent? (share-rows (weighted-concept facts))))
+                  (filterv parent? (weighted-rows facts)))
         diluted (rows-by-class
-                 (filterv parent? (share-rows (diluted-concept facts))))
+                 (filterv parent? (diluted-rows facts)))
         classes (->> (concat (keys outstanding) (keys weighted) (keys diluted))
                      distinct
                      (sort-by #(if (= % "Common") " " %)))]
@@ -492,15 +515,51 @@
        (some xbrl-text? texts)
        (seq (e/xbrl-docs filing)))))
 
+(defn- filing-share-summary
+  "Parse one `filing` into the `share-summary-cik` result map."
+  [cik filing]
+  (let [html (e/html filing)
+        exhibit (xbrl/statement-exhibit-name html)
+        instance (instance-text filing)
+        texts (->> [html
+                    (when exhibit (e/filing-document filing exhibit))
+                    instance]
+                   (keep identity)
+                   vec)
+        parsed (xbrl/parse-all texts {:accn (:accessionNumber filing)
+                                      :filed (:filingDate filing)
+                                      :form (:form filing)})
+        entities (reporting-entities parsed)]
+    (cond-> {:cik cik
+             :filing-date (:filingDate filing)
+             :form-type (:form filing)
+             :shares (share-summary parsed)}
+      entities
+      (assoc :entities entities)
+
+      (not (filing-xbrl? filing texts parsed))
+      (assoc :xbrl false))))
+
+(defn- shares-known?
+  "True when a share summary carries a positive count in any class."
+  [summary]
+  (boolean (some (fn [class] (some #(and (number? %) (pos? %)) (vals class)))
+                 (vals summary))))
+
 (defn share-summary-cik
   "Latest annual filing for `cik`, parsed with `edgar2.filing.xbrl/parse-all`.
 
-  The filing is the newest 10-K, 20-F, or 40-F. When the cover links an
-  audited-statement exhibit (`_d2`, `ex99d2`, or an `ex99-2` variant), that
-  HTML is parsed with the cover so its facts can use the cover's contexts.
-  The extracted instance (`form40f_htm.xml`) is included when SEC has one,
-  and a pre-inline filing's EX-101 instance from the index when it does
-  not, so a cover fact can use a context that the inline HTML left out.
+  The filing is the newest 10-K, 20-F, or 40-F of the newest report period.
+  An amendment that furnishes XBRL is tried first, because a filer can
+  refile an untagged annual report solely to add Inline XBRL; when that
+  amendment carries no usable share count (a stub `10-K/A` with only
+  placeholders), the original filing of the same period is tried next.
+  When the cover links an audited-statement exhibit (`_d2`, `ex99d2`, or an
+  `ex99-2` variant), that HTML is parsed with the cover so its facts can
+  use the cover's contexts. The extracted instance (`form40f_htm.xml`) is
+  included when SEC has one, and a pre-inline filing's EX-101 instance from
+  the index when it does not, so a cover fact can use a context that the
+  inline HTML left out.
   Each share class also has the cover `:ticker` and `:exchange`. A listed
   note or bond is not a share class and is left out. When subsidiaries are
   co-registrants (`dei:LegalEntityAxis`), only the parent's share counts are
@@ -510,30 +569,14 @@
   no XBRL at all, the way a 40-F with an untagged cover does."
   [cik]
   (ucore/ensure-identity!)
-  (let [filing (ufiling/latest-annual-filing cik)]
-    (when-not filing
+  (let [candidates (ufiling/annual-filing-candidates cik)]
+    (when-not (seq candidates)
       (throw (ex-info "no annual filing" {:cik cik})))
-    (let [html (e/html filing)
-          exhibit (xbrl/statement-exhibit-name html)
-          instance (instance-text filing)
-          texts (->> [html
-                      (when exhibit (e/filing-document filing exhibit))
-                      instance]
-                     (keep identity)
-                     vec)
-          parsed (xbrl/parse-all texts {:accn (:accessionNumber filing)
-                                        :filed (:filingDate filing)
-                                        :form (:form filing)})
-          entities (reporting-entities parsed)]
-      (cond-> {:cik cik
-               :filing-date (:filingDate filing)
-               :form-type (:form filing)
-               :shares (share-summary parsed)}
-        entities
-        (assoc :entities entities)
-
-        (not (filing-xbrl? filing texts parsed))
-        (assoc :xbrl false)))))
+    (loop [[filing & more] candidates]
+      (let [result (filing-share-summary cik filing)]
+        (if (and (not (shares-known? (:shares result))) (seq more))
+          (recur more)
+          result)))))
 
 (defn share-summary-ticker
   "CIK for `ticker`, then `share-summary-cik`, with `:ticker` added."

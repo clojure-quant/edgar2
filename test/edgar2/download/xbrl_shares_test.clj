@@ -464,6 +464,34 @@
                                    (shares-fact 40)}}})
                "Common")))))
 
+(deftest zero-cover-count-does-not-block-a-statement-count
+  (is (= {"Common" {:weighted-diluted nil :weighted nil :outstanding 99061523}}
+         (shares/share-summary
+          {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 0)}
+                   :us-gaap {:CommonStockSharesOutstanding (shares-fact 99061523)}}}))))
+
+(deftest zero-cover-count-does-not-block-ifrs
+  (is (= 166896936
+         (:outstanding
+          (get (shares/share-summary
+                {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 0)}
+                         :ifrs-full {:NumberOfSharesOutstanding (shares-fact 166896936)}}})
+               "Common")))))
+
+(deftest an-all-zero-filing-still-reads-zero
+  (is (= 0 (:outstanding
+            (get (shares/share-summary
+                  {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 0)}}})
+                 "Common")))))
+
+(deftest zero-weighted-basic-does-not-block-ifrs
+  (is (= 100 (:weighted
+              (get (shares/share-summary
+                    {:facts {:us-gaap {:WeightedAverageNumberOfSharesOutstandingBasic
+                                       (shares-fact 0)}
+                             :ifrs-full {:WeightedAverageShares (shares-fact 100)}}})
+                   "Common")))))
+
 (deftest one-entity-has-no-entity-count
   (is (nil? (shares/reporting-entities
              {:facts {:dei {:EntityCommonStockSharesOutstanding (shares-fact 100)}}}))))

@@ -31,6 +31,11 @@ issues with share count:
 6. some filings dont have xbrl inline tags.
    ZTEKF	40-F	no XBRL at all (0 facts, all 9 docs untagged); counts only in prose: 107,792,002 / weighted 105,919,553	genuine data gap, not a parser bug
 
+7. some filers do not have shares, only bonds:
+   NRUC: truly zero — a tax-exempt cooperative that "does not issue capital stock", and the 
+   word no itself is inside the dei:EntityCommonStockSharesOutstanding tag with ixt:fixed-zero. 
+   The ticker is a bond (NRUC 26), not equity.
+
 
 FMCC  freddi Mac
 - 10 classes of preferrence shares.
