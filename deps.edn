@@ -28,6 +28,7 @@
   :download-fx {:exec-fn edgar2.download.fx/download-fx}
   :download-eodhd-mapping {:exec-fn edgar2.download.eodhd-mapping/download-eodhd-mapping}
   :download-eodhd-exchange {:exec-fn edgar2.download.eodhd-exchange/download-eodhd-exchange}
+  :download-eodhd-quotes-market {:exec-fn edgar2.download.eodhd-quotes-market/download-eodhd-quotes-market}
   :massive {:exec-fn edgar2.download.massive/download}
   :filing-daily-zip {:exec-fn edgar2.download.filing-daily-zip/download
                      :exec-args {:year 2026
@@ -50,8 +51,8 @@
             :exec-fn edgar2.report.ingress/run}
   :ingress-eodhd {:exec-fn edgar2.eodhd.ingress/run}
   :ingress-all {:exec-fn edgar2.eodhd.ingress/run-all}
-  :screen {:exec-fn edgar2.screen.core/run}
-  :eodhd-screen {:exec-fn edgar2.screen.core/run
+  :screen {:exec-fn edgar2.cli.screen/run}
+  :eodhd-screen {:exec-fn edgar2.cli.screen/run
                  :exec-args {:name :lt-breakout}}
   :calculate-price-change {:exec-fn edgar2.report.price-change/run}
   :institutional {:exec-fn edgar2.institutional/print-filers
