@@ -9,7 +9,7 @@ clj -X:web
 clj -X:web :port 8080
 ```
 
-Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first). `/screen` is the screen tabs, same tables as `clj -X:screen`. `/company/financials` is one ticker. The ticker stays with the browser tab across `/company/financials`, `/company/google-finance`, `/company/filings`, `/company/current-annual`, and `/company/description`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
+Open a web UI. `/` is quintiles from `data/stats.edn` (run `clj -X:stats` first). `/screen` is the screen tabs, same tables as `clj -X:screen`. `/industry` is a SIC sector/industry/subindustry browser showing the Growth screen columns. `/company/financials` is one ticker. The ticker stays with the browser tab across `/company/financials`, `/company/google-finance`, `/company/filings`, `/company/current-annual`, and `/company/description`. Financials defaults to `:n 5` (five fiscal years, or five quarters when the period is quarterly). The page also accepts 10, 15, 20, 25, 30, 35, 40, 45, or 50. No login.
 
 
 ## Entrypoints for cli tasks
@@ -47,3 +47,4 @@ clj -X:stats :limit 25
 ```
 
 From `universe-facts.edn` + `companyfacts.zip` + `prices.edn`, write `data/stats.edn`: 7-year mean YoY sales growth (%), profit margin (Net Income / revenue), return on assets (Net Income / assets), return on capital employed (EBIT / (assets − current liabilities)), `:shares` (most recent 10-Q when that quarter is at least as recent as the annual report; otherwise the annual report), `:price`, `:marketcap` (price × shares), `:price-sales` (USD market cap / USD revenue), `:price-earnings` (USD market cap / USD Net Income, else USD price / USD EPS), `:dividend-yield` (USD dividends paid / USD market cap, else USD dividend per share / price, %), and `:dividend-coverage` (net income / dividends paid, only when a dividend was paid).
+

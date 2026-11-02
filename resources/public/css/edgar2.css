@@ -28,6 +28,10 @@ body {
   background: #fff;
 }
 
+param-select {
+  display: inline-block;
+}
+
 .screen-controls {
   display: inline-block;
   margin-bottom: 1rem;

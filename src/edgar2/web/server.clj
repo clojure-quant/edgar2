@@ -9,6 +9,7 @@
             [edgar2.web.filings :refer [filings-page]]
             [edgar2.web.financials :refer [financials-page]]
             [edgar2.web.ingress :refer [ingress-page]]
+            [edgar2.web.industry :refer [industry-page]]
             [edgar2.web.ingress-eodhd :refer [ingress-eodhd-page]]
             [edgar2.web.overview :refer [overview-page]]
             [edgar2.web.pairs :refer [pairs-page]]
@@ -51,6 +52,9 @@
    ["/screen" {:name :screen
                :title "Screen"
                :get #'screen-page}]
+   ["/industry" {:name :industry
+                 :title "Industry"
+                 :get #'industry-page}]
    ["/pairs" {:name :pairs
               :title "Pairs"
               :get #'pairs-page}]

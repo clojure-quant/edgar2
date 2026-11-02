@@ -4,6 +4,7 @@
             [hyper.core :as h]
             [edgar2.screen.core :as screen]
             [edgar2.screen.registry :as registry]
+            [edgar2.web.controls :as controls]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
 
@@ -18,7 +19,8 @@
       [label]
       (vec (interpose [:br] parts)))))
 
-(defn- screen-table
+(defn screen-table
+  "Table of `columns` over `rows`. A ticker cell links to that company."
   [{:keys [columns rows]}]
   [:div.table-wrap
    [:table
@@ -51,22 +53,21 @@
                         default)])
                (:params screen-map)))))
 
-(defn- param-select
-  [param params* err*]
-  (let [selected (let [stored (get @params* (:key param))]
-                   (if (some? stored) stored (:default param)))
-        parse (or (:parse param) identity)]
-    [:label.screen-controls (str (:label param) " ")
-     [:select {:data-on:change
-               (h/action
-                (reset! err* nil)
-                (let [v (parse $value)]
-                  (when (some? v)
-                    (swap! params* assoc (:key param) v))))}
-      (for [choice (:choices param)]
-        [:option (cond-> {:key (str choice) :value (str choice)}
-                   (= choice selected) (assoc :selected true))
-         (str choice)])]]))
+(defn- set-screen-param!
+  [params* err* screen detail]
+  (if-let [param (some (fn [p]
+                         (when (= (name (:key p)) (:param detail))
+                           p))
+                       (:params screen))]
+    (let [parse (or (:parse param) identity)
+          value (parse (:value detail))]
+      (if (some? value)
+        (do
+          (reset! err* nil)
+          (swap! params* assoc (:key param) value))
+        (reset! err* (str "Invalid value for " (:label param) ": "
+                          (:value detail)))))
+    (reset! err* (str "Unknown parameter: " (:param detail)))))
 
 (defn screen-page
   [_req]
@@ -100,9 +101,16 @@
            [:div
             (when (seq (:params current))
               [:div
-               (for [param (:params current)]
-                 [:span {:key (name (:key param))}
-                  (param-select param params* err*)])])
+                (for [param (:params current)]
+                  [:span {:key (name (:key param))}
+                   (controls/param-select
+                     {:label (:label param)
+                      :param (name (:key param))
+                      :value (str (get params (:key param)))
+                      :options (controls/options (:choices param))
+                      :data-on:param-select-change
+                      (h/action
+                        (set-screen-param! params* err* current $detail))})])])
             [:h1 (:title current)]
             (when-let [text (->> (concat (:description current) (:lines result))
                                  (remove str/blank?)

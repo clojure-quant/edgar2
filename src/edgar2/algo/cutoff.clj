@@ -4,6 +4,15 @@
   The cut is taken after the screen's universe is chosen, so the
   percentile is of that set.")
 
+(def fraction-choices
+  "Percentile fractions offered by the fundamental screens."
+  [0.05 0.10 0.20 0.25 0.30 0.50])
+
+(defn pct-label
+  "Whole-number percentage label for fraction `p`."
+  [p]
+  (long (Math/round (* 100.0 (double p)))))
+
 (defn cutoff-max-bottom
   "Largest value still in the bottom `p` fraction of xs."
   [xs p]

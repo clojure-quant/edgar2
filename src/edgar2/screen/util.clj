@@ -1,11 +1,52 @@
 (ns edgar2.screen.util
-  "Filter pipelines shared by the screens.
+  "Filter pipelines and parameters shared by the screens.
 
   apply-and-pipeline walks {:label :pred} steps in order. Each
   predicate runs on the tickers that survived the previous step.
   The first stage is the incoming count, labeled universe.
   report-pipeline-info formats those stages as the count lines the
-  screen prints, label on the left and survivors on the right.")
+  screen prints, label on the left and survivors on the right.
+
+  choice-param builds a dropdown parameter from a fixed choice list;
+  param-value resolves a typed value with the param's default as the
+  fallback."
+  (:require [clojure.string :as str]))
+
+(defn as-number
+  "Number value of `x`, or nil. Accepts a number or a decimal string."
+  [x]
+  (cond
+    (number? x) (double x)
+    (string? x) (try (Double/parseDouble (str/trim x))
+                     (catch Exception _ nil))
+    :else nil))
+
+(defn parse-choice
+  "One of `choices`, or nil. Accepts the number or its decimal string.
+  Choices are matched numerically and the original choice is returned."
+  [choices x]
+  (let [n (as-number x)]
+    (when (some? n)
+      (some (fn [choice]
+              (when (and (number? choice)
+                         (= n (double choice)))
+                choice))
+            choices))))
+
+(defn choice-param
+  "A parameter whose value is one of `choices`."
+  [key label choices default]
+  {:key key
+   :label label
+   :choices choices
+   :default default
+   :parse (fn [x] (parse-choice choices x))})
+
+(defn param-value
+  "Value of `param` in `params`, or that param's default."
+  [params {:keys [key default]}]
+  (let [v (get params key)]
+    (if (some? v) v default)))
 
 (defn at-least
   "Predicate: `k` is a number and is at least `minimum`."
@@ -22,6 +63,28 @@
     (let [v (get row k)]
       (and (number? v)
            (<= (double lo) (double v) (double hi))))))
+
+(defn at-most
+  "Predicate: `k` is a number and is at most `maximum`."
+  [k maximum]
+  (fn [row]
+    (let [v (get row k)]
+      (and (number? v)
+           (<= (double v) (double maximum))))))
+
+(defn number-at
+  "Predicate: the value at `k` is a number."
+  [k]
+  (fn [row]
+    (number? (get row k))))
+
+(defn positive-at
+  "Predicate: the value at `k` is a number and is positive."
+  [k]
+  (fn [row]
+    (let [v (get row k)]
+      (and (number? v)
+           (pos? (double v))))))
 
 (defn apply-and-pipeline
   "Filter `tickers` through `filter-ands` in order.

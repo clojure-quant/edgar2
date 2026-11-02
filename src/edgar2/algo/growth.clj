@@ -4,8 +4,7 @@
   earnings growth between 12% and 65%, sales growth of at least 12%,
   revenue-score of at least 65, operating-income-score of at least 70,
   then market cap at or above Min mc. Each cut is a screen parameter."
-  (:require [clojure.string :as str]
-            [edgar2.report.screen :as report]
+  (:require [edgar2.report.screen :as report]
             [edgar2.screen.universe :as uni]
             [edgar2.screen.util :as util]))
 
@@ -18,47 +17,24 @@
 (def score-choices
   [0 20 40 50 60 65 70 75 80 85 90 95 100])
 
-(defn- as-long
-  "Long value of `x`, or nil. Accepts a number or a decimal string."
-  [x]
-  (cond
-    (integer? x) (long x)
-    (number? x) (long x)
-    (string? x) (parse-long (str/trim x))
-    :else nil))
-
-(defn- parse-choice
-  "One of `choices`, or nil. Accepts the number or its string."
-  [choices x]
-  (let [n (as-long x)]
-    (when (some #{n} choices) n)))
-
-(defn- choice-param
-  [key label choices default]
-  {:key key
-   :label label
-   :choices choices
-   :default default
-   :parse (fn [x] (parse-choice choices x))})
-
 (def min-annual-years
-  (choice-param :min-annual-years "Min annual years" year-choices 7))
+  (util/choice-param :min-annual-years "Min annual years" year-choices 7))
 
 (def min-earnings-growth
-  (choice-param :min-earnings-growth "Min earnings growth" growth-choices 12))
+  (util/choice-param :min-earnings-growth "Min earnings growth" growth-choices 12))
 
 (def max-earnings-growth
-  (choice-param :max-earnings-growth "Max earnings growth" growth-choices 65))
+  (util/choice-param :max-earnings-growth "Max earnings growth" growth-choices 65))
 
 (def min-sales-growth
-  (choice-param :min-sales-growth "Min sales growth" growth-choices 12))
+  (util/choice-param :min-sales-growth "Min sales growth" growth-choices 12))
 
 (def min-revenue-score
-  (choice-param :min-revenue-score "Min revenue score" score-choices 65))
+  (util/choice-param :min-revenue-score "Min revenue score" score-choices 65))
 
 (def min-operating-income-score
-  (choice-param :min-operating-income-score "Min operating income score"
-                score-choices 70))
+  (util/choice-param :min-operating-income-score "Min operating income score"
+                     score-choices 70))
 
 (def sort-line
   "take this list and sort by earnings-future-3-yield")
@@ -77,22 +53,16 @@
    {:key :net-income-change-q-on-y :label "net-income-change-q-on-y" :num? true :decimals 1}
    {:key :earnings-variation :label "earnings-variation" :num? true :decimals 1}])
 
-(defn- param-value
-  "Value of `param` in `params`, or that param's default."
-  [params {:keys [key default]}]
-  (let [v (get params key)]
-    (if (some? v) v default)))
-
 (defn filter-ands
   "Growth cuts, then market cap. Thresholds come from `params`."
   [params]
-  (let [min-years (param-value params min-annual-years)
-        min-earn (param-value params min-earnings-growth)
-        max-earn (param-value params max-earnings-growth)
-        min-sales (param-value params min-sales-growth)
-        min-rev (param-value params min-revenue-score)
-        min-oi (param-value params min-operating-income-score)
-        min-mc (param-value params uni/min-mc)]
+  (let [min-years (util/param-value params min-annual-years)
+        min-earn (util/param-value params min-earnings-growth)
+        max-earn (util/param-value params max-earnings-growth)
+        min-sales (util/param-value params min-sales-growth)
+        min-rev (util/param-value params min-revenue-score)
+        min-oi (util/param-value params min-operating-income-score)
+        min-mc (util/param-value params uni/min-mc)]
     [{:label (format "annual-count >= %d" min-years)
       :pred (util/at-least :annual-count min-years)}
      {:label (format "earnings-stabilized-yoy between %d and %d"
@@ -104,9 +74,7 @@
       :pred (util/at-least :revenue-score min-rev)}
      {:label (format "operating-income-score >= %d" min-oi)
       :pred (util/at-least :operating-income-score min-oi)}
-     {:label (format "mc >= %d ($ millions)" min-mc)
-      :pred (fn [row]
-              (seq (report/at-least-mc [row] min-mc)))}]))
+     (uni/min-mc-step min-mc)]))
 
 (defn- future-yield
   [row]
@@ -115,7 +83,7 @@
 
 (defn calculate
   [items params]
-  (let [result (util/apply-and-pipeline (mapv :row items)
+  (let [result (util/apply-and-pipeline (uni/calculate-stats items)
                                         (filter-ands params))
         hits (vec (sort-by #(or (future-yield %) Double/NEGATIVE_INFINITY)
                            >
@@ -135,6 +103,6 @@
             min-operating-income-score
             uni/min-mc]
    :columns columns
-   :universe uni/stats-all
+   :universe uni/stats-universe-all
    :calculate calculate
    :stamp uni/stats-stamp})

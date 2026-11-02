@@ -1,10 +1,12 @@
 (ns edgar2.screen.universe
-  "Ticker lists a screen can score.
+  "Ticker lists a screen can score, and how their rows are loaded.
 
-  `stats` reads data/stats.edn and keeps companies at or above :min-mc.
-  `stats-all` reads the same file and keeps every company. `eodhd`
-  reads the EODHD equity list and keeps symbols that have a bar file.
-  None of these functions loads a bar series; that happens in calculate."
+  `stats-universe-all` returns every ticker in data/stats.edn.
+  `calculate-stats` turns such a ticker list into rows, using a
+  dictionary built from the same file. `stats` keeps companies at or
+  above :min-mc. `eodhd` reads the EODHD equity list and keeps symbols
+  that have a bar file. None of these functions loads a bar series;
+  that happens in calculate."
   (:require [clojure.java.io :as io]
             [edgar2.download.dataset :as dataset]
             [edgar2.eodhd.ingress :as ingress]
@@ -19,6 +21,13 @@
    :default report/default-min-mc
    :parse report/parse-min-mc})
 
+(defn min-mc-step
+  "Pipeline step: market cap is at least `min-mc` millions of dollars."
+  [min-mc]
+  {:label (format "mc >= %d ($ millions)" (long min-mc))
+   :pred (fn [row]
+           (seq (report/at-least-mc [row] min-mc)))})
+
 (defn stats-stamp
   "Modification time of data/stats.edn. A newer file misses the cache."
   [_]
@@ -32,15 +41,18 @@
            :row r})
         rows))
 
-(defn stats-all
-  "Every company in data/stats.edn.
+(defn stats-universe-all
+  "Every ticker in data/stats.edn."
+  []
+  (mapv :ticker (report/load-stats)))
 
-  Each item is {:ticker :name :row}. Market cap is not applied; a
-  screen that wants that cut filters in its own pipeline. The
-  company count is reported by that pipeline, as the universe stage."
-  [_]
-  {:items (company-items (report/load-stats))
-   :lines []})
+(defn calculate-stats
+  "Rows for `tickers`, looked up in a dictionary built from
+  data/stats.edn. Rows keep the order of `tickers`; a ticker that is
+  not in the file is left out."
+  [tickers]
+  (let [by-ticker (into {} (map (juxt :ticker identity)) (report/load-stats))]
+    (into [] (keep #(get by-ticker %)) tickers)))
 
 (defn stats
   "Companies in data/stats.edn at or above :min-mc.

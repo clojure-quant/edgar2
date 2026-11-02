@@ -1,7 +1,8 @@
 (ns edgar2.algo.growth-test
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is]]
-            [edgar2.algo.growth :as growth]))
+            [edgar2.algo.growth :as growth]
+            [edgar2.report.screen :as report]))
 
 (defn- item
   [ticker overrides]
@@ -15,6 +16,11 @@
                 :earnings-future-3-yield 1
                 :marketcap 200e6}
                overrides)})
+
+(defn- calculate
+  [items params]
+  (with-redefs [report/load-stats (fn [] (mapv :row items))]
+    (growth/calculate (mapv :ticker items) params)))
 
 (deftest calculate-filters-in-stages-then-sorts-by-future-yield
   (let [items [(item "PASS-LO" {:annual-count 7
@@ -33,7 +39,7 @@
                (item "FAIL-OI" {:operating-income-score 69.9})
                (item "FAIL-MC" {:marketcap 50e6})
                (item "NO-YIELD" {:earnings-future-3-yield nil})]
-        {:keys [rows lines]} (growth/calculate items {})
+        {:keys [rows lines]} (calculate items {})
         counts (mapv #(Long/parseLong (re-find #"\d+$" %)) (butlast lines))
         count-at (fn [line]
                    (let [n (re-find #"\d+$" line)]
@@ -61,7 +67,7 @@
                (item "SMALL" {:annual-count 8 :marketcap 150e6})
                (item "NOMC" {:annual-count 8 :marketcap nil})]
         {:keys [rows lines]}
-        (growth/calculate items {:min-annual-years 8
+        (calculate items {:min-annual-years 8
                                  :min-earnings-growth 15
                                  :max-earnings-growth 40
                                  :min-mc 1000})]

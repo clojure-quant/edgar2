@@ -1,8 +1,12 @@
 (ns edgar2.algo.cheap-consistent-margin
-  "Bottom 50% PE, top 30% revenue-score and operating-income-score, top 30% margin."
+  "Bottom fraction of PE, top fractions of revenue-score,
+  operating-income-score and avg-profit-margin. Each fraction and
+  Min mc is a screen parameter."
   (:require [edgar2.algo.cheap-consistent :as consistent]
+            [edgar2.algo.cutoff :as cutoff]
             [edgar2.report.screen :as report]
-            [edgar2.screen.universe :as uni]))
+            [edgar2.screen.universe :as uni]
+            [edgar2.screen.util :as util]))
 
 (def columns
   [{:key :ticker :label "Ticker"}
@@ -15,18 +19,32 @@
    {:key :avg-margin :label "Avg margin" :num? true}
    {:key :dyld :label "Yield" :num? true}])
 
+(def pe-fraction
+  (util/choice-param :pe-fraction "PE fraction"
+                     cutoff/fraction-choices 0.50))
+
 (defn calculate
-  [items _params]
-  (let [result (consistent/cheap-consistent-on (mapv :row items) 0.50 0.30)]
+  [items params]
+  (let [result (consistent/cheap-consistent-on
+                (uni/calculate-stats items)
+                {:min-mc (util/param-value params uni/min-mc)
+                 :pe-p (util/param-value params pe-fraction)
+                 :rev-p (util/param-value params consistent/revenue-score-fraction)
+                 :oi-p (util/param-value params consistent/operating-income-score-fraction)
+                 :margin-p (util/param-value params consistent/margin-fraction)})]
     {:rows (mapv report/table-row (:rows result))
-     :lines (consistent/consistent-lines result)}))
+     :lines (:lines result)}))
 
 (def screen
   {:id :cheap-consistent-margin
    :title "Cheap consistent margin"
-   :description ["Bottom 50% PE (positive only), top 30% revenue-score, top 30% operating-income-score, top 30% avg-profit-margin."]
-   :params [uni/min-mc]
+   :description ["Bottom fraction of PE (positive only), top fractions of revenue-score, operating-income-score and avg-profit-margin. Each fraction and Min mc is a parameter."]
+   :params [pe-fraction
+            consistent/revenue-score-fraction
+            consistent/operating-income-score-fraction
+            consistent/margin-fraction
+            uni/min-mc]
    :columns columns
-   :universe uni/stats
+   :universe uni/stats-universe-all
    :calculate calculate
    :stamp uni/stats-stamp})
