@@ -1,0 +1,509 @@
+(ns edgar2.filing.xbrl.xbrl-shares-v1
+  "Parse one filing into a share summary."
+  (:require [clojure.string :as str]
+            [edgar.api :as e]
+            [edgar2.filing.xbrl :as xbrl]))
+
+(def ^:private class-axes
+  "Class-of-stock axes. An IFRS filer uses its own axis, not the US-GAAP one."
+  [:us-gaap:StatementClassOfStockAxis
+   :ifrs-full:ClassesOfShareCapitalAxis])
+
+(defn- map-get
+  "Value for `k` when map keys may be keywords or strings.
+
+  A sorted map throws if probed with the other key type, which is how
+  `edgar2.filing.xbrl/parse` stores units and dimensions."
+  [m k]
+  (when m
+    (let [s (if (keyword? k) (name k) (str k))]
+      (some (fn [[mk v]]
+              (when (= s (if (keyword? mk) (name mk) (str mk)))
+                v))
+            m))))
+
+(def ^:private entity-axis
+  "A combined annual report tags each co-registrant's facts on this axis."
+  :dei:LegalEntityAxis)
+
+(defn- entity-member
+  "Legal-entity member on `row`. Nil for the primary registrant, whose rows
+  carry no entity axis."
+  [row]
+  (map-get (:dimensions row) entity-axis))
+
+(defn- class-member
+  "Value of the class-of-stock axis, or nil when the row has no class."
+  [row]
+  (some #(map-get (:dimensions row) %) class-axes))
+
+(defn- local-name
+  "Name after the last colon. A keyword's name may already contain one,
+  because `:us-gaap:CommonClassAMember` has no namespace."
+  [s]
+  (let [s (if (keyword? s) (name s) (str s))
+        i (str/last-index-of s ":")]
+    (if i (subs s (inc i)) s)))
+
+(def ^:private voting-class-re
+  "A class named for its voting rights, as a Canadian filer tags
+  `SuperVotingSharesMember`, `MultipleVotingSharesMember`, or
+  `SubordinateVotingSharesMember`. These are distinct classes, not one
+  common class, and a zero super-voting class must not stand for the total."
+  #"(?i)(subordinate|multiple|super)\s*voting")
+
+(defn- class-label
+  "\"Class B\" for a ClassB, ClassBCommonShare, OrdinarySharesB, or
+  ClassBShares member; \"Subordinate Voting\", \"Multiple Voting\", or
+  \"Super Voting\" for those classes; \"Common Nonvoting\" or \"Common
+  Voting\" for those other common classes; and \"Common\" for no axis or
+  any other member.
+
+  The letter is any capital after `Class` that does not start a lowercase
+  word, so `ClassACommonShareMember` and `CommonClassAMember` both read as
+  Class A while `ClassifiedBoardMember` does not."
+  [member]
+  (let [n (local-name member)
+        lower (str/lower-case n)
+        common? (str/includes? lower "common")
+        letter (or (second (re-find #"Class([A-Z])(?![a-z])" n))
+                   (second (re-find #"Shares([A-Z])Member$" n))
+                   (second (re-find #"([A-Z])Shares?Member$" n)))
+        voting (second (re-find voting-class-re n))]
+    (cond
+      letter (str "Class " letter)
+      voting (str (str/capitalize (str/lower-case voting)) " Voting")
+      (and common? (str/includes? lower "nonvoting")) "Common Nonvoting"
+      (and common? (str/includes? lower "voting")) "Common Voting"
+      :else "Common")))
+
+(def ^:private exchange-axis-name "EntityListingsExchangeAxis")
+
+(def ^:private stock-axis-names
+  "Either axis marks a cover context as one class of stock."
+  #{"StatementClassOfStockAxis" "ClassesOfShareCapitalAxis"})
+
+(def ^:private debt-title-re
+  "A cover title for notes, bonds, or debentures is not a share class."
+  #"(?i)\b(?:notes?|bonds?|debentures?)\b")
+
+(defn- share-class-context?
+  "True when the cover context is a class of stock.
+
+  A statement-class or IFRS share-capital axis is that class. No axes, or
+  only the exchange axis, is the single common class. Debt and any other
+  instrument are not. A title that names notes, bonds, or debentures is not
+  a share even when the filer left the debt axis off."
+  [dims title]
+  (let [axes (into #{} (map local-name) (keys dims))]
+    (and (not (re-find debt-title-re (str title)))
+         (or (some axes stock-axis-names)
+             (empty? (disj axes exchange-axis-name))))))
+
+(defn- title-class
+  "Class letter named in a cover title, e.g. \"Class A Common Stock\" or
+  \"American Depositary Shares (each representing one B share)\". Nil when
+  the title names no class."
+  [title]
+  (let [t (str title)]
+    (or (second (re-find #"(?i)Class\s+([A-Z])\b" t))
+        (second (re-find #"(?i)representing\s+(?:one|two|three|\d+)?\s*([A-Z])\s+share" t)))))
+
+(defn- cover-class
+  "Share class for one cover context: its class axis, else the class letter
+  in the security title, else \"Common\"."
+  [dims title]
+  (if-let [member (class-member {:dimensions dims})]
+    (class-label member)
+    (if-let [letter (title-class title)]
+      (str "Class " letter)
+      "Common")))
+
+(defn- cover-by-name
+  [facts]
+  (into {}
+        (map (fn [fact]
+               [(local-name (:qname fact)) (:val fact)]))
+        facts))
+
+(defn- class-markets
+  "Ticker and exchange for each share class on the cover.
+
+  Rows that share a context are one security. The first context for a
+  class wins. A debt instrument, or a row that is not the parent's, is
+  omitted."
+  [cover parent?]
+  (reduce
+   (fn [m facts]
+     (let [row (first facts)
+           dims (:dimensions row)
+           by (cover-by-name facts)
+           title (get by "Security12bTitle")]
+       (if (or (not (parent? row))
+               (not (share-class-context? dims title)))
+         m
+         (let [class (cover-class dims title)
+               ticker (not-empty (get by "TradingSymbol"))
+               exchange (not-empty (get by "SecurityExchangeName"))]
+           (if (or (contains? m class) (not (or ticker exchange)))
+             m
+             (assoc m class (cond-> {}
+                              ticker (assoc :ticker ticker)
+                              exchange (assoc :exchange exchange))))))))
+   {}
+   (vals (group-by :context cover))))
+
+(defn- with-markets
+  "Add :ticker and :exchange onto each class the cover lists as stock."
+  [shares cover parent?]
+  (let [markets (class-markets cover parent?)]
+    (into {}
+          (map (fn [[class row]]
+                 [class (merge row (get markets class))]))
+          shares)))
+
+(defn- share-rows
+  [concept]
+  (or (map-get (:units concept) :shares)
+      []))
+
+(defn- latest-val
+  "Value on the greatest :end. A later :filed breaks a tie, then the larger
+  value, so two tags of the same fact resolve the same way on every run."
+  [rows]
+  (when (seq rows)
+    (:val (last (sort-by (juxt #(or (:end %) "")
+                               #(or (:filed %) "")
+                               #(or (:val %) 0))
+                          rows)))))
+
+(defn- rows-by-class
+  [rows]
+  (group-by #(class-label (class-member %)) rows))
+
+(defn- positive-count?
+  "True when a share row carries a positive count."
+  [row]
+  (let [v (:val row)]
+    (and (number? v) (pos? v))))
+
+(defn- choose-rows
+  "Rows from the first candidate with a positive count, else the first
+  candidate with any row.
+
+  A zero-valued higher-priority fact is usually a cover placeholder — an
+  `ixt:fixed-zero` dash, a blank line, or the word \"no\" — and must not
+  block a real count on a lower-priority tag. When every candidate is
+  zero the first non-empty one is kept, so a genuinely shareless filer
+  still reads as zero and a real per-class zero survives."
+  [candidates]
+  (or (some (fn [rows] (when (some positive-count? rows) rows)) candidates)
+      (some not-empty candidates)))
+
+(defn- weighted-rows
+  "Basic weighted-average share rows.
+
+  US-GAAP outstanding, then US-GAAP issued when the outstanding tag is
+  absent, then IFRS weighted-average shares, then limited-partnership
+  units. The unit count is last because an MLP's units are not shares;
+  it is the same income-statement denominator for those filers."
+  [facts]
+  (choose-rows
+   [(share-rows (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesOutstandingBasic]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageNumberOfSharesIssuedBasic]))
+    (share-rows (get-in facts [:facts :ifrs-full :WeightedAverageShares]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstanding]))]))
+
+(defn- diluted-rows
+  "Diluted weighted-average share rows.
+
+  `us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding` is the diluted
+  EPS denominator. The limited-partnership units variant, the IFRS adjusted
+  average, and the US-GAAP adjustment to the count are fallbacks for
+  filers that tag no diluted total. The adjustment is not a total on its
+  own, so it is the last resort."
+  [facts]
+  (choose-rows
+   [(share-rows (get-in facts [:facts :us-gaap :WeightedAverageNumberOfDilutedSharesOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstandingDiluted]))
+    (share-rows (get-in facts [:facts :ifrs-full :AdjustedWeightedAverageShares]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageNumberDilutedSharesOutstandingAdjustment]))]))
+
+(defn- preference-class?
+  "True for a preferred or preference share class, which is not common
+  equity and so is not a share count for the common stock."
+  [row]
+  (let [n (some-> (class-member row) local-name str/lower-case)]
+    (boolean (and n (re-find #"preference|preferred" n)))))
+
+(defn- outstanding-rows
+  "Share-count rows for the common stock.
+
+  `dei:EntityCommonStockSharesOutstanding` when it has a share fact, then
+  `us-gaap:SharesOutstanding`, then `us-gaap:CommonStockSharesOutstanding`,
+  then IFRS `ifrs-full:NumberOfSharesOutstanding` without preference
+  classes, then partnership units. An empty higher-priority concept does
+  not block the fallback, and neither does an all-zero one. A filer that
+  tags no DEI cover count often still tags the common shares on the
+  statement of equity.
+
+  Partnership units are the last resort and are taken one at a time, never
+  summed: a fund reports limited-partner units and a near-zero general-
+  partner count, and the first tag with a positive share fact wins."
+  [facts]
+  (choose-rows
+   [(share-rows (get-in facts [:facts :dei :EntityCommonStockSharesOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :SharesOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :CommonStockSharesOutstanding]))
+    (remove preference-class?
+            (share-rows (get-in facts [:facts :ifrs-full :NumberOfSharesOutstanding])))
+    (share-rows (get-in facts [:facts :us-gaap :LimitedPartnersCapitalAccountUnitsOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :GeneralPartnersCapitalAccountUnitsOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :CapitalUnitsOutstanding]))
+    (share-rows (get-in facts [:facts :us-gaap :WeightedAverageLimitedPartnershipUnitsOutstanding]))]))
+
+(defn- name-key
+  "Lowercased letters and digits, so a DEI name can be compared with a
+  member's local name."
+  [s]
+  (some-> s str str/lower-case (str/replace #"[^a-z0-9]" "") not-empty))
+
+(defn- member-name-key
+  "`wmb:TranscontinentalGasPipeLineCompanyLLCMember` → the company part,
+  without the `Member` suffix."
+  [member]
+  (some-> member local-name name-key (str/replace #"member$" "")))
+
+(defn- registrant-member?
+  "True when `member` names the registrant in `entityName`.
+
+  \"Williams Companies, Inc.\" matches `wmb:WilliamsCompaniesIncMember`, and
+  so does \"The Williams Companies, Inc.\". A short member key is rejected
+  so it cannot match everything."
+  [entity-name member]
+  (let [entity (name-key entity-name)
+        member (member-name-key member)]
+    (and entity member
+         (>= (count member) 8)
+         (or (str/includes? entity member)
+             (str/includes? member entity)))))
+
+(defn- share-facts
+  "Outstanding and weighted share rows together. An entity that reports only
+  one of the two still counts."
+  [facts]
+  (into []
+        (concat (outstanding-rows facts)
+                (weighted-rows facts))))
+
+(defn reporting-entities
+  "Number of legal entities that report share facts, or nil when every row
+  belongs to one registrant.
+
+  A combined 10-K lists the parent plus its subsidiary registrants, and tags
+  the subsidiaries' rows with `dei:LegalEntityAxis`. The parent's rows have
+  no entity axis. Three entities therefore return 3. An undimensioned parent
+  and a parent-shaped member are one entity, not two."
+  [facts]
+  (let [members (distinct (map entity-member (share-facts facts)))
+        named? #(registrant-member? (:entityName facts) %)]
+    (when (some some? members)
+      (if (some nil? members)
+        (inc (count (remove named? (remove nil? members))))
+        (count members)))))
+
+(defn- parent-row?
+  "Predicate for the rows that belong to the registrant.
+
+  Rows without the axis are the parent. When every share row is dimensioned,
+  the member named like `:entityName` wins; otherwise the first member in
+  sort order, because a combined report lists the parent first. With an
+  undimensioned parent, a member that also names the registrant is kept."
+  [facts rows]
+  (let [members (distinct (map entity-member rows))
+        named? #(registrant-member? (:entityName facts) %)]
+    (if-not (some some? members)
+      (constantly true)
+      (if (some nil? members)
+        (fn [row]
+          (let [member (entity-member row)]
+            (or (nil? member) (named? member))))
+        (let [parent (or (some #(when (named? %) %) members)
+                         (first (sort-by str members)))]
+          (fn [row] (= parent (entity-member row))))))))
+
+(defn share-summary
+  "Latest weighted-average and shares outstanding by common-stock class.
+
+  `facts` is a companyfacts map. Outstanding shares are
+  `:dei/EntityCommonStockSharesOutstanding`, then
+  `:us-gaap/SharesOutstanding`, then `:us-gaap/CommonStockSharesOutstanding`,
+  then `:ifrs-full/NumberOfSharesOutstanding` without preference classes,
+  then partnership units.
+  Weighted shares are
+  `:us-gaap/WeightedAverageNumberOfSharesOutstandingBasic`, then
+  `:us-gaap/WeightedAverageNumberOfSharesIssuedBasic` when that tag is
+  absent, then `:ifrs-full/WeightedAverageShares`, then limited-partnership
+  units. `:weighted-diluted` is
+  `:us-gaap/WeightedAverageNumberOfDilutedSharesOutstanding`, then the
+  units-diluted, IFRS adjusted-average, and adjustment-to-the-count
+  fallbacks, or nil when the filing tags no diluted count.
+  A row with no class axis (`:us-gaap:StatementClassOfStockAxis` or
+  `:ifrs-full:ClassesOfShareCapitalAxis`) is \"Common\". A ClassA, ClassB,
+  OrdinarySharesB, or ClassBShares member is \"Class A\", \"Class B\", and
+  so on; a nonvoting or voting common member is \"Common Nonvoting\" or
+  \"Common Voting\"; any other member is \"Common\". Each figure is the
+  observation with the greatest `:end`.
+
+  When several entities report (`dei:LegalEntityAxis`), only the parent's
+  rows are used. See `reporting-entities` for how many there are.
+
+  When `facts` has `:cover` (from `edgar2.filing.xbrl/parse`), each class
+  the cover lists as stock also gets `:ticker` and `:exchange`. A debt
+  line, such as senior notes, is not a share class and is left out."
+  [facts]
+  (let [rows (share-facts facts)
+        parent? (parent-row? facts rows)
+        outstanding (rows-by-class (filterv parent? (outstanding-rows facts)))
+        weighted (rows-by-class
+                  (filterv parent? (weighted-rows facts)))
+        diluted (rows-by-class
+                 (filterv parent? (diluted-rows facts)))
+        classes (->> (concat (keys outstanding) (keys weighted) (keys diluted))
+                     distinct
+                     (sort-by #(if (= % "Common") " " %)))]
+    (with-markets
+     (into {}
+           (map (fn [class]
+                  [class {:weighted (latest-val (get weighted class))
+                          :weighted-diluted (latest-val (get diluted class))
+                          :outstanding (latest-val (get outstanding class))}]))
+           classes)
+     (:cover facts)
+     parent?)))
+
+(defn- instance-name
+  "Extracted XBRL instance for a primary document.
+  `form40f.htm` is `form40f_htm.xml`."
+  [primary]
+  (when-let [[_ stem] (re-find #"(?i)^(.+)\.html?$" (str primary))]
+    (str stem "_htm.xml")))
+
+(defn- fetch-document
+  "Text of `name` in `filing`, or nil when SEC has no such document."
+  [filing name]
+  (when name
+    (try
+      (e/filing-document filing name)
+      (catch clojure.lang.ExceptionInfo e
+        (if (= 404 (:status (ex-data e)))
+          nil
+          (throw e))))))
+
+(defn instance-root?
+  "True when `text` is an XBRL instance rather than a linkbase, a schema,
+  or a plain HTML page. The root element is `xbrl`, with or without a
+  namespace prefix."
+  [text]
+  (xbrl/instance-document? text))
+
+(def ^:private linkbase-name-re
+  "A linkbase shares the instance's `.xml` extension but holds no facts."
+  #"(?i)[_-](?:cal|def|lab|pre|ref)\.xml$")
+
+(defn indexed-instances
+  "Instance documents listed in `filing`'s index, EX-101.INS first, then
+  any other `.xml` that is not a linkbase or a schema.
+
+  A pre-inline filing has no extracted instance, and its instance is not
+  named after the cover: SCDA's 2016 10-K keeps 27,243,414 outstanding
+  shares in `scda-20151031.xml`. `instance-name` cannot guess that name,
+  so the filing index supplies it."
+  [filing]
+  (let [docs (e/xbrl-docs filing)
+        xml? #(re-find #"(?i)\.xml$" (str (:name %)))
+        ins? #(= "EX-101.INS" (str/upper-case (str (:type %))))]
+    (->> docs
+         (filter xml?)
+         (remove #(re-find linkbase-name-re (str (:name %))))
+         (sort-by #(if (ins? %) 0 1))
+         (keep :name)
+         distinct
+         vec)))
+
+(defn- instance-text
+  "XBRL instance for `filing`, or nil when there is none.
+
+  The post-inline extracted instance (`form40f_htm.xml`) is tried first.
+  A pre-inline filing has no such document and keeps its instance in the
+  filing index as EX-101.INS, so that is tried next. Both are checked for
+  an `<xbrl>` root, so a linkbase or an HTML page is never read as facts.
+  Its contexts and units resolve cover facts left without them."
+  [filing]
+  (let [extracted (fetch-document filing (instance-name (:primaryDocument filing)))]
+    (or (when (and extracted (instance-root? extracted)) extracted)
+        (some (fn [name]
+                (let [text (fetch-document filing name)]
+                  (when (and text (instance-root? text)) text)))
+              (indexed-instances filing)))))
+
+(def ^:private xbrl-text-re
+  "Inline facts, or an XBRL instance root (with or without a prefix, as in
+  `<xbrli:xbrl>`). A document with neither carries no machine-readable
+  number."
+  #"(?i)<ix:(?:nonfraction|nonnumeric|header|hidden)\b|<(?:[a-z0-9_-]+:)?xbrl[\s>]")
+
+(defn xbrl-text?
+  "True when one filing document carries machine-readable XBRL: inline
+  facts in HTML, or an XBRL instance."
+  [text]
+  (boolean (when text (re-find xbrl-text-re (str text)))))
+
+(defn- xbrl-flag?
+  "True for a submissions-API XBRL flag: 1, \"1\", or true."
+  [v]
+  (try
+    (pos? (long v))
+    (catch Throwable _
+      false)))
+
+(defn filing-xbrl?
+  "True when `filing` carries XBRL anywhere.
+
+  Inline facts in one of `texts` count, as does a parsed `:facts` map, an
+  instance or linkbase in the filing index, or the submission's own XBRL
+  flag. A filing whose primary document, statement exhibit, and instance
+  are all plain or untagged has none: nothing is machine-readable even
+  when the page prints a share count."
+  [filing texts parsed]
+  (boolean
+   (or (xbrl-flag? (:isXBRL filing))
+       (xbrl-flag? (:isInlineXBRL filing))
+       (seq (:facts parsed))
+       (some xbrl-text? texts)
+       (seq (e/xbrl-docs filing)))))
+
+(defn filing-share-summary
+  "Parse one `filing` into the `share-summary-cik` result map."
+  [cik filing]
+  (let [html (e/html filing)
+        exhibit (xbrl/statement-exhibit-name html)
+        instance (instance-text filing)
+        texts (->> [html
+                    (when exhibit (e/filing-document filing exhibit))
+                    instance]
+                   (keep identity)
+                   vec)
+        parsed (xbrl/parse-all texts {:accn (:accessionNumber filing)
+                                      :filed (:filingDate filing)
+                                      :form (:form filing)})
+        entities (reporting-entities parsed)]
+    (cond-> {:cik cik
+             :filing-date (:filingDate filing)
+             :form-type (:form filing)
+             :shares (share-summary parsed)}
+      entities
+      (assoc :entities entities)
+
+      (not (filing-xbrl? filing texts parsed))
+      (assoc :xbrl false))))

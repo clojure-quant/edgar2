@@ -1,8 +1,8 @@
-(ns edgar2.download.xbrl-shares-test
+(ns edgar2.filing.xbrl.xbrl-shares-v1-test
   (:require [clojure.test :refer [deftest is]]
             [edgar.api :as e]
-            [edgar2.download.xbrl-shares :as shares]
-            [edgar2.filing.xbrl :as xbrl]))
+            [edgar2.filing.xbrl :as xbrl]
+            [edgar2.filing.xbrl.xbrl-shares-v1 :as shares]))
 
 (defn- shares-fact
   [val]

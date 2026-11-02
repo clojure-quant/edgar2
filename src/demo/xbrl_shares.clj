@@ -2,7 +2,7 @@
   "Check `dei:EntityCommonStockSharesOutstanding` across multi-class filers.
 
   The reusable extraction and share-count heuristics live in
-  `edgar2.filing.xbrl-shares`. This demo selects the multi-class tickers,
+  `edgar2.filing.xbrl.xbrl-shares`. This demo selects the multi-class tickers,
   verifies `CommonStockTotal == sum(other classes)`, reports mismatches, and
   checkpoints results."
   (:require
@@ -10,7 +10,7 @@
    [clojure.pprint :as pprint]
    [clojure.string :as str]
    [edgar2.download.dataset :as dataset]
-   [edgar2.filing.xbrl-shares :as xbrl-shares]
+   [edgar2.filing.xbrl.xbrl-shares :as xbrl-shares]
    [edgar2.util.core :as ucore]))
 
 (def shares-path
@@ -344,9 +344,7 @@
   (xbrl-shares/outstanding f)
   (xbrl-shares/outstanding cpa)
 
-  (def msft (xbrl-shares/check "MSFT"))
-  msft
-  (xbrl-shares/shares-outstanding msft)
+ 
 
   (multi-class-rows)
   (check-one "CPA")
