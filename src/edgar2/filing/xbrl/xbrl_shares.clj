@@ -143,6 +143,7 @@
               [k (->> facts
                       (filter v)
                       (map :value)
+                      (remove nil?)
                       (into [])
                       first)]))
        (into {})))
@@ -168,7 +169,7 @@
   #"(?i)\b(?:notes?|bonds?|debentures?)\b")
 
 (defn debt-title? [fact]
- (re-find debt-title-re (:title fact)))
+  (re-find debt-title-re (:title fact)))
 
 (def fields-tickers
   {:ticker ticker?
@@ -233,7 +234,7 @@
      ;:facts-all (count facts-with-concepts)
      ;:facts-ticker (count facts-ticker-table)
      ;:facts-class (count facts-class-table)
-     
+
      ;:facts-first (first facts-with-concepts)
      ;:classes (classes facts-class-table)
      ;:periods (periods facts-class-table)
@@ -246,11 +247,10 @@
   "returns facts with concepts for a ticker."
   [ticker]
   (-> (wf/annual-report-file ticker)
-      (.getPath)
-      ))
+      (.getPath)))
 
 (defn share-summary-ticker [ticker]
-  (-> ticker 
+  (-> ticker
       ticker->url-file
       (load-filing-facts)
       (share-summary)))
@@ -266,6 +266,7 @@
   as their aggregate and dropped; and `:dei/AdrMember`, an ADR count rather
   than a share class, is dropped. The remaining class values are summed."
   [shares]
+  (println "shares..")
   (cond
     (empty? shares)
     nil
@@ -287,6 +288,12 @@
                                               (== v (reduce + 0 others)))))
                               k))
                           (sort-by (comp str key) classes))
-          values (vals (dissoc classes aggregate :dei/AdrMember))]
-      (when (and (seq values) (every? number? values))
-        (reduce + 0 values)))))
+          _ (println "aggregate: " aggregate)
+          classes  (dissoc classes :dei/AdrMember aggregate)]
+      (println "classes:" classes)
+      (when (seq classes)
+        (->> classes
+             vals
+             (map :outstanding)
+             (filter number?)
+             (reduce + 0))))))

@@ -8,8 +8,7 @@
        :shares
        (map (fn [[k v]]
               (assoc v :class k)))
-       (map #(select-keys % [:class :outstanding :weighted :diluted
-                             ]))
+       (map #(select-keys % [:class :outstanding :weighted :diluted]))
        (into [])))
 
 (defn ticker-ui [summary]
@@ -58,6 +57,32 @@
 (-> "test/html/COKE.html"
     (xbrl-shares/load-filing-facts)
     (xbrl-shares/share-summary)
-    ;ticker-ui
-    ;print-table
+    shares-ui
+    print-table)
+
+(-> "test/html/COKE.html"
+    (xbrl-shares/load-filing-facts)
+    (xbrl-shares/share-summary)
+    :shares
+    (xbrl-shares/shares-outstanding)
     )
+;66564294
+
+(defn store-test [ticker]
+  (let [url (xbrl-shares/ticker->url-file ticker)
+        content (slurp url)]
+    (spit (str "test/html/" ticker ".html") content)))
+
+(store-test "BRK-B")
+
+(-> "test/html/BRK-B.html"
+    (xbrl-shares/load-filing-facts)
+    (xbrl-shares/share-summary)
+    shares-ui
+    print-table)
+
+(-> "test/html/BRK-B.html"
+    (xbrl-shares/load-filing-facts)
+     (xbrl-shares/share-summary)
+    ticker-ui
+    print-table)
