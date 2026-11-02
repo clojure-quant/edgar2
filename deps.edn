@@ -36,7 +36,7 @@
   :filing-quarterly-index {:exec-fn edgar2.download.filing-quarterly-index/download
                            :exec-args {:year 2026
                                        :dest "data/full-index"}}
-  :adr {:exec-fn edgar2.adr/run}
+  :adr {:exec-fn edgar2.download.fsds-adr/run}
   :adr-list {:exec-fn edgar2.download.adr-list/run}
   ; universe 
   :universe-facts {:exec-fn edgar2.download.facts-universe/universe}

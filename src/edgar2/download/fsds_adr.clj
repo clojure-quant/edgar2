@@ -1,4 +1,4 @@
-(ns edgar2.adr
+(ns edgar2.download.fsds-adr
   "ADR listings from 20-F/40-F cover-page Security12bTitle."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
