@@ -3,6 +3,7 @@
   (:require [clojure.string :as str]
             [edgar.api :as e]
             [hyper.core :as h]
+            [edgar2.db.ticker :as db-ticker]
             [edgar2.util :as util]
             [edgar2.util.core :as ucore]
             [edgar2.util.ticker-info :as ticker-info]
@@ -133,13 +134,13 @@
   "10-digit CIK from the local exchange listing.
 
   XOM uses the operating filer. Every other ticker uses
-  `ticker-info/ticker->cik`. Nil when the listing has no row."
+  `db-ticker/ticker->cik`. Nil when the listing has no row."
   [ticker]
   (let [t (some-> ticker str str/trim not-empty str/upper-case)]
     (ticker-info/pad-cik
      (if (= t "XOM")
        (util/resolve-filer2 t)
-       (ticker-info/ticker->cik t)))))
+       (db-ticker/ticker->cik t)))))
 
 (defn load-filings
   "Filings for a ticker or a CIK. A ticker wins when both are set.

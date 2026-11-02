@@ -13,18 +13,24 @@
   [ticker]
   (e/facts (util/resolve-filer2 ticker)))
 
+(defn- ticker-str [t]
+  (cond (nil? t) ticker
+        (clojure.core/string? t) t
+        :else (name t)))
+
 (defn run
-  "Load facts for one ticker, run `stats/stats-one`, print the row."
+  "Load facts for one ticker, run `stats/stats-one`, print the row.
+  Accepts a ticker string, a symbol/keyword, or an exec-args map
+  (e.g. `clj -X:stats-one :ticker '\"CPA\"'`)."
   ([] (run ticker))
-  ([ticker]
+  ([ticker-or-opts]
    (ucore/ensure-identity!)
-   (let [cik (util/resolve-filer2 ticker)
+   (let [ticker (if (map? ticker-or-opts)
+                  (ticker-str (:ticker ticker-or-opts))
+                  (ticker-str ticker-or-opts))
+         cik (util/resolve-filer2 ticker)
          dss (load-facts ticker)
          st (stats/stats-one dss cik)]
      (println "\n=== stats-one" ticker "cik" cik "===")
      (pprint/pprint st)
      st)))
-
-(defn -main
-  [& args]
-  (run (or (first args) ticker)))

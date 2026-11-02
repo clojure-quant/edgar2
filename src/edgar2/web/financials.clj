@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyper.core :as h]
             [hyper.effects :as effects]
+            [edgar2.db.ticker :as db-ticker]
             [edgar2.financials.facts-ui :as facts-ui]
             [edgar2.financials.facts-zip :as facts-zip]
             [edgar2.financials.view.core :as view]
@@ -259,7 +260,7 @@
     (ticker-info/pad-cik
      (if (= t "XOM")
        (util/resolve-filer2 t)
-       (ticker-info/ticker->cik t)))))
+       (db-ticker/ticker->cik t)))))
 
 (defn- load-statement
   "Presentable statement for `ticker` from data/companyfacts.zip.

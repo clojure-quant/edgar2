@@ -4,7 +4,7 @@
             [hyper.effects :as effects]
             [edgar2.db.sector :as sector]
             [edgar2.db.sic :as sic]
-            [edgar2.util.ticker-info :as ticker-info]
+            [edgar2.db.ticker :as db-ticker]
             [edgar2.web.ticker :as ticker]))
 
 (def company-routes
@@ -43,7 +43,7 @@
 (defn- sector-line
   "SIC code for `ticker`, then sector, industry, and subindustry names."
   [ticker]
-  (let [code (some-> (ticker-info/ticker->cik ticker)
+  (let [code (some-> (db-ticker/ticker->cik ticker)
                      sic/sic-for-cik
                      str str/trim not-empty)
         {:keys [sector industry subindustry]} (sector/get-sector-data code)
@@ -80,8 +80,8 @@
                        :readonly true
                        :tabindex -1
                        :aria-readonly "true"
-                       :value (or (ticker-info/ticker->cik current) "")}]]
-     [:span.company-name (or (ticker-info/ticker->name current) "")]
+                       :value (or (db-ticker/ticker->cik current) "")}]]
+     [:span.company-name (or (db-ticker/ticker->name current) "")]
      (sector-line current)]))
 
 (defn- sub-link

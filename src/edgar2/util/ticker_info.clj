@@ -1,10 +1,6 @@
 (ns edgar2.util.ticker-info
-  "Listed-ticker helpers shared by the exchange file and the facts universe."
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
-            [edgar2.download.dataset :as dataset]))
-
-(def exchange-rows-path "data/ticker-exchange.edn")
+  "Static ticker and company-name helpers: CIK padding, categories, and ETFs."
+  (:require [clojure.string :as str]))
 
 (defn pad-cik
   "10-digit CIK string, or nil when `cik` is blank / non-numeric."
@@ -65,70 +61,3 @@
          (re-find #"(?i)\bExchange[\s-]+Traded\s+(?:Fund|Trust)\b" s)
          (re-find #"(?i)\bETFS\b" s)
          (re-find #"(?i)\bETF\s*(?:II|III)?\s*[.,]?\s*$" s)))))
-
-(defn- read-exchange-rows
-  []
-  (let [f (io/file exchange-rows-path)]
-    (if (.exists f)
-      (dataset/read-rows f)
-      [])))
-
-(def ^:private exchange-rows
-  "Every listed row. Loaded on first use."
-  (delay (vec (read-exchange-rows))))
-
-(def ^:private rows-by-cik
-  (delay (group-by :cik @exchange-rows)))
-
-(def ^:private cik-by-ticker
-  (delay
-    (into {}
-          (keep (fn [{:keys [ticker cik]}]
-                  (when (and (not (str/blank? (str ticker)))
-                             (not (str/blank? (str cik))))
-                    [(str/upper-case (str ticker))
-                     (pad-cik cik)])))
-          @exchange-rows)))
-
-(def ^:private name-by-ticker
-  (delay
-    (into {}
-          (keep (fn [{:keys [ticker name]}]
-                  (when (and (not (str/blank? (str ticker)))
-                             (not (str/blank? (str name))))
-                    [(str/upper-case (str ticker)) (str/trim (str name))])))
-          @exchange-rows)))
-
-(defn ticker->cik
-  "10-digit CIK for a listed ticker, or nil."
-  [ticker]
-  (when-let [t (some-> ticker str str/trim not-empty str/upper-case)]
-    (get @cik-by-ticker t)))
-
-(defn ticker->name
-  "Registrant name for a listed ticker, or nil."
-  [ticker]
-  (when-let [t (some-> ticker str str/trim not-empty str/upper-case)]
-    (get @name-by-ticker t)))
-
-(defn- listed-rows
-  "Exchange rows for `cik` in SEC file order (primary first)."
-  [cik]
-  (if-let [padded (pad-cik cik)]
-    (->> (get @rows-by-cik padded)
-         (filterv #(not (str/blank? (str (:ticker %))))))
-    []))
-
-(defn tickers-for-cik
-  "Every listed ticker for `cik`, primary first (SEC order). Empty when absent."
-  [cik]
-  (vec (distinct (map :ticker (listed-rows cik)))))
-
-(defn primary-ticker-for-cik
-  "Primary listed ticker and exchange for `cik`, or nil.
-  Primary is the first symbol for that CIK in company_tickers_exchange.json
-  (same choice `filter-primary-filers` makes)."
-  [cik]
-  (when-let [row (first (listed-rows cik))]
-    {:ticker (:ticker row)
-     :exchange (:exchange row)}))

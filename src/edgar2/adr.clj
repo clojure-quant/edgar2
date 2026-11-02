@@ -3,6 +3,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [edgar.api :as e]
+            [edgar2.db.ticker :as db-ticker]
             [edgar2.download.dataset :as dataset]
             [edgar2.download.fsds :as dl]
             [edgar2.download.fsds-universe :as fsds]
@@ -234,7 +235,7 @@
 (defn- adr-row
   [sub titles]
   (when-let [title (some #(when (adr-title? %) %) titles)]
-    (when-let [{:keys [ticker]} (ticker-info/primary-ticker-for-cik (:cik sub))]
+    (when-let [{:keys [ticker]} (db-ticker/primary-ticker-for-cik (:cik sub))]
       (let [ratio (parse-ratio title)]
         (cond-> {:ticker (str ticker)
                  :cik (:cik sub)

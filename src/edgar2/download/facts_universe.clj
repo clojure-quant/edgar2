@@ -4,6 +4,7 @@
             [clojure.string :as str]
             [edgar.xbrl :as xbrl]
             [edgar2.util.core :as ucore]
+            [edgar2.db.ticker :as db-ticker]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.financials.facts-zip :as facts-zip]
@@ -144,9 +145,9 @@
 
 (defn with-listing
   [row]
-  (if-let [listing (ticker-info/primary-ticker-for-cik (:cik row))]
+  (if-let [listing (db-ticker/primary-ticker-for-cik (:cik row))]
     (assoc (merge row listing)
-           :tickers (ticker-info/tickers-for-cik (:cik row)))
+           :tickers (db-ticker/tickers-for-cik (:cik row)))
     row))
 
 (defn empty-facts?
