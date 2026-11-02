@@ -1,5 +1,5 @@
-(ns demo.stats-one
-  "Demo: stats-one for a single ticker via load-facts."
+(ns edgar2.cli.stats-one
+  "Stats-one for a single ticker via load-facts."
   (:require [clojure.pprint :as pprint]
             [edgar.api :as e]
             [edgar2.util :as util]

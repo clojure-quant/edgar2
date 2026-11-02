@@ -44,7 +44,7 @@
   :xbrl-extract-filing {:exec-fn edgar2.download.xbrl-extract-filing/run
                         :exec-args {:url "http://localhost:3000/filing/0000317540/0001628280-26-009057/coke-20251231.htm"}}
   :stats {:exec-fn edgar2.report.stats/stats}
-  :stats-one {:exec-fn demo.stats-one/run}
+  :stats-one {:exec-fn edgar2.cli.stats-one/run}
   :stats-nippy {:exec-fn edgar2.report.stats/stats-nippy}
   :facts-nippy {:exec-fn edgar2.financials.facts-ds-converter/convert-zip-to-dataset}
   :cef {:exec-fn edgar2.report.cef/cef}
