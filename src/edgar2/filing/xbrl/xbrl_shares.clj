@@ -13,11 +13,8 @@
   (:import [java.time LocalDate]
            [java.time.temporal ChronoUnit]))
 
-(defn fetch-share-data
-  "returns facts with concepts for a ticker."
-  [ticker]
-  (-> (wf/annual-report-file ticker)
-      (.getPath)
+(defn load-filing-facts [file-or-url]
+  (-> file-or-url
       (xbrl-loader/load-documents)
       (xbrl/overview)
       (xbrl/facts-with-concepts)))
@@ -62,13 +59,16 @@
   (and (= :dei taxonomy)
        (= :EntityCommonStockSharesOutstanding concept)))
 
-(defn relevant? [fact]
+(defn class-table? [fact]
+  (or
+   (shares-outstanding? fact)
+   (weighted-share? fact)
+   (diluted-share? fact)))
+
+(defn ticker-table? [fact]
   (or (ticker? fact)
       (title? fact)
-      (exchange? fact)
-      (shares-outstanding? fact)
-      (weighted-share? fact)
-      (diluted-share? fact)))
+      (exchange? fact)))
 
 
 ;; share-class 
@@ -106,13 +106,13 @@
 
 (defn classes [facts]
   (->> facts
-       (filter relevant?)
+       (filter class-table?)
        (map determine-class)
        (distinct)))
 
 (defn periods [facts]
   (->> facts
-       (filter relevant?)
+       (filter ticker-table?)
        (map :period)
        (distinct)))
 
@@ -151,13 +151,10 @@
                       (filter v)
                       (map :value)
                       (into [])
-                      first
-                      )]))
+                      first)]))
        (into {})))
 
-(into {} [[:a 1] [:b 2]])
-
-(into [] '(1 2))
+;; classes
 
 (defn tabulate-classes [facts]
   (->> facts
@@ -165,6 +162,24 @@
        (map (fn [[k v]]
               [k (facts->map v)]))
        (into {})))
+
+;; tickers
+
+(def ^:private debt-title-re
+  "A cover title for notes, bonds, or debentures is not a share class."
+  #"(?i)\b(?:notes?|bonds?|debentures?)\b")
+
+(defn debt-title? [fact]
+ (re-find debt-title-re (:title fact)))
+
+(defn tabulate-tickers [facts]
+  (->> facts
+       (group-by :dimension)
+       (map (fn [[k v]]
+              (assoc (facts->map v) :class k)))
+       (remove debt-title?)
+       (into [])))
+
 
 (defn parse-date
   [d]
@@ -201,23 +216,40 @@
 
 (defn share-summary
   "Class key → shares outstanding from `ticker`'s latest annual filing."
-  [ticker]
-  (let [facts-with-concepts (fetch-share-data ticker)
-        facts-relevant (filter relevant? facts-with-concepts)
-        facts-most-recent (remove-old-periods facts-relevant)]
+  [facts-with-concepts]
+  (let [facts-ticker-table (->> facts-with-concepts
+                                (filter ticker-table?)
+                                (remove-old-periods))
+        facts-class-table (->> facts-with-concepts
+                               (filter class-table?)
+                               (remove-old-periods))]
     {:end-date (get-dei-fact facts-with-concepts :DocumentPeriodEndDate)
      :cik  (get-dei-fact facts-with-concepts :EntityCentralIndexKey)
      :company-name  (get-dei-fact facts-with-concepts :EntityRegistrantName)
+     ;:facts-all (count facts-with-concepts)
+     ;:facts-ticker (count facts-ticker-table)
+     ;:facts-class (count facts-class-table)
+     
+     ;:facts-first (first facts-with-concepts)
+     ;:classes (classes facts-class-table)
+     ;:periods (periods facts-class-table)
+     :shares (tabulate-classes facts-class-table)
+     :tickers (tabulate-tickers facts-ticker-table)}))
 
-     :facts-all (count facts-with-concepts)
-     :facts-relevant (count facts-relevant)
-     :facts-most-recent (count facts-most-recent)
+;; ticker based version
 
-     :facts-first (first facts-with-concepts)
-     :classes (classes facts-relevant)
-     :periods (periods facts-relevant)
-     :shares (tabulate-classes facts-most-recent)}))
+(defn ticker->url-file
+  "returns facts with concepts for a ticker."
+  [ticker]
+  (-> (wf/annual-report-file ticker)
+      (.getPath)
+      ))
 
+(defn share-summary-ticker [ticker]
+  (-> ticker 
+      ticker->url-file
+      (load-filing-facts)
+      (share-summary)))
 
 ;; db helper
 
