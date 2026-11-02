@@ -136,15 +136,8 @@
 
 ;; tabulation
 
-(def fields
-  {:outstanding shares-outstanding?
-   :weighted weighted-share?
-   :diluted diluted-share?
-   :ticker ticker?
-   :exchange exchange?
-   :title title?})
 
-(defn facts->map [facts]
+(defn facts->map [fields facts]
   (->> fields
        (map (fn [[k v]]
               [k (->> facts
@@ -156,11 +149,16 @@
 
 ;; classes
 
+(def fields-classes
+  {:outstanding shares-outstanding?
+   :weighted weighted-share?
+   :diluted diluted-share?})
+
 (defn tabulate-classes [facts]
   (->> facts
        (group-by determine-class)
        (map (fn [[k v]]
-              [k (facts->map v)]))
+              [k (facts->map fields-classes v)]))
        (into {})))
 
 ;; tickers
@@ -172,11 +170,17 @@
 (defn debt-title? [fact]
  (re-find debt-title-re (:title fact)))
 
+(def fields-tickers
+  {:ticker ticker?
+   :exchange exchange?
+   :title title?})
+
+
 (defn tabulate-tickers [facts]
   (->> facts
        (group-by :dimension)
        (map (fn [[k v]]
-              (assoc (facts->map v) :class k)))
+              (assoc (facts->map fields-tickers v) :class k)))
        (remove debt-title?)
        (into [])))
 

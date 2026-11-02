@@ -58,6 +58,6 @@
 (-> "test/html/COKE.html"
     (xbrl-shares/load-filing-facts)
     (xbrl-shares/share-summary)
-    ticker-ui
-    print-table
+    ;ticker-ui
+    ;print-table
     )
