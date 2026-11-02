@@ -1,6 +1,9 @@
 (ns edgar2.web.nav
-  (:require [hyper.core :as h]
+  (:require [clojure.string :as str]
+            [hyper.core :as h]
             [hyper.effects :as effects]
+            [edgar2.db.sector :as sector]
+            [edgar2.db.sic :as sic]
             [edgar2.util.ticker-info :as ticker-info]
             [edgar2.web.ticker :as ticker]))
 
@@ -37,6 +40,21 @@
         active? (assoc :class "active"))
    label])
 
+(defn- sector-line
+  "SIC code for `ticker`, then sector, industry, and subindustry names."
+  [ticker]
+  (let [code (some-> (ticker-info/ticker->cik ticker)
+                     sic/sic-for-cik
+                     str str/trim not-empty)
+        {:keys [sector industry subindustry]} (sector/get-sector-data code)
+        names (->> [sector industry subindustry]
+                   (keep #(some-> % str str/trim not-empty)))]
+    (when (or code (seq names))
+      [:span.fin-sector
+       (when code [:span.fin-sic code])
+       (when (and code (seq names)) " ")
+       (when (seq names) (str/join " · " names))])))
+
 (defn- ticker-form
   [req]
   (let [current (ticker/current)
@@ -63,7 +81,8 @@
                        :tabindex -1
                        :aria-readonly "true"
                        :value (or (ticker-info/ticker->cik current) "")}]]
-     [:span.company-name (or (ticker-info/ticker->name current) "")]]))
+     [:span.company-name (or (ticker-info/ticker->name current) "")]
+     (sector-line current)]))
 
 (defn- sub-link
   [req label route-name active-names]

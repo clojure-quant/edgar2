@@ -28,3 +28,16 @@
   (let [loaded (sector/sic-rows)]
     (is (seq loaded))
     (is (every? #(and (:sector %) (:industry %) (:subindustry %)) loaded))))
+
+(deftest get-sector-data-returns-names-for-a-known-sic
+  (is (= "Transportation, Communications, Electric, Gas, And Sanitary Services"
+         (:sector (sector/get-sector-data "4512"))))
+  (is (= "Transportation By Air"
+         (:industry (sector/get-sector-data "4512"))))
+  (is (= "Air Transportation, Scheduled"
+         (:subindustry (sector/get-sector-data "4512")))))
+
+(deftest get-sector-data-rejects-blank-and-unknown-codes
+  (is (nil? (sector/get-sector-data nil)))
+  (is (nil? (sector/get-sector-data "")))
+  (is (nil? (sector/get-sector-data "9998"))))

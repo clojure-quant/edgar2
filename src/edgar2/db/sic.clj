@@ -37,3 +37,11 @@
   [cik {:keys [by-cik]}]
   (or (get by-cik (some-> cik str str/trim))
       {}))
+
+(def ^:private sic-index
+  (delay (load-sic-index)))
+
+(defn sic-for-cik
+  "SIC code for `cik` from data/universe-fsds.edn, or nil."
+  [cik]
+  (some-> (sic-data cik @sic-index) :sic))

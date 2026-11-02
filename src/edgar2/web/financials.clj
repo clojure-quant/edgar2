@@ -69,19 +69,6 @@
   [ticker]
   (get @stats-by-ticker (str/upper-case (str ticker))))
 
-(defn- sector-line
-  "SIC code, then sector, industry, and subindustry from the stats row."
-  [ticker]
-  (let [{:keys [sic sector industry subindustry]} (stats-row ticker)
-        code (some-> sic str str/trim not-empty)
-        names (->> [sector industry subindustry]
-                   (keep #(some-> % str str/trim not-empty)))]
-    (when (or code (seq names))
-      [:p.fin-sector
-       (when code [:span.fin-sic code])
-       (when (and code (seq names)) " ")
-       (when (seq names) (str/join " · " names))])))
-
 (defn- header-text
   "Units note for the statement table."
   []
@@ -318,7 +305,6 @@
                       :error [:p.error message]
                       :ready [:div
                               [:p.fin-header (header-text)]
-                              (sector-line ticker)
                               (ratios-table ticker)
                               (financials-table (:table data))]
                       [:p "Enter a ticker."])]))
