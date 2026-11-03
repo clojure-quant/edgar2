@@ -30,7 +30,9 @@
            [:us-gaap :RevenueFromContractWithCustomerIncludingAssessedTax]
            [:ifrs-full :Revenue]
            [:ifrs-full :RevenueFromContractsWithCustomers]
-           [:ifrs-full :RevenueFromSaleOfGoods]]}
+           [:ifrs-full :RevenueFromSaleOfGoods]
+           [:ifrs-full :RevenueFromRenderingOfTransportServices] ; VLRS
+           ]}
    
    {:id :cost-of-revenue
     :label "Cost of Revenue"
@@ -53,7 +55,7 @@
     :label "Operating Income"
     :data [[:us-gaap :OperatingIncomeLoss]
            [:ifrs-full :ProfitLossFromOperatingActivities]]}
-
+   
    {:id :nonoperating-income
     :label "Non-Operating Income"
     :data [[:us-gaap :NonoperatingIncomeExpense]]}
@@ -195,14 +197,15 @@
 
    {:id :depreciation
     :label "Depreciation"
-    :data [[:ifrs-full :DepreciationAndAmortisationExpense]
-           [:us-gaap :DepreciationDepletionAndAmortization]
+    :data [[:us-gaap :DepreciationDepletionAndAmortization]
            [:us-gaap :DepreciationAndAmortization]
            [:us-gaap :DepreciationExpense]
            [:us-gaap :Depreciation]
+           [:us-gaap :DepreciationNonproduction]
+           [:ifrs-full :DepreciationAndAmortisationExpense]
            [:ifrs-full :AdjustmentsForDepreciationAndAmortisationExpense]
            [:ifrs-full :DepreciationPropertyPlantAndEquipment]
-           [:us-gaap :DepreciationNonproduction]]}
+           ]}
 
    {:id :amortization
     :label "Amortization"
