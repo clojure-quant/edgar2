@@ -276,7 +276,7 @@
     nil
 
     (= 1 (count shares))
-    (val (first shares))
+    (-> shares first val :outstanding)
 
     :else
     (let [classes (dissoc shares "CommonStockTotal")

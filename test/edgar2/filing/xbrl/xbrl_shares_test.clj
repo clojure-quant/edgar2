@@ -90,7 +90,7 @@
              xbrl-shares/share-summary))))
 
 (deftest aapl-shares-outstanding-sums-the-classes
-  (is (= {:outstanding 14776353000, :weighted 14948500000, :diluted 15004697000}
+  (is (= 14776353000
          (-> "test/html/AAPL.html"
              xbrl-shares/load-filing-facts
              xbrl-shares/share-summary

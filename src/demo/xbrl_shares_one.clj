@@ -1,7 +1,8 @@
 (ns demo.xbrl-shares-one
   (:require
+   [clojure.pprint :refer [print-table]]
    [edgar2.filing.xbrl.xbrl-shares :as xbrl-shares]
-   [clojure.pprint :refer [print-table]]))
+   [edgar2.db.shares :as db-shares]))
 
 (defn shares-ui [summary]
   (->> summary
@@ -19,15 +20,24 @@
 
 ;; live test for one ticker
 
-(-> "ABT"
+(-> "LUV"
     xbrl-shares/share-summary-ticker
     shares-ui
     print-table)
 
-(-> "ABT"
+(-> "LUV"
     xbrl-shares/share-summary-ticker
     ticker-ui
     print-table)
+
+(-> "LUV"
+    xbrl-shares/share-summary-ticker
+    :shares
+    (xbrl-shares/shares-outstanding))
+
+(db-shares/get-shares-ticker "LUV")
+(db-shares/get-shares-cik "0000092380")
+(db-shares/get-shares-cik "92380")
 
 ;; store for unit test
 
