@@ -9,15 +9,15 @@
   (:require
    [clojure.string :as str]
    [edgar2.filing.xbrl-loader :as xbrl-loader]
-   [edgar2.filing.xbrl :as xbrl]
+   [edgar2.filing.xbrl-overview :as xbrl-overview]
    [edgar2.web.filing :as wf])
   (:import [java.time LocalDate]))
 
 (defn load-filing-facts [file-or-url]
   (-> file-or-url
       (xbrl-loader/load-documents)
-      (xbrl/overview)
-      (xbrl/facts-with-concepts)))
+      (xbrl-overview/overview)
+      (xbrl-overview/facts-with-concepts)))
 
 ;; predicates for concept
 

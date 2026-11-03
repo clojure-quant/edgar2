@@ -20,20 +20,21 @@
 
 ;; live test for one ticker
 
-(-> "LUV"
+(-> "UAL"
     xbrl-shares/share-summary-ticker
     shares-ui
     print-table)
 
-(-> "LUV"
+(-> "UAL"
     xbrl-shares/share-summary-ticker
     ticker-ui
     print-table)
 
-(-> "LUV"
+(-> "UAL"
     xbrl-shares/share-summary-ticker
     :shares
     (xbrl-shares/shares-outstanding))
+
 
 (db-shares/get-shares-ticker "LUV")
 (db-shares/get-shares-cik "0000092380")
@@ -46,7 +47,14 @@
         content (slurp url)]
     (spit (str "test/html/" ticker ".html") content)))
 
-(store-test "TDAC")
+(store-test "UAL")
+
+(->> "test/html/UAL.html"
+     (xbrl-shares/load-filing-facts)
+     (filter #(= :dei (:taxonomy %)))
+     (filter #(= :EntityCommonStockSharesOutstanding ( :concept %)))
+     
+    )
 
 ;; run from unit test data folder
 

@@ -1,7 +1,7 @@
 (ns edgar2.filing.xbrl.xbrl-shares-v1-test
   (:require [clojure.test :refer [deftest is]]
             [edgar.api :as e]
-            [edgar2.filing.xbrl :as xbrl]
+            [edgar2.filing.xbrl-facts :as xbrl-facts]
             [edgar2.filing.xbrl.xbrl-shares-v1 :as shares]))
 
 (defn- shares-fact
@@ -27,7 +27,7 @@
                   <ifrs-full:WeightedAverageShares contextRef=\"C_20240501to20250430\" unitRef=\"Share\" decimals=\"INF\">267326705</ifrs-full:WeightedAverageShares>
                   </xbrl>"]
     (is (= {"Common" {:weighted-diluted nil :weighted 338886497, :outstanding 351018130}}
-           (shares/share-summary (xbrl/parse-all [cover instance]))))))
+           (shares/share-summary (xbrl-facts/parse-all [cover instance]))))))
 
 (deftest outstanding-basic-wins-when-issued-is-also-present
   (is (= {"Common" {:weighted-diluted nil :weighted 100 :outstanding nil}}
@@ -72,7 +72,7 @@
               </body></html>"]
     (is (= {"Class A" {:weighted-diluted nil :weighted nil :outstanding 16778631}
             "Class B" {:weighted-diluted nil :weighted nil :outstanding 355040}}
-           (shares/share-summary (xbrl/parse html))))))
+           (shares/share-summary (xbrl-facts/parse html))))))
 
 (deftest voting-share-classes-stay-distinct
   (let [html "<html><body>
@@ -109,7 +109,7 @@
             "Subordinate Voting" {:weighted-diluted nil :weighted nil :outstanding 169080759}
             "Multiple Voting" {:weighted-diluted nil :weighted nil :outstanding 23226386}
             "Super Voting" {:weighted-diluted nil :weighted nil :outstanding 0}}
-           (shares/share-summary (xbrl/parse html))))))
+           (shares/share-summary (xbrl-facts/parse html))))))
 
 (def tap-cover
   "<html><body>
@@ -189,9 +189,9 @@
                      :outstanding 175592622
                      :ticker "TAP"
                      :exchange "New York Stock Exchange"}}
-         (shares/share-summary (xbrl/parse tap-cover))))
+         (shares/share-summary (xbrl-facts/parse tap-cover))))
   (is (not-any? #(= "TAP 32" (:ticker %))
-                (vals (shares/share-summary (xbrl/parse tap-cover))))))
+                (vals (shares/share-summary (xbrl-facts/parse tap-cover))))))
 
 (deftest common-listing-keeps-ticker-when-a-note-has-no-debt-axis
   (let [html "<html><body>
@@ -230,7 +230,7 @@
                       :outstanding 8654370
                       :ticker "BSET"
                       :exchange "Nasdaq"}}
-           (shares/share-summary (xbrl/parse html))))))
+           (shares/share-summary (xbrl-facts/parse html))))))
 
 (deftest dei-outstanding-wins-over-shares-outstanding
   (is (= {"Common" {:weighted-diluted nil :weighted nil :outstanding 100}}
@@ -295,7 +295,7 @@
               </body></html>"]
     (is (= {"Common" {:weighted-diluted nil :weighted nil, :outstanding 550107295}
             "Common Nonvoting" {:weighted-diluted nil :weighted nil, :outstanding 0}}
-           (shares/share-summary (xbrl/parse html))))))
+           (shares/share-summary (xbrl-facts/parse html))))))
 
 (defn- ifrs-class-context
   [id member period]
@@ -333,7 +333,7 @@
                        :ticker "ERIC"
                        :exchange "The NASDAQ Stock Market LLC"}
             "Class C" {:weighted-diluted nil :weighted nil, :outstanding 0}}
-           (shares/share-summary (xbrl/parse html))))))
+           (shares/share-summary (xbrl-facts/parse html))))))
 
 (defn- ifrs-share-context
   [id dims period]
@@ -370,7 +370,7 @@
                   "</body></html>")]
     (is (= {"Common" {:weighted-diluted nil :weighted 929100000, :outstanding 932525817}
             "Class B" {:weighted-diluted nil :weighted nil, :outstanding 0}}
-           (shares/share-summary (xbrl/parse html))))))
+           (shares/share-summary (xbrl-facts/parse html))))))
 
 (deftest dei-outstanding-wins-over-ifrs-number-of-shares-outstanding
   (is (= {"Common" {:weighted-diluted nil :weighted nil :outstanding 100}}
@@ -379,13 +379,13 @@
                    :ifrs-full {:NumberOfSharesOutstanding (shares-fact 999)}}}))))
 
 (deftest parent-wins-when-subsidiaries-also-report
-  (let [facts (xbrl/parse (combined-cover nil))]
+  (let [facts (xbrl-facts/parse (combined-cover nil))]
     (is (= 3 (shares/reporting-entities facts)))
     (is (= {"Common" {:weighted-diluted nil :weighted 1221000000, :outstanding 1221563111}}
            (shares/share-summary facts)))))
 
 (deftest parent-member-is-recognized-when-every-row-has-an-entity-axis
-  (let [facts (xbrl/parse (combined-cover "wmb:WilliamsCompaniesIncMember"))]
+  (let [facts (xbrl-facts/parse (combined-cover "wmb:WilliamsCompaniesIncMember"))]
     (is (= 3 (shares/reporting-entities facts)))
     (is (= {"Common" {:weighted-diluted nil :weighted 1221000000, :outstanding 1221563111}}
            (shares/share-summary facts)))))

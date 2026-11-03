@@ -7,7 +7,7 @@
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
-            [edgar2.filing.xbrl :as xbrl]
+            [edgar2.filing.xbrl-facts :as xbrl-facts]
             [edgar2.filing.xbrl-loader :as xbrl-loader]
             [jsonista.core :as json]))
 (def ^:private json-mapper
@@ -47,7 +47,7 @@
    (if-let [docs (xbrl-loader/load-documents (or (:file args) (:url args)))]
      (let [where (-> docs first :where)
           accn (accession where)
-           parsed (xbrl/parse-all (map :text docs)
+           parsed (xbrl-facts/parse-all (map :text docs)
                                   (cond-> {} accn (assoc :accn accn)))
            shares (get-in parsed [:facts :dei :EntityCommonStockSharesOutstanding])]
        (println (:entityName parsed) " cik " (:cik parsed))

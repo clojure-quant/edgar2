@@ -2,7 +2,9 @@
   "Parse one filing into a share summary."
   (:require [clojure.string :as str]
             [edgar.api :as e]
-            [edgar2.filing.xbrl :as xbrl]))
+            [edgar2.filing.xbrl :as xbrl]
+            [edgar2.filing.xbrl-facts :as xbrl-facts]
+            [edgar2.filing.xbrl-loader :as xbrl-loader]))
 
 (def ^:private class-axes
   "Class-of-stock axes. An IFRS filer uses its own axis, not the US-GAAP one."
@@ -13,7 +15,7 @@
   "Value for `k` when map keys may be keywords or strings.
 
   A sorted map throws if probed with the other key type, which is how
-  `edgar2.filing.xbrl/parse` stores units and dimensions."
+  `edgar2.filing.xbrl-facts/parse` stores units and dimensions."
   [m k]
   (when m
     (let [s (if (keyword? k) (name k) (str k))]
@@ -358,7 +360,7 @@
   When several entities report (`dei:LegalEntityAxis`), only the parent's
   rows are used. See `reporting-entities` for how many there are.
 
-  When `facts` has `:cover` (from `edgar2.filing.xbrl/parse`), each class
+  When `facts` has `:cover` (from `edgar2.filing.xbrl-facts/parse`), each class
   the cover lists as stock also gets `:ticker` and `:exchange`. A debt
   line, such as senior notes, is not a share class and is left out."
   [facts]
@@ -487,14 +489,14 @@
   "Parse one `filing` into the `share-summary-cik` result map."
   [cik filing]
   (let [html (e/html filing)
-        exhibit (xbrl/statement-exhibit-name html)
+        exhibit (xbrl-loader/statement-exhibit-name html)
         instance (instance-text filing)
         texts (->> [html
                     (when exhibit (e/filing-document filing exhibit))
                     instance]
                    (keep identity)
                    vec)
-        parsed (xbrl/parse-all texts {:accn (:accessionNumber filing)
+        parsed (xbrl-facts/parse-all texts {:accn (:accessionNumber filing)
                                       :filed (:filingDate filing)
                                       :form (:form filing)})
         entities (reporting-entities parsed)]

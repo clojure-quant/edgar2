@@ -7,7 +7,7 @@
   taxonomy combobox submits a GET request, so switching taxonomies reuses
   the cached rows instead of re-parsing the filing."
   (:require [clojure.string :as str]
-            [edgar2.filing.xbrl :as xbrl]
+            [edgar2.filing.xbrl-overview :as xbrl-overview]
             [edgar2.filing.xbrl-loader :as xbrl-loader]))
 
 (defn fact-rows
@@ -18,7 +18,7 @@
   `:dimension` keys. Facts whose context does not resolve have nil
   period/dimension."
   [docs]
-  (->> (xbrl/facts-with-concepts (xbrl/overview docs))
+  (->> (xbrl-overview/facts-with-concepts (xbrl-overview/overview docs))
        (mapv #(select-keys % [:taxonomy :concept :value :period :dimension]))))
 
 (defn facts->taxonomies
@@ -85,7 +85,7 @@
   "Escaped duration `start-end` or instant date; an absent period becomes
   the shared em dash so the fact stays visible."
   [period]
-  (html-escape (label (xbrl/printable-period period))))
+  (html-escape (label (xbrl-overview/printable-period period))))
 
 (defn- qname
   "Keyword as `prefix:name`, without the leading colon `str` would add.
@@ -106,11 +106,11 @@
                       dimension)))
 
 (defn- dimension-html
-  "Visible member text from `xbrl/printable-dimension`, with the axis/member
+  "Visible member text from `xbrl-overview/printable-dimension`, with the axis/member
   pairs in a `title`. An absent dimension is an em dash with no title, and
   both the text and the title are escaped."
   [dimension]
-  (let [s (xbrl/printable-dimension dimension)]
+  (let [s (xbrl-overview/printable-dimension dimension)]
     (if s
       (str "<span class=\"dimension\" title=\""
            (html-escape (dimension-title dimension)) "\">"

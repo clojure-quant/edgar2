@@ -2,7 +2,9 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is]]
             [edgar2.filing.xbrl :as xbrl]
-            [edgar2.filing.xbrl-loader :as xbrl-loader]))
+            [edgar2.filing.xbrl-facts :as xbrl-facts]
+            [edgar2.filing.xbrl-loader :as xbrl-loader]
+            [edgar2.filing.xbrl-overview :as xbrl-overview]))
 
 (def coke-cover
   "<html><body>
@@ -52,7 +54,7 @@
   {:accn "0001628280-26-009057" :filed "2026-02-18"})
 
 (deftest cover-page-shares-keep-each-class
-  (let [parsed (xbrl/parse coke-cover filing-meta)
+  (let [parsed (xbrl-facts/parse coke-cover filing-meta)
         shares (get-in parsed [:facts :dei :EntityCommonStockSharesOutstanding :units "shares"])
         interest (get-in parsed [:facts :us-gaap :InterestIncomeExpenseNonoperatingNet :units "USD"])]
     (is (= 317540 (:cik parsed)))
@@ -92,22 +94,22 @@
 
 (deftest statement-exhibit-name-is-ex99d2
   (is (= "su-20251231xex99d2.htm"
-         (xbrl/statement-exhibit-name
+         (xbrl-loader/statement-exhibit-name
           "<a href=\"su-20251231xex99d1.htm\"></a><a href=\"su-20251231xex99d2.htm\"></a><a href=\"su-20251231xex99d10.htm\"></a>")))
-  (is (nil? (xbrl/statement-exhibit-name "<a href=\"su-20251231xex99d10.htm\"></a>")))
-  (is (nil? (xbrl/statement-exhibit-name
+  (is (nil? (xbrl-loader/statement-exhibit-name "<a href=\"su-20251231xex99d10.htm\"></a>")))
+  (is (nil? (xbrl-loader/statement-exhibit-name
              "<a href=\"https://www.sec.gov/Archives/edgar/data/1273813/000110465909052888/a09-25104_1ex99d2.htm\"></a>"))))
 
 (deftest statement-exhibit-name-matches-dashed-variants
   (is (= "exhibit99-2.htm"
-         (xbrl/statement-exhibit-name "<a href=\"exhibit99-1.htm\"></a><a href=\"exhibit99-2.htm\"></a>")))
+         (xbrl-loader/statement-exhibit-name "<a href=\"exhibit99-1.htm\"></a><a href=\"exhibit99-2.htm\"></a>")))
   (is (= "ex-99.2.htm"
-         (xbrl/statement-exhibit-name "<a href=\"ex-99.2.htm\"></a>")))
+         (xbrl-loader/statement-exhibit-name "<a href=\"ex-99.2.htm\"></a>")))
   (is (= "ex99-2.htm"
-         (xbrl/statement-exhibit-name "<a href=\"ex99-2.htm\"></a>")))
+         (xbrl-loader/statement-exhibit-name "<a href=\"ex99-2.htm\"></a>")))
   (is (= "su-20251231x_d2.htm"
-         (xbrl/statement-exhibit-name "<a href=\"su-20251231x_d2.htm\"></a>")))
-  (is (nil? (xbrl/statement-exhibit-name "<a href=\"form1992.htm\"></a>"))))
+         (xbrl-loader/statement-exhibit-name "<a href=\"su-20251231x_d2.htm\"></a>")))
+  (is (nil? (xbrl-loader/statement-exhibit-name "<a href=\"form1992.htm\"></a>"))))
 
 (deftest numeric-formats-and-scales
   (let [html "<html><body>
@@ -121,7 +123,7 @@
    <ix:nonFraction name=\"ifrs-full:Goodwill\" contextRef=\"fy\" unitRef=\"eur\" scale=\"-2\" format=\"ixt:num-dot-decimal\">5</ix:nonFraction>
    <ix:nonFraction name=\"ifrs-full:IntangibleAssetsOtherThanGoodwill\" contextRef=\"fy\" unitRef=\"eur\" scale=\"6\" sign=\"-\" format=\"ixt:num-dot-decimal\">1.5</ix:nonFraction>
    </body></html>"
-        parsed (xbrl/parse html)
+        parsed (xbrl-facts/parse html)
         val #(get-in parsed [:facts :ifrs-full % :units "EUR" 0 :val])]
     (is (= 1234500 (val :Revenue)))
     (is (= 1234.5 (val :Assets)))
@@ -137,7 +139,7 @@
    <xbrli:unit id=\"segment\"><xbrli:measure>segment</xbrli:measure></xbrli:unit>
    <ix:nonFraction name=\"us-gaap:NumberOfReportableSegments\" contextRef=\"fy\" unitRef=\"segment\" decimals=\"INF\" format=\"ixt-sec:numwordsen\"><ix:nonFraction name=\"us-gaap:NumberOfReportableSegments\" contextRef=\"fy\" unitRef=\"segment\" scale=\"0\">1</ix:nonFraction></ix:nonFraction>
    </body></html>"
-        rows (:units (get-in (xbrl/parse html)
+        rows (:units (get-in (xbrl-facts/parse html)
                              [:facts :us-gaap :NumberOfReportableSegments]))
         facts (mapcat val rows)]
     (is (= [1] (mapv :val facts)))))
@@ -155,7 +157,7 @@
    <ix:nonFraction name=\"us-gaap:EarningsPerShareBasic\" contextRef=\"fy\" unitRef=\"usd\" scale=\"3\">1,234</ix:nonFraction>
    <ix:nonFraction name=\"dei:EntityCommonStockSharesOutstanding\" contextRef=\"instant\" unitRef=\"shares\">100</ix:nonFraction>
    </body></html>"
-        parsed (xbrl/parse html)
+        parsed (xbrl-facts/parse html)
         shares (get-in parsed [:facts :dei :EntityCommonStockSharesOutstanding :units "shares" 0])
         eps (get-in parsed [:facts :us-gaap :EarningsPerShareBasic :units "USD/shares" 0])]
     (is (= 100 (:val shares)))
@@ -173,7 +175,7 @@
    </xbrli:xbrl>"]
     (is (true? (xbrl/instance-document? instance)))
     (is (= 99000000
-           (get-in (xbrl/parse instance)
+           (get-in (xbrl-facts/parse instance)
                    [:facts :us-gaap :CommonStockSharesOutstanding :units "shares" 0 :val])))))
 
 (deftest instance-unit-keeps-its-divide
@@ -185,7 +187,7 @@
      </divide></unit>
      <us-gaap:EarningsPerShareBasic contextRef=\"c\" unitRef=\"u\">1.25</us-gaap:EarningsPerShareBasic>
    </xbrl>"]
-    (is (= 1.25 (get-in (xbrl/parse instance)
+    (is (= 1.25 (get-in (xbrl-facts/parse instance)
                         [:facts :us-gaap :EarningsPerShareBasic :units "USD/shares" 0 :val])))))
 
 (deftest exhibit-fact-uses-cover-context
@@ -203,7 +205,7 @@
         exhibit "<html><body>
                  <ix:nonFraction name=\"ifrs-full:RevenueFromContractsWithCustomers\" contextRef=\"c-1\" unitRef=\"cad\" scale=\"6\">123</ix:nonFraction>
                  </body></html>"
-        parsed (xbrl/parse-all [cover exhibit] {:accn "0001104659-26-020411"})]
+        parsed (xbrl-facts/parse-all [cover exhibit] {:accn "0001104659-26-020411"})]
     (is (= 311337 (:cik parsed)))
     (is (= "Suncor Energy Inc." (:entityName parsed)))
     (is (= [{:start "2025-01-01"
@@ -227,7 +229,7 @@
                   <context id=\"C_20260430\"><period><instant>2026-04-30</instant></period></context>
                   <unit id=\"Share\"><measure>shares</measure></unit>
                   </xbrl>"
-        parsed (xbrl/parse-all [cover instance])]
+        parsed (xbrl-facts/parse-all [cover instance])]
     (is (= [{:end "2026-04-30"
              :val 351018130
              :fy 2026
@@ -243,11 +245,11 @@
               <xbrli:unit id=\"pure\"><xbrli:measure>xbrli:pure</xbrli:measure></xbrli:unit>
               <ix:nonFraction name=\"us-gaap:NumberOfReportingUnits\" contextRef=\"c\" unitRef=\"pure\" format=\"ixt-sec:numwordsen\">one hundred and five</ix:nonFraction>
               </body></html>"
-        parsed (xbrl/parse html)]
+        parsed (xbrl-facts/parse html)]
     (is (= 105 (get-in parsed [:facts :us-gaap :NumberOfReportingUnits :units "pure" 0 :val])))))
 
 (deftest overview-flattens-facts-contexts-dimensions
-  (let [o (xbrl/overview [{:text coke-cover :where "cover"}])
+  (let [o (xbrl-overview/overview [{:text coke-cover :where "cover"}])
         facts (:facts o)
         shares (filterv #(and (= :dei (:taxonomy %))
                               (= :EntityCommonStockSharesOutstanding (:concept %))
@@ -291,7 +293,7 @@
    </body></html>")
 
 (deftest overview-keeps-typed-members-and-dangling-contexts
-  (let [o (xbrl/overview [{:text typed-cover :where "x"}])
+  (let [o (xbrl-overview/overview [{:text typed-cover :where "x"}])
         typed (first (filter #(= :SomeTypedAxis (:axis-concept %)) (:dimension o)))
         dangling (first (filter #(= :Assets (:concept %)) (:facts o)))
         context (first (filter #(= "c-t" (:context-id %)) (:context o)))]
@@ -305,19 +307,19 @@
 
 (deftest printable-period-renders-durations-and-instants
   (is (= "2025-01-01-2025-12-31"
-         (xbrl/printable-period {:start "2025-01-01" :end "2025-12-31"})))
-  (is (= "2026-01-30" (xbrl/printable-period {:instant "2026-01-30"})))
-  (is (nil? (xbrl/printable-period nil)))
-  (is (nil? (xbrl/printable-period {}))))
+         (xbrl-overview/printable-period {:start "2025-01-01" :end "2025-12-31"})))
+  (is (= "2026-01-30" (xbrl-overview/printable-period {:instant "2026-01-30"})))
+  (is (nil? (xbrl-overview/printable-period nil)))
+  (is (nil? (xbrl-overview/printable-period {}))))
 
 (deftest printable-dimension-joins-members-without-axes-and-caps
   (is (= ":a/X, date"
-         (xbrl/printable-dimension
+         (xbrl-overview/printable-dimension
           (array-map :a/Axis :a/X :b/TypedAxis "date"))))
   (let [member (keyword "us-gaap" (apply str (repeat 30 "x")))]
-    (is (= 20 (count (xbrl/printable-dimension {:us-gaap/Axis member})))))
-  (is (nil? (xbrl/printable-dimension nil)))
-  (is (nil? (xbrl/printable-dimension {}))))
+    (is (= 20 (count (xbrl-overview/printable-dimension {:us-gaap/Axis member})))))
+  (is (nil? (xbrl-overview/printable-dimension nil)))
+  (is (nil? (xbrl-overview/printable-dimension {}))))
 
 (defn- rm-r
   [^java.io.File f]
