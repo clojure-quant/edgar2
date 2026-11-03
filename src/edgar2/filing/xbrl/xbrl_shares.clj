@@ -7,11 +7,11 @@
   `StatementClassOfStockAxis` keeps its member keyword, and every other
   dimension is \"UnknownClass\"."
   (:require
+   [clojure.string :as str]
    [edgar2.filing.xbrl-loader :as xbrl-loader]
    [edgar2.filing.xbrl :as xbrl]
    [edgar2.web.filing :as wf])
-  (:import [java.time LocalDate]
-           [java.time.temporal ChronoUnit]))
+  (:import [java.time LocalDate]))
 
 (defn load-filing-facts [file-or-url]
   (-> file-or-url
@@ -170,7 +170,7 @@
   #"(?i)\b(?:notes?|bonds?|debentures?)\b")
 
 (defn debt-title? [fact]
-  (re-find debt-title-re (:title fact)))
+  (re-find debt-title-re (str (:title fact))))
 
 (def fields-tickers
   {:ticker ticker?
@@ -184,6 +184,9 @@
        (map (fn [[k v]]
               (assoc (facts->map fields-tickers v) :class k)))
        (remove debt-title?)
+       (remove (fn [{:keys [ticker title]}]
+                 (and (str/blank? (str ticker))
+                      (str/blank? (str title)))))
        (into [])))
 
 
@@ -267,7 +270,6 @@
   as their aggregate and dropped; and `:dei/AdrMember`, an ADR count rather
   than a share class, is dropped. The remaining class values are summed."
   [shares]
-  (println "shares..")
   (cond
     (empty? shares)
     nil
@@ -289,9 +291,7 @@
                                               (== v (reduce + 0 others)))))
                               k))
                           (sort-by (comp str key) classes))
-          _ (println "aggregate: " aggregate)
           classes  (dissoc classes :dei/AdrMember aggregate)]
-      (println "classes:" classes)
       (when (seq classes)
         (->> classes
              vals

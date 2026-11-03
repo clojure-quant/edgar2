@@ -17,42 +17,28 @@
        (map #(select-keys % [:ticker :exchange :title :class]))
        (into [])))
 
+;; live test for one ticker
 
-(-> "AAPL" ; 10-K with 1 class, lots of notes
+(-> "ABT"
     xbrl-shares/share-summary-ticker
     shares-ui
     print-table)
 
-(-> "AAPL" 
+(-> "ABT"
     xbrl-shares/share-summary-ticker
     ticker-ui
     print-table)
 
-(-> "CPA" ; 20-F filer
-    xbrl-shares/share-summary-ticker
-    shares-ui
-    print-table)
+;; store for unit test
 
-(-> "COKE" ; 10-K stock with 2 classes, 1 listed
-    xbrl-shares/share-summary-ticker
-    shares-ui
-    print-table)
+(defn store-test [ticker]
+  (let [url (xbrl-shares/ticker->url-file ticker)
+        content (slurp url)]
+    (spit (str "test/html/" ticker ".html") content)))
 
-(-> "COKE" ; 10-K stock with 2 listed classes and lots of notes
-    xbrl-shares/share-summary-ticker
-    ticker-ui
-    print-table)
+(store-test "TDAC")
 
-
-(-> "BRK-B" 
-    xbrl-shares/share-summary-ticker
-    shares-ui
-    print-table)
-
-(-> "BRK-B" ; 10-K stock with 2 listed classes and lots of notes
-    xbrl-shares/share-summary-ticker
-    ticker-ui
-    print-table)
+;; run from unit test data folder
 
 (-> "test/html/TDAC.html"
     (xbrl-shares/load-filing-facts)
@@ -65,23 +51,3 @@
     (xbrl-shares/share-summary)
     :shares
     (xbrl-shares/shares-outstanding))
-;66564294
-
-(-> "test/html/TDAC.html"
-    (xbrl-shares/load-filing-facts)
-    (xbrl-shares/share-summary)
-    ticker-ui
-    print-table)
-
-
-(defn store-test [ticker]
-  (let [url (xbrl-shares/ticker->url-file ticker)
-        content (slurp url)]
-    (spit (str "test/html/" ticker ".html") content)))
-
-(store-test "TDAC")
-
-; tdac: ticker: shares + units + warrant
-;        2 share classes
-; differ in voting rights.
-

@@ -4,8 +4,7 @@
   clj -X:xbrl-shares
   clj -X:xbrl-shares :ticker '\"SONY\"'
   clj -X:xbrl-shares :file '\"test/facts/COKE.json\"'"
-  (:require [clojure.java.io :as io]
-            [clojure.pprint :as pprint]
+  (:require [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar2.db.universe :as universe]
             [edgar2.download.dataset :as dataset]
