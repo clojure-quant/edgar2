@@ -14,12 +14,16 @@
   "Every fact from `docs`, the vector built by `xbrl-loader/load-documents`.
 
   Keeps document order and duplicate facts, like the demo table, and keeps
-  only the projected `:taxonomy`, `:concept`, `:value`, `:period`, and
-  `:dimension` keys. Facts whose context does not resolve have nil
-  period/dimension."
+  only the projected `:taxonomy`, `:concept`, `:value`, `:period`, `:cik`,
+  and `:dimension` keys. `:cik` is the fact's context entity identifier as
+  written in the document, not the filing's CIK.
+
+  Facts whose context does not resolve, or whose context has no entity, have
+  nil period/cik/dimension."
   [docs]
   (->> (xbrl-overview/facts-with-concepts (xbrl-overview/overview docs))
        (mapv #(assoc (select-keys % [:taxonomy :concept :value :period])
+                     :cik (get-in % [:entity :cik])
                      :dimension (get-in % [:entity :dimension])))))
 
 (defn facts->taxonomies
@@ -143,11 +147,12 @@
   renders shortened with its full text in a hidden sibling span."
   [rows]
   (str/join
-   (map (fn [{:keys [taxonomy concept period value dimension]}]
+   (map (fn [{:keys [taxonomy concept period value cik dimension]}]
           (str "<tr><td>" (html-escape (label taxonomy)) "</td>"
                "<td class=\"concept\">" (html-escape (label concept)) "</td>"
                "<td class=\"period\">" (period-html period) "</td>"
                "<td>" (value-html value) "</td>"
+               "<td class=\"cik\">" (html-escape (or cik "")) "</td>"
                "<td>" (dimension-html dimension) "</td></tr>"))
         rows)))
 
@@ -207,7 +212,7 @@
        "th{position:sticky;top:0;background:#f4f4f4;font-weight:600;z-index:1}"
        "td:first-child{color:#555;white-space:nowrap}"
        "td.concept{overflow-wrap:anywhere}"
-       "td.period{white-space:nowrap}"
+       "td.period,td.cik{white-space:nowrap}"
        ".dimension{display:inline-block;max-width:8em;overflow:hidden;"
        "text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}"
        ".empty,.error{margin:12px;color:#555}"
@@ -306,7 +311,7 @@
                    (if (seq shown)
                       (str "<table><thead><tr>"
                            "<th>Taxonomy</th><th>Concept</th><th>Period</th>"
-                           "<th>Value</th><th>Dimension</th>"
+                           "<th>Value</th><th>CIK</th><th>Dimension</th>"
                            "</tr></thead><tbody>"
                           (rows-html shown)
                           "</tbody></table>")

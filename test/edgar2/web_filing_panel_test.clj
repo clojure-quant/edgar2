@@ -72,9 +72,12 @@
            (:period (:Revenue by-concept))))
     (is (= {:us-gaap/StatementBusinessSegmentsAxis :us-gaap/RetailMember}
            (:dimension (:Revenue by-concept))))
+    (is (= "0000000001" (:cik (:Revenue by-concept))))
     (is (= {:instant "2026-01-30"} (:period (:Assets by-concept))))
+    (is (nil? (:cik (:Assets by-concept))))
     (is (nil? (:dimension (:Assets by-concept))))
     (is (nil? (:period (:Liabilities by-concept))))
+    (is (nil? (:cik (:Liabilities by-concept))))
     (is (nil? (:dimension (:Liabilities by-concept))))))
 
 (deftest fact-rows-keeps-every-fact-in-document-order
@@ -83,9 +86,10 @@
     (is (= [:DocumentType :Assets :DocumentType :EntityRegistrantName]
            (mapv :concept rows)))
     (is (= [:dei :us-gaap :dei :dei] (mapv :taxonomy rows)))
-    (is (every? #(= #{:taxonomy :concept :value :period :dimension}
+    (is (every? #(= #{:taxonomy :concept :value :period :cik :dimension}
                     (set (keys %)))
-                rows))))
+                rows))
+    (is (every? #(nil? (:cik %)) rows))))
 
 (deftest facts->taxonomies-puts-dei-first-and-skips-nil
   (is (= [:dei :srt :us-gaap]
@@ -125,6 +129,7 @@
                                 :concept :DocumentType
                                 :value "10-K"}])]
     (is (= 2 (count (re-seq #"\u2014" html))))
+    (is (str/includes? html "<td class=\"cik\"></td>"))
     (is (not (str/includes? html "title=")))))
 
 (deftest rows-html-caps-and-escapes-a-long-dimension
@@ -135,6 +140,22 @@
                                 :dimension {:a/Axis member}}])]
     (is (str/includes? html ">:b/&lt;script&gt;alert(1)&lt;</span>"))
     (is (str/includes? html "b:&lt;script&gt;alert(1)&lt;/script&gt;tail"))
+    (is (not (str/includes? html "<script>")))))
+
+(deftest rows-html-renders-a-present-cik
+  (let [html (panel/rows-html [{:taxonomy :dei
+                                :concept :DocumentType
+                                :value "10-K"
+                                :cik "0000000001"}])]
+    (is (str/includes? html "<td class=\"cik\">0000000001</td>"))))
+
+(deftest rows-html-escapes-the-cik
+  (let [html (panel/rows-html [{:taxonomy :dei
+                                :concept :DocumentType
+                                :value "10-K"
+                                :cik "<script>alert(1)</script>"}])]
+    (is (str/includes? html
+                       "<td class=\"cik\">&lt;script&gt;alert(1)&lt;/script&gt;</td>"))
     (is (not (str/includes? html "<script>")))))
 
 (deftest rows-html-renders-blank-values-as-an-em-dash
@@ -195,9 +216,10 @@
       (let [html (panel/page-html file)]
         (is (str/includes? html
                            (str "<th>Taxonomy</th><th>Concept</th><th>Period</th>"
-                                "<th>Value</th><th>Dimension</th>")))
+                                "<th>Value</th><th>CIK</th><th>Dimension</th>")))
         (is (str/includes? html ">2025-01-01-2025-12-31</td>"))
         (is (str/includes? html ">2026-01-30</td>"))
+        (is (str/includes? html "<td class=\"cik\">0000000001</td>"))
         (is (= 1 (count (re-seq #"class=\"dimension\"" html))))
         (is (str/includes?
              html
