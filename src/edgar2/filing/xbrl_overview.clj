@@ -100,17 +100,22 @@
                             value)))))
 
 (defn facts-with-concepts
-  "Facts joined to their context's period, entity identifier, and
-  dimension by :context-id. A fact whose context does not resolve keeps
-  its raw :context-id and gets nil joined fields."
+  "Facts joined to their context's period and entity by :context-id. Each
+  resolved fact's :entity is a map with :cik and, when the context has
+  dimensions, :dimension. A fact whose context does not resolve keeps its
+  raw :context-id and gets nil joined fields."
   [data]
   (let [contexts (into {} (map (juxt :context-id identity)) (:context data))]
     (mapv (fn [fact]
-            (let [ctx (get contexts (:context-id fact))]
-              (assoc fact
-                     :period (:period ctx)
-                     :identifier (get-in ctx [:entity :identifier])
-                     :dimension (:dimension ctx))))
+            (let [ctx (get contexts (:context-id fact))
+                  dimension (:dimension ctx)
+                  entity (when ctx
+                           (cond-> {:cik (get-in ctx [:entity :identifier])}
+                             (seq dimension) (assoc :dimension dimension)))]
+              (-> fact
+                  (dissoc :identifier :dimension)
+                  (assoc :period (:period ctx)
+                         :entity entity))))
           (:facts data))))
 
 (defn print-concepts

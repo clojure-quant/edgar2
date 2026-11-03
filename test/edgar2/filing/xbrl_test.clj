@@ -305,6 +305,39 @@
     (is (= [] (:dimensions dangling)))
     (is (= "missing" (:context-id dangling)))))
 
+(deftest facts-with-concepts-moves-dimension-into-entity
+  (let [facts (xbrl-overview/facts-with-concepts
+               (xbrl-overview/overview [{:text coke-cover :where "cover"}]))
+        by-context (fn [id] (first (filter #(= id (:context-id %)) facts)))
+        shares (filter #(and (= :EntityCommonStockSharesOutstanding (:concept %))
+                             (= "c-3" (:context-id %)))
+                       facts)]
+    (is (= {:cik "0000317540"
+            :dimension {:us-gaap/StatementClassOfStockAxis
+                        :coke/CommonClassUndefinedMember}}
+           (:entity (by-context "c-3"))))
+    (is (= {:cik "0000317540"} (:entity (by-context "c-1"))))
+    (is (not (contains? (:entity (by-context "c-1")) :dimension)))
+    (is (every? #(not (contains? % :identifier)) facts))
+    (is (every? #(not (contains? % :dimension)) facts))
+    (is (= [{:axis-taxonomy :us-gaap
+             :axis-concept :StatementClassOfStockAxis
+             :member-taxonomy :coke
+             :member-concept :CommonClassUndefinedMember}]
+           (:dimensions (first shares))))))
+
+(deftest facts-with-concepts-handles-typed-and-dangling-contexts
+  (let [facts (xbrl-overview/facts-with-concepts
+               (xbrl-overview/overview [{:text typed-cover :where "x"}]))
+        typed (first (filter #(= :Revenue (:concept %)) facts))
+        dangling (first (filter #(= :Assets (:concept %)) facts))]
+    (is (= {:cik "0000000001"
+            :dimension {:us-gaap/SomeTypedAxis "2025-01-01"}}
+           (:entity typed)))
+    (is (nil? (:entity dangling)))
+    (is (= "missing" (:context-id dangling)))
+    (is (nil? (:period dangling)))))
+
 (deftest printable-period-renders-durations-and-instants
   (is (= "2025-01-01-2025-12-31"
          (xbrl-overview/printable-period {:start "2025-01-01" :end "2025-12-31"})))

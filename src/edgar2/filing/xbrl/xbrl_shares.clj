@@ -73,25 +73,32 @@
 
 ;; share-class 
 
+(defn fact-dimension
+  "The axis→member map joined onto a fact's `:entity`, or nil when the fact
+  has no entity or no dimensions."
+  [fact]
+  (get-in fact [:entity :dimension]))
+
 (defn determine-class
   "Class key for a fact: the undimensioned total, a class-axis member, or
   \"UnknownClass\"."
-  [{:keys [dimension]}]
-  (cond
-    (empty? dimension)
-    "CommonStockTotal"
+  [fact]
+  (let [dimension (fact-dimension fact)]
+    (cond
+      (empty? dimension)
+      "CommonStockTotal"
 
-    (contains? dimension :ifrs-full/ClassesOfShareCapitalAxis)
-    (get dimension :ifrs-full/ClassesOfShareCapitalAxis)
+      (contains? dimension :ifrs-full/ClassesOfShareCapitalAxis)
+      (get dimension :ifrs-full/ClassesOfShareCapitalAxis)
 
-    (contains? dimension :us-gaap/StatementClassOfStockAxis)
-    (get dimension :us-gaap/StatementClassOfStockAxis)
+      (contains? dimension :us-gaap/StatementClassOfStockAxis)
+      (get dimension :us-gaap/StatementClassOfStockAxis)
 
-    (contains? dimension :dei/LegalEntityAxis)
-    (get dimension :dei/LegalEntityAxis)
-    
-    :else
-    "UnknownClass"))
+      (contains? dimension :dei/LegalEntityAxis)
+      (get dimension :dei/LegalEntityAxis)
+
+      :else
+      "UnknownClass")))
 
 ;; filing info 
 
@@ -180,7 +187,7 @@
 
 (defn tabulate-tickers [facts]
   (->> facts
-       (group-by :dimension)
+       (group-by #(or (fact-dimension %) {}))
        (map (fn [[k v]]
               (assoc (facts->map fields-tickers v) :class k)))
        (remove debt-title?)
@@ -203,7 +210,7 @@
   [facts-with-concepts]
   (->> facts-with-concepts
        (filter shares-outstanding?)
-       (map #(select-keys % [:concept :value :dimension]))))
+       (map #(select-keys % [:concept :value :entity]))))
 
 
 

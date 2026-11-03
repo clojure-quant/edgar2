@@ -19,7 +19,8 @@
   period/dimension."
   [docs]
   (->> (xbrl-overview/facts-with-concepts (xbrl-overview/overview docs))
-       (mapv #(select-keys % [:taxonomy :concept :value :period :dimension]))))
+       (mapv #(assoc (select-keys % [:taxonomy :concept :value :period])
+                     :dimension (get-in % [:entity :dimension])))))
 
 (defn facts->taxonomies
   "Distinct `:taxonomy` values in `facts`, `:dei` first, then by name.

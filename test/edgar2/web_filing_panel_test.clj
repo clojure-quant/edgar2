@@ -73,7 +73,7 @@
     (is (= {:us-gaap/StatementBusinessSegmentsAxis :us-gaap/RetailMember}
            (:dimension (:Revenue by-concept))))
     (is (= {:instant "2026-01-30"} (:period (:Assets by-concept))))
-    (is (= {} (:dimension (:Assets by-concept))))
+    (is (nil? (:dimension (:Assets by-concept))))
     (is (nil? (:period (:Liabilities by-concept))))
     (is (nil? (:dimension (:Liabilities by-concept))))))
 
