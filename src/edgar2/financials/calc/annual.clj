@@ -5,7 +5,7 @@
             [edgar2.financials.derived :as derived]
             [edgar2.financials.calc.concept :as calc-concept]
             [edgar2.financials.calc.quarterly :as calc-q]
-            [edgar2.financials.calc.regression :as regression]
+            [edgar2.regression.log :as log]
             [edgar2.financials.calc.row.dividend-coverage :as div-cov]
             [edgar2.financials.facts-ds :as facts-ds]))
 
@@ -270,7 +270,7 @@
         debt-v-div-ebitda (ratio debt-v ebitda-v)
         debt2ebitda (most-recent debt-v-div-ebitda)
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
-        earn (regression/earnings-regression
+        earn (log/log-regression
               (take-last sales-growth-window (reverse ni)))
         ni-qoy (calc-q/net-income-change-q-on-y q-ni)
         rev-qoy (calc-q/sales-change-q-on-y q-rev)

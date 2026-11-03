@@ -7,7 +7,7 @@
   SW: annual net income from /company/financials/10. That page asks for 10
   years; Smurfit Westrock has four annual columns, 2022 through 2025."
   (:require [clojure.pprint :as pprint]
-            [edgar2.financials.calc.regression :as regression]))
+            [edgar2.regression.log :as log]))
 
 (def pay-earnings
   "Oldest-first annual net income for PAY, including the 2022 loss."
@@ -21,7 +21,7 @@
 
 (defn- fit
   [label vals]
-  (let [result (regression/earnings-regression vals)]
+  (let [result (log/log-regression vals)]
     (println label)
     (pprint/pprint result)
     result))
