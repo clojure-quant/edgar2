@@ -100,6 +100,18 @@
       :else
       "UnknownClass")))
 
+(defn fact-for-dei-legal-entity? [{:keys [entity] :as _fact}]
+  ; :dei/LegalEntityAxis means the fact is for a different entity.
+  ; so we dont want it
+  ; TDAC reports share classes under :dei/LeegalEntityAxis
+  ; we added an escape hatch, because the values are normally
+  ; namespaced to contain a issuer specific namespace
+  (and (contains? (:dimension entity) :dei/LegalEntityAxis)
+       (let [v (get-in entity [:dimension :dei/LegalEntityAxis])
+             n (namespace v)]
+         (not (= n "us-gaap")))))
+;(namespace :us-gaap/CommonClassAMember)
+
 ;; filing info 
 
 (defn dei-concept? [target-concept {:keys [taxonomy concept]}]
@@ -209,7 +221,7 @@
   "The `dei:EntityCommonStockSharesOutstanding` facts in `summary`."
   [facts-with-concepts]
   (->> facts-with-concepts
-       (filter shares-outstanding?)
+       (filter shares-outstanding?) 
        (map #(select-keys % [:concept :value :entity]))))
 
 
@@ -238,6 +250,7 @@
                                 (remove-old-periods))
         facts-class-table (->> facts-with-concepts
                                (filter class-table?)
+                               (remove fact-for-dei-legal-entity?) ; UAL reports shares for multiple entities
                                (remove-old-periods))]
     {:end-date (get-dei-fact facts-with-concepts :DocumentPeriodEndDate)
      :cik  (get-dei-fact facts-with-concepts :EntityCentralIndexKey)

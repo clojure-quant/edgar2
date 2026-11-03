@@ -18,7 +18,11 @@
        (map #(select-keys % [:ticker :exchange :title :class]))
        (into [])))
 
+
+;; add test for UAL
 ;; live test for one ticker
+
+;; UAL is reporting shares for a subsidiary
 
 (-> "UAL"
     xbrl-shares/share-summary-ticker
@@ -49,12 +53,36 @@
 
 (store-test "UAL")
 
-(->> "test/html/UAL.html"
+(->> "test/html/BRK-B.html"
      (xbrl-shares/load-filing-facts)
      (filter #(= :dei (:taxonomy %)))
-     (filter #(= :EntityCommonStockSharesOutstanding ( :concept %)))
-     
-    )
+     (filter #(= :EntityCommonStockSharesOutstanding (:concept %)))
+     (map #(select-keys % [:entity :value :dimensions])))
+
+; UAL
+#_({:dimensions [], :entity {:cik "0000100517"}, :value 323430419}
+ {:dimensions [{:axis-concept :LegalEntityAxis,
+                :axis-taxonomy :dei,
+                :member-concept :UnitedAirLinesIncMember,
+                :member-taxonomy :ual}],
+  :entity {:cik "0000100517", :dimension #:dei{:LegalEntityAxis :ual/UnitedAirLinesIncMember}},
+  :value 1000})
+;; LegalEntitytAxis - no. 
+;; ClassesOfShareCaptialAxis - yes
+; CPA
+#_({:dimensions [], :entity {:cik "0001345105"}, :value 41138553}
+ {:dimensions [{:axis-concept :ClassesOfShareCapitalAxis,
+                :axis-taxonomy :ifrs-full,
+                :member-concept :ClassACommonStockMember,
+                :member-taxonomy :cpa}],
+  :entity {:cik "0001345105", :dimension #:ifrs-full{:ClassesOfShareCapitalAxis :cpa/ClassACommonStockMember}},
+  :value 30200428}
+ {:dimensions [{:axis-concept :ClassesOfShareCapitalAxis,
+                :axis-taxonomy :ifrs-full,
+                :member-concept :ClassBCommonStockMember,
+                :member-taxonomy :cpa}],
+  :entity {:cik "0001345105", :dimension #:ifrs-full{:ClassesOfShareCapitalAxis :cpa/ClassBCommonStockMember}},
+  :value 10938125})
 
 ;; run from unit test data folder
 

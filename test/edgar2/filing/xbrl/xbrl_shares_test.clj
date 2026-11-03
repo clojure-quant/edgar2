@@ -154,3 +154,32 @@
              xbrl-shares/share-summary
              :shares
              xbrl-shares/shares-outstanding))))
+
+; UAL is a 10-K stock with 1 class and facts for multiple legal entities,
+; which are filtered out so only the undimensioned total remains.
+
+(deftest ual-cover-summary-reads-classes-and-listing
+  (is (= {:cik "0000100517"
+          :company-name "United Airlines Holdings, Inc."
+          :end-date "December 31, 2025"
+          :shares {"CommonStockTotal"
+                   {:outstanding 323430419 :weighted 324900000 :diluted 328500000}}
+          :tickers [{:class {:us-gaap/StatementClassOfStockAxis :us-gaap/CommonStockMember}
+                     :exchange "The Nasdaq Stock Market LLC"
+                     :ticker "UAL"
+                     :title "Common Stock, $0.01 par value"}
+                    {:class {:us-gaap/StatementClassOfStockAxis :us-gaap/WarrantMember}
+                     :exchange nil
+                     :ticker nil
+                     :title "Preferred Stock Purchase Rights"}]}
+         (-> "test/html/UAL.html"
+             xbrl-shares/load-filing-facts
+             xbrl-shares/share-summary))))
+
+(deftest ual-shares-outstanding-is-the-total
+  (is (= 323430419
+         (-> "test/html/UAL.html"
+             xbrl-shares/load-filing-facts
+             xbrl-shares/share-summary
+             :shares
+             xbrl-shares/shares-outstanding))))
