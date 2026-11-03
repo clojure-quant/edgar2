@@ -87,6 +87,9 @@
     (contains? dimension :us-gaap/StatementClassOfStockAxis)
     (get dimension :us-gaap/StatementClassOfStockAxis)
 
+    (contains? dimension :dei/LegalEntityAxis)
+    (get dimension :dei/LegalEntityAxis)
+    
     :else
     "UnknownClass"))
 
@@ -106,13 +109,11 @@
 
 (defn classes [facts]
   (->> facts
-       (filter class-table?)
        (map determine-class)
        (distinct)))
 
 (defn periods [facts]
   (->> facts
-       (filter ticker-table?)
        (map :period)
        (distinct)))
 

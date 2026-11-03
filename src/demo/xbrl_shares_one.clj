@@ -23,7 +23,7 @@
     shares-ui
     print-table)
 
-(-> "AAPL" ; 10-K stock with 2 listed classes and lots of notes
+(-> "AAPL" 
     xbrl-shares/share-summary-ticker
     ticker-ui
     print-table)
@@ -44,7 +44,7 @@
     print-table)
 
 
-(-> "BRK-B" ; 10-K stock with 2 listed classes
+(-> "BRK-B" 
     xbrl-shares/share-summary-ticker
     shares-ui
     print-table)
@@ -54,35 +54,34 @@
     ticker-ui
     print-table)
 
-(-> "test/html/COKE.html"
+(-> "test/html/TDAC.html"
     (xbrl-shares/load-filing-facts)
     (xbrl-shares/share-summary)
     shares-ui
     print-table)
 
-(-> "test/html/COKE.html"
+(-> "test/html/TDAC.html"
     (xbrl-shares/load-filing-facts)
     (xbrl-shares/share-summary)
     :shares
-    (xbrl-shares/shares-outstanding)
-    )
+    (xbrl-shares/shares-outstanding))
 ;66564294
+
+(-> "test/html/TDAC.html"
+    (xbrl-shares/load-filing-facts)
+    (xbrl-shares/share-summary)
+    ticker-ui
+    print-table)
+
 
 (defn store-test [ticker]
   (let [url (xbrl-shares/ticker->url-file ticker)
         content (slurp url)]
     (spit (str "test/html/" ticker ".html") content)))
 
-(store-test "BRK-B")
+(store-test "TDAC")
 
-(-> "test/html/BRK-B.html"
-    (xbrl-shares/load-filing-facts)
-    (xbrl-shares/share-summary)
-    shares-ui
-    print-table)
+; tdac: ticker: shares + units + warrant
+;        2 share classes
+; differ in voting rights.
 
-(-> "test/html/BRK-B.html"
-    (xbrl-shares/load-filing-facts)
-     (xbrl-shares/share-summary)
-    ticker-ui
-    print-table)
