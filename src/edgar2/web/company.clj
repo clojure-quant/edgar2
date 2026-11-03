@@ -4,6 +4,7 @@
             [hyper.core :as h]
             [edgar2.description :as description]
             [edgar2.download.ticker-exchange :as exchanges]
+            [edgar2.web.filing :as wf]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
 
@@ -63,8 +64,12 @@
        (nav req)
        (if-not t
          [:p "Enter a ticker."]
-         [:iframe.annual-frame {:src (str "/filing/" t)
-                                :title "Latest annual report"}])])))
+         (let [file (try (wf/annual-report-file t)
+                         (catch Throwable _ nil))]
+           (if file
+             [:iframe.annual-frame {:src (str "/filing/" t)
+                                    :title "Latest annual report"}]
+             [:p "No Annual Report filed"])))])))
 
 (defn description-page
   [req]

@@ -8,6 +8,8 @@
             [edgar.core]
             [edgar.filing :as ef]
             [edgar2.filing.xbrl-loader :as xbrl-loader]
+            [edgar2.util :as util]
+            [edgar2.util.core :as ucore]
             [edgar2.util.filing :as ufiling]
             [edgar2.web.filing :as web]
             [edgar2.web.filing-panel :as panel]))
@@ -283,3 +285,27 @@
         (is (= file (web/filing-doc-file aiv-cik aiv-accession aiv-doc)))
         (is (zero? @calls)))
       (finally (rm-r dir)))))
+
+(deftest annual-report-file-returns-nil-on-missing-filer
+  (with-redefs [ucore/ensure-identity! (fn [])
+                util/resolve-filer (fn [_] (throw (http-ex 404)))]
+    (is (nil? (web/annual-report-file "AMFN")))))
+
+(deftest annual-report-file-returns-nil-without-an-annual-filing
+  (with-redefs [ucore/ensure-identity! (fn [])
+                util/resolve-filer (fn [_] "0000096664")
+                ufiling/latest-annual-filing (fn [_] nil)]
+    (is (nil? (web/annual-report-file "AMFN")))))
+
+(deftest annual-report-file-rethrows-service-errors
+  (with-redefs [ucore/ensure-identity! (fn [])
+                util/resolve-filer (fn [_] (throw (http-ex 503)))]
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (web/annual-report-file "AMFN")))))
+
+(deftest annual-report-page-reports-a-missing-annual-report
+  (with-redefs [web/annual-report-file (fn [_] nil)]
+    (let [resp (web/annual-report-page
+                {:hyper/route {:path-params {:ticker "AMFN"}}})]
+      (is (= 404 (:status resp)))
+      (is (= "No Annual Report filed" (:body resp))))))

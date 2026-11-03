@@ -2,7 +2,8 @@
   "Share-class totals from data/share-classes.edn."
   (:require [clojure.string :as str]
             [edgar2.download.dataset :as dataset]
-            [edgar2.util.ticker-info :as ticker-info]))
+            [edgar2.util.ticker-info :as ticker-info]
+            [edgar2.filing.xbrl.xbrl-shares :as xbrl-shares]))
 
 (def share-classes-path
   "data/share-classes.edn")
@@ -11,23 +12,13 @@
   [ticker]
   (some-> ticker str str/trim not-empty str/upper-case))
 
-(defn- sum-key
-  "Sum of `k` across share classes. A nil value counts as 0."
-  [classes k]
-  (transduce (map #(or (get % k) 0)) + 0 classes))
-
 (defn- share-info
   "Totals across every share class, plus the filing identity.
   {:cik :filing-date :form-type :weighted :outstanding}, and `:xbrl false`
   when the filing carried no XBRL. A nil class value counts as 0."
   [row]
-  (let [classes (vals (:shares row))]
-    (cond-> {:cik (:cik row)
-             :filing-date (:filing-date row)
-             :form-type (:form-type row)
-             :weighted (sum-key classes :weighted)
-             :outstanding (sum-key classes :outstanding)}
-      (contains? row :xbrl) (assoc :xbrl (:xbrl row)))))
+  (let [shares (:shares row)]
+    (xbrl-shares/shares-outstanding shares)))
 
 (defn- index-rows
   "CIK and ticker → share totals, plus the set of tickers in the file."

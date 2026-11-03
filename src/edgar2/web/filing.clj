@@ -204,25 +204,30 @@
    :body body})
 
 (declare redirect)
+(declare sec-miss?)
 
 (defn annual-report-file
   "Path of the latest 10-K, 20-F, or 40-F primary document.
-  Downloads it into data/filings when it is not already there."
+  Downloads it into data/filings when it is not already there.
+  Returns nil when the ticker has no annual report."
   [ticker]
   (ucore/ensure-identity!)
-  (let [cik (util/resolve-filer ticker)
-        f (when cik (ufiling/latest-annual-filing cik))
-        primary (when f (ef/primary-doc (ef/filing-index f)))]
-    (when primary
-      (let [path (io/file ufiling/filing-dir
-                          (str (:form f))
-                          (str (:cik f))
-                          (str (:accessionNumber f))
-                          (str (:name primary)))]
-        (if (.isFile path)
-          path
-          (when-let [saved (ef/filing-save! f ufiling/filing-dir)]
-            (io/file saved)))))))
+  (try
+    (let [cik (util/resolve-filer ticker)
+          f (when cik (ufiling/latest-annual-filing cik))
+          primary (when f (ef/primary-doc (ef/filing-index f)))]
+      (when primary
+        (let [path (io/file ufiling/filing-dir
+                            (str (:form f))
+                            (str (:cik f))
+                            (str (:accessionNumber f))
+                            (str (:name primary)))]
+          (if (.isFile path)
+            path
+            (when-let [saved (ef/filing-save! f ufiling/filing-dir)]
+              (io/file saved))))))
+    (catch clojure.lang.ExceptionInfo e
+      (if (sec-miss? e) nil (throw e)))))
 
 (defn annual-report-page
   "Hyper handler. Redirects to the cached primary document so relative
@@ -237,7 +242,7 @@
           (redirect (str "/filing/" (.getName cik)
                          "/" (.getName accession)
                          "/" (.getName file))))
-        (text-response 404 (str "No annual report for " ticker)))
+        (text-response 404 "No Annual Report filed"))
       (catch Throwable e
         (text-response 502 (or (ex-message e) (str e)))))))
 

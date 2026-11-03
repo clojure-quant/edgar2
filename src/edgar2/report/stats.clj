@@ -124,7 +124,7 @@
    (let [row (or row (db-universe/universe-row-by-cik cik) {:cik (str cik)})
          sic-db (or sic-db (db-sic/load-sic-index))
          shares (or shares
-                    (:outstanding (db-shares/get-shares-cik cik)))
+                    (db-shares/get-shares-cik cik))
          changes (db-price-change/get-change (:ticker row))]
      (try
        (let [annual-map (if (contains? opts :annual-map)
