@@ -248,16 +248,17 @@
 ;; ticker based version
 
 (defn ticker->url-file
-  "returns facts with concepts for a ticker."
+  "Path of `ticker`'s latest annual filing, or nil when there is none."
   [ticker]
-  (-> (wf/annual-report-file ticker)
-      (.getPath)))
+  (some-> (wf/annual-report-file ticker)
+          (.getPath)))
 
 (defn share-summary-ticker [ticker]
-  (-> ticker
-      ticker->url-file
-      (load-filing-facts)
-      (share-summary)))
+  (if-let [file (ticker->url-file ticker)]
+    (-> file
+        (load-filing-facts)
+        (share-summary))
+    {:ticker ticker :error "no annual filing found for ticker"}))
 
 ;; db helper
 
