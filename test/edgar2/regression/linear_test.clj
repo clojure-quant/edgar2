@@ -21,8 +21,7 @@
     (is (approx= 3.0 (:n result)))
     (is (approx= 10.0 (:intercept result)))
     (is (approx= 10.0 (:slope result)))
-    (is (approx= 25.0 (:mean result)))
-    (is (approx= 40.0 (linear/slope-percent result)))
+    (is (approx= 25.0 (linear/slope-percent result)))
     (is (approx= 40.0 (linear/estimate result 0)))
     (is (approx= 50.0 (linear/estimate result 1)))
     (is (approx= 0.0 (:variation result)))))
@@ -31,19 +30,17 @@
   (let [result (linear/regression [-10 0 10 20])]
     (is (map? result))
     (is (every? finite? (vals result)))
-    (is (approx= 100.0 (linear/slope-percent result)))
+    (is (approx= 50.0 (linear/slope-percent result)))
     (is (approx= 20.0 (linear/estimate result 0)))))
 
 (deftest symmetric-series-stays-finite
   (let [result (linear/regression [-10 -5 0 5 10])]
     (is (every? finite? (vals result)))
-    (is (approx= (* 100.0 (/ 5.0 6.0))
-                 (linear/slope-percent result)))
+    (is (approx= 50.0 (linear/slope-percent result)))
     (is (approx= 10.0 (linear/estimate result 0)))))
 
 (deftest all-zero-series-is-zero
   (let [result (linear/regression [0 0 0])]
-    (is (approx= 0.0 (:mean result)))
     (is (approx= 0.0 (linear/slope-percent result)))
     (is (approx= 0.0 (linear/estimate result 0)))
     (is (approx= 0.0 (:variation result)))))
@@ -84,7 +81,6 @@
                          vals)))]
     (is (not (approx= (:slope square) (:slope absolute))))
     (is (not (approx= (:intercept square) (:intercept absolute))))
-    (is (approx= (:mean square) (:mean absolute)))
     (is (<= (sae absolute) (sae square)))
     (is (not (approx= (:variation square) (:variation absolute))))
     (is (approx= (:variation square)

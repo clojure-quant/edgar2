@@ -2,7 +2,7 @@
   "Asinh earnings fit: asinh(E(n)) = a + b*n.
 
   Unlike the log fit, non-positive earnings stay in the fit."
-  (:require [edgar2.regression.line :as line]))
+  (:require [edgar2.regression.fit :as fit]))
 
 (defn- asinh
   [x]
@@ -11,13 +11,20 @@
         m (Math/log (+ ax (Math/sqrt (inc (* ax ax)))))]
     (if (neg? x) (- m) m)))
 
-(defn- error-fn
-  [error]
-  (case error
-    :square (fn [d] (* d d))
-    :absolute (fn [d] (Math/abs (double d)))
-    (throw (IllegalArgumentException.
-             (str "Unknown :error " error ", expected :square or :absolute")))))
+(defn- preprocess
+  [v]
+  (when (number? v)
+    (asinh v)))
+
+(defn- summarize
+  [{:keys [error k err]}]
+  (let [variation (if (or (< k 3) (zero? (double err)))
+                    0.0
+                    (let [s (if (= :absolute error)
+                              (/ err (- k 2))
+                              (Math/sqrt (/ err (- k 2))))]
+                      (* 100.0 (- (Math/exp s) 1.0))))]
+    {:variation variation}))
 
 (defn regression
   "Fit asinh(earnings) on position in an oldest-first vector.
@@ -44,32 +51,7 @@
   zero error) is 0."
   ([vals] (regression {:error :square} vals))
   ([opts vals]
-   (let [error (or (:error opts) :square)
-         err-fn (error-fn error)
-         vals (vec vals)
-         points (vec (keep-indexed (fn [i v]
-                                     (when (number? v)
-                                       [(double i) (asinh v)]))
-                                   vals))]
-     (when (>= (count points) 2)
-       (when-let [[intercept slope] (if (= :absolute error)
-                                      (line/lad points)
-                                      (line/ols points))]
-         (let [n-last (double (dec (count vals)))
-               k (count points)
-               err (reduce + (map (fn [[n y]]
-                                    (err-fn (- y (+ intercept (* slope n)))))
-                                  points))
-               variation (if (or (< k 3) (zero? (double err)))
-                           0.0
-                           (let [s (if (= :absolute error)
-                                     (/ err (- k 2))
-                                     (Math/sqrt (/ err (- k 2))))]
-                             (* 100.0 (- (Math/exp s) 1.0))))]
-           {:intercept intercept
-            :slope slope
-            :variation variation
-            :n n-last}))))))
+   (fit/regression opts vals preprocess summarize)))
 
 (defn estimate
   "Fitted earnings at `offset` periods past the last input index.

@@ -1,5 +1,5 @@
-(ns edgar2.regression.line
-  "Univariate line fits on transformed points `[[x y] ...]`.")
+(ns edgar2.regression.fit
+  "Univariate line fits and the shared earnings-regression pipeline.")
 
 (defn- mean
   [xs]
@@ -45,3 +45,51 @@
                   [(- y1 (* slope x1)) slope]))]
     (when (seq pairs)
       (apply min-key (fn [[a b]] (absolute-error a b points)) pairs))))
+
+(defn- error-fn
+  [error]
+  (case error
+    :square (fn [d] (* d d))
+    :absolute (fn [d] (Math/abs (double d)))
+    (throw (IllegalArgumentException.
+             (str "Unknown :error " error ", expected :square or :absolute")))))
+
+(defn regression
+  "Fit transformed earnings on position in an oldest-first vector.
+
+  `vals` is the input vector; `preprocess` owns filtering and
+  transformation, receiving each entry and returning the transformed value
+  or nil to skip it. Skipped slots still advance the index, so a missing
+  year counts as a year. Needs two transformed values at different
+  positions, otherwise nil.
+
+  `opts` selects the line and how residuals are measured: `{:error
+  :square}` (default) fits by least squares, `{:error :absolute}` fits by
+  least absolute deviations.
+
+  `summarize` receives `{:error :k :err :ys}` and returns the
+  method-specific fields, such as `:variation`; it must not emit
+  `:intercept`, `:slope`, or `:n`. The result is those fields merged with
+  `{:intercept :slope :n}`, where `:n` is the last input index."
+  [opts vals preprocess summarize]
+  (let [error (or (:error opts) :square)
+        err-fn (error-fn error)
+        vals (vec vals)
+        points (vec (keep-indexed (fn [i v]
+                                    (when-let [y (preprocess v)]
+                                      [(double i) y]))
+                                  vals))]
+    (when (>= (count points) 2)
+      (when-let [[intercept slope] (if (= :absolute error)
+                                     (lad points)
+                                     (ols points))]
+        (let [n-last (double (dec (count vals)))
+              k (count points)
+              err (reduce + (map (fn [[n y]]
+                                   (err-fn (- y (+ intercept (* slope n)))))
+                                 points))
+              summarized (summarize {:error error
+                                     :k k
+                                     :err err
+                                     :ys (mapv second points)})]
+          (merge {:intercept intercept :slope slope :n n-last} summarized))))))
