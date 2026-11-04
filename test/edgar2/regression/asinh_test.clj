@@ -33,13 +33,13 @@
               [9300000 -513000 22300000 44200000 66900000])
         mixed (asinh/regression [10 0 -5 20])]
     (is (map? pay))
-    (is (every? finite? (vals pay)))
+    (is (every? finite? (filter number? (vals pay))))
     (is (map? mixed))
-    (is (every? finite? (vals mixed)))))
+    (is (every? finite? (filter number? (vals mixed))))))
 
 (deftest large-negative-values-stay-finite
   (let [result (asinh/regression [-1e9 -2e9 -3e9])]
-    (is (every? finite? (vals result)))
+    (is (every? finite? (filter number? (vals result))))
     (is (neg? (asinh/slope-percent result)))))
 
 (deftest nils-skip-but-advance-index
@@ -71,11 +71,30 @@
 (deftest absolute-error-fits-least-absolute-deviations
   (let [vals [10 0 -5 20]
         square (asinh/regression {:error :square} vals)
-        absolute (asinh/regression {:error :absolute} vals)]
+        absolute (asinh/regression {:error :absolute} vals)
+        asinh-fn (fn [x]
+                   (let [x (double x)
+                         ax (Math/abs x)
+                         m (Math/log (+ ax (Math/sqrt (inc (* ax ax)))))]
+                     (if (neg? x) (- m) m)))
+        sae (fn [fit]
+              (reduce + (map-indexed
+                         (fn [i v]
+                           (Math/abs (- (asinh-fn v)
+                                        (+ (:intercept fit)
+                                           (* (:slope fit) i)))))
+                         vals)))
+        k (count vals)
+        expected-variation (* 100.0
+                              (- (Math/exp (Math/sqrt (* 2.0 (/ (sae absolute)
+                                                                (- k 2)))))
+                                 1.0))]
     (is (not (approx= (:slope square) (:slope absolute))))
     (is (not (approx= (:intercept square) (:intercept absolute))))
     (is (= (:n square) (:n absolute)))
+    (is (<= (sae absolute) (sae square)))
     (is (not (approx= (:variation square) (:variation absolute))))
+    (is (approx= expected-variation (:variation absolute)))
     (is (approx= (:variation square)
                  (:variation (asinh/regression vals))))))
 

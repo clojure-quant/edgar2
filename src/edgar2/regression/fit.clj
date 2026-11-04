@@ -46,13 +46,36 @@
     (when (seq pairs)
       (apply min-key (fn [[a b]] (absolute-error a b points)) pairs))))
 
+
 (defn- error-fn
   [error]
   (case error
     :square (fn [d] (* d d))
     :absolute (fn [d] (Math/abs (double d)))
     (throw (IllegalArgumentException.
-             (str "Unknown :error " error ", expected :square or :absolute")))))
+            (str "Unknown :error " error ", expected :square or :absolute")))))
+
+(defn err
+  "Residual standard-deviation-equivalent of the fit, on the scale of the
+  residuals.
+
+  For `:square` this is sqrt(SSE / (k - 2)). For `:absolute` it is the
+  Laplace sigma-equivalent sqrt(2 * SAE / (k - 2)), since a Laplace error
+  with mean absolute deviation b has standard deviation sqrt(2) * b. Both
+  are 0 when there are at most two points."
+  [intercept slope points error]
+  (let [k (count points)
+        err-fn (error-fn error)
+        err-sum (reduce + (map (fn [[n y]]
+                                 (err-fn (- y (+ intercept (* slope n)))))
+                               points))
+        err (if (> k 2)
+              (if (= :absolute error)
+                (Math/sqrt (* 2.0 (/ err-sum (- k 2))))
+                (Math/sqrt (/ err-sum (- k 2))))
+              0.0)]
+    err))
+
 
 (defn regression
   "Fit transformed earnings on position in an oldest-first vector.
@@ -70,10 +93,12 @@
   `summarize` receives `{:error :k :err :ys}` and returns the
   method-specific fields, such as `:variation`; it must not emit
   `:intercept`, `:slope`, or `:n`. The result is those fields merged with
-  `{:intercept :slope :n}`, where `:n` is the last input index."
-  [opts vals preprocess summarize]
+  `{:intercept :slope :n}`, where `:n` is the last input index.
+
+  `:e` is the residual standard-deviation-equivalent from `err`, so both
+  error modes report on the same scale."
+  [opts vals preprocess err-normalize]
   (let [error (or (:error opts) :square)
-        err-fn (error-fn error)
         vals (vec vals)
         points (vec (keep-indexed (fn [i v]
                                     (when-let [y (preprocess v)]
@@ -84,12 +109,20 @@
                                      (lad points)
                                      (ols points))]
         (let [n-last (double (dec (count vals)))
-              k (count points)
-              err (reduce + (map (fn [[n y]]
-                                   (err-fn (- y (+ intercept (* slope n)))))
-                                 points))
-              summarized (summarize {:error error
-                                     :k k
-                                     :err err
-                                     :ys (mapv second points)})]
-          (merge {:intercept intercept :slope slope :n n-last} summarized))))))
+              e (err intercept slope points error)
+              result {; regression output
+                      :intercept intercept
+                      :slope slope
+                                ; for current stabilized value
+                      :n n-last
+                                ; for error estimate
+                      :points points
+                      :error error
+                      :e e}]
+          (assoc result :e e :variation (err-normalize result))
+          )))))
+
+
+
+
+

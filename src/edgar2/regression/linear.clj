@@ -11,17 +11,16 @@
   (when (number? v)
     (double v)))
 
-(defn- summarize
-  [{:keys [error k err ys]}]
-  (let [mean-abs-y (mean (map #(Math/abs (double %)) ys))
-        variation (if (or (< k 3) (zero? (double err))
-                          (zero? (double mean-abs-y)))
+(defn- err-normalize [{:keys [e points]}]
+ ; linear
+  (let [ys (mapv second points)
+        k (count ys)
+        mean-y (mean (map #(Math/abs (double %)) ys))
+        variation (if (or (< k 3) (zero? (double e))
+                          (zero? (double mean-y)))
                     0.0
-                    (* 100.0 (/ (if (= :absolute error)
-                                  (/ err (- k 2))
-                                  (Math/sqrt (/ err (- k 2))))
-                                mean-abs-y)))]
-    {:variation variation}))
+                    (* 100.0 (/ e mean-y)))]
+    variation))
 
 (defn regression
   "Fit earnings on position in an oldest-first vector.
@@ -45,11 +44,12 @@
   `:variation` is the residual error as a percent of the mean absolute
   earnings level, which is used only as an internal scale. For `:square`, it
   is 100 * sqrt(SSE / (k - 2)) / mean-abs-y; for `:absolute`, it is
-  100 * (SAE / (k - 2)) / mean-abs-y. An exact line (fewer than 3 points, or
+  100 * sqrt(2 * SAE / (k - 2)) / mean-abs-y, the Laplace
+  standard-deviation-equivalent. An exact line (fewer than 3 points, or
   zero error) is 0, as is a zero mean absolute level."
   ([vals] (regression {:error :square} vals))
   ([opts vals]
-   (fit/regression opts vals preprocess summarize)))
+   (fit/regression opts vals preprocess err-normalize)))
 
 (defn estimate
   "Fitted earnings at `offset` periods past the last input index.

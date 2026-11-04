@@ -29,13 +29,13 @@
 (deftest negatives-and-zeros-stay-in-fit
   (let [result (linear/regression [-10 0 10 20])]
     (is (map? result))
-    (is (every? finite? (vals result)))
+    (is (every? finite? (filter number? (vals result))))
     (is (approx= 50.0 (linear/slope-percent result)))
     (is (approx= 20.0 (linear/estimate result 0)))))
 
 (deftest symmetric-series-stays-finite
   (let [result (linear/regression [-10 -5 0 5 10])]
-    (is (every? finite? (vals result)))
+    (is (every? finite? (filter number? (vals result))))
     (is (approx= 50.0 (linear/slope-percent result)))
     (is (approx= 10.0 (linear/estimate result 0)))))
 
@@ -78,10 +78,16 @@
                          (fn [i v]
                            (Math/abs (- v (+ (:intercept fit)
                                              (* (:slope fit) i)))))
-                         vals)))]
+                         vals)))
+        k (count vals)
+        mean-abs-y (/ (reduce + (map #(Math/abs (double %)) vals)) k)
+        expected-variation (* 100.0
+                              (/ (Math/sqrt (* 2.0 (/ (sae absolute) (- k 2))))
+                                 mean-abs-y))]
     (is (not (approx= (:slope square) (:slope absolute))))
     (is (not (approx= (:intercept square) (:intercept absolute))))
     (is (<= (sae absolute) (sae square)))
     (is (not (approx= (:variation square) (:variation absolute))))
+    (is (approx= expected-variation (:variation absolute)))
     (is (approx= (:variation square)
                  (:variation (linear/regression vals))))))

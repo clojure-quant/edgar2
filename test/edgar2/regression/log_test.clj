@@ -53,11 +53,17 @@
                            (Math/abs (- (Math/log (double v))
                                         (+ (:intercept fit)
                                            (* (:slope fit) i)))))
-                         vals)))]
+                         vals)))
+        k (count vals)
+        expected-variation (* 100.0
+                              (- (Math/exp (Math/sqrt (* 2.0 (/ (sae absolute)
+                                                                (- k 2)))))
+                                 1.0))]
     (is (not (approx= (:slope square) (:slope absolute))))
     (is (not (approx= (:intercept square) (:intercept absolute))))
     (is (= (:n square) (:n absolute)))
     (is (<= (sae absolute) (sae square)))
     (is (not (approx= (:variation square) (:variation absolute))))
+    (is (approx= expected-variation (:variation absolute)))
     (is (approx= (:variation square)
                  (:variation (log/regression vals))))))

@@ -7,15 +7,9 @@
   (when (and (number? v) (pos? (double v)))
     (Math/log (double v))))
 
-(defn- summarize
-  [{:keys [error k err]}]
-  (let [variation (if (or (< k 3) (zero? (double err)))
-                    0.0
-                    (let [s (if (= :absolute error)
-                              (/ err (- k 2))
-                              (Math/sqrt (/ err (- k 2))))]
-                      (* 100.0 (- (Math/exp s) 1.0))))]
-    {:variation variation}))
+(defn- err-normalize ; log
+  [{:keys [e]}]
+  (* 100.0 (- (Math/exp e) 1.0)))
 
 (defn regression
   "Fit ln(earnings) on position in an oldest-first vector.
@@ -35,12 +29,13 @@
 
   `:variation` is the residual error as a percent: 100 * (exp(s) - 1). For
   `:square`, s = sqrt(SSE / (k - 2)) on the log residuals of the positive
-  years. For `:absolute`, s = SAE / (k - 2). An exact line (fewer than 3
-  points, or zero error) is 0. A value of 20 means a typical year sits about
-  20% off the path."
+  years. For `:absolute`, s = sqrt(2 * SAE / (k - 2)), the Laplace
+  standard-deviation-equivalent. An exact line (fewer than 3 points, or zero
+  error) is 0. A value of 20 means a typical year sits about 20% off the
+  path."
   ([vals] (regression {:error :square} vals))
   ([opts vals]
-   (fit/regression opts vals preprocess summarize)))
+   (fit/regression opts vals preprocess err-normalize)))
 
 (defn estimate
   "Fitted earnings at `offset` periods past the last input index.

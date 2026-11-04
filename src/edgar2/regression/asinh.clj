@@ -16,15 +16,9 @@
   (when (number? v)
     (asinh v)))
 
-(defn- summarize
-  [{:keys [error k err]}]
-  (let [variation (if (or (< k 3) (zero? (double err)))
-                    0.0
-                    (let [s (if (= :absolute error)
-                              (/ err (- k 2))
-                              (Math/sqrt (/ err (- k 2))))]
-                      (* 100.0 (- (Math/exp s) 1.0))))]
-    {:variation variation}))
+(defn- err-normalize ; asinh
+  [{:keys [e]}]
+  (* 100.0 (- (Math/exp e) 1.0)))
 
 (defn regression
   "Fit asinh(earnings) on position in an oldest-first vector.
@@ -47,11 +41,12 @@
 
   `:variation` is 100 * (exp(s) - 1) on the asinh residuals: a relative-error
   analogue, approximate near zero. For `:square`, s = sqrt(SSE / (k - 2));
-  for `:absolute`, s = SAE / (k - 2). An exact line (fewer than 3 points, or
-  zero error) is 0."
+  for `:absolute`, s = sqrt(2 * SAE / (k - 2)), the Laplace
+  standard-deviation-equivalent. An exact line (fewer than 3 points, or zero
+  error) is 0."
   ([vals] (regression {:error :square} vals))
   ([opts vals]
-   (fit/regression opts vals preprocess summarize)))
+   (fit/regression opts vals preprocess err-normalize)))
 
 (defn estimate
   "Fitted earnings at `offset` periods past the last input index.

@@ -27,17 +27,15 @@
     (is (approx= 1.0 (:intercept result)))
     (is (approx= 1.0 (:slope result)))))
 
-(deftest summarize-fields-are-merged
-  (let [result (fit/regression {:error :square} [1 2 3]
+(deftest err-normalize-receives-fit-context
+  (let [seen (atom nil)
+        result (fit/regression {:error :square} [1 2 3]
                                number-preprocess
-                               (fn [{:keys [error k err ys]}]
-                                 {:error error :k k :err err :ys ys
-                                  :custom 42}))]
-    (is (= 42 (:custom result)))
-    (is (= :square (:error result)))
-    (is (= 3 (:k result)))
-    (is (approx= 0.0 (:err result)))
-    (is (= [1.0 2.0 3.0] (:ys result)))
+                               (fn [ctx] (reset! seen ctx) 42.0))]
+    (is (= 42.0 (:variation result)))
+    (is (= :square (:error @seen)))
+    (is (= [[0.0 1.0] [1.0 2.0] [2.0 3.0]] (:points @seen)))
+    (is (approx= 0.0 (:e @seen)))
     (is (approx= 1.0 (:intercept result)))
     (is (approx= 1.0 (:slope result)))
     (is (approx= 2.0 (:n result)))))
@@ -59,6 +57,23 @@
     (is (approx= lad-intercept (:intercept absolute)))
     (is (approx= lad-slope (:slope absolute)))
     (is (not (approx= (:slope square) (:slope absolute))))))
+
+(deftest err-reports-standard-deviation-equivalent
+  (let [points [[0.0 1.0] [1.0 3.0] [2.0 2.0] [3.0 5.0]]
+        k (count points)
+        residual (fn [[x y]] (- y (+ 1.0 (* 1.0 x))))
+        sse (reduce + (map (fn [p] (let [d (residual p)] (* d d))) points))
+        sae (reduce + (map (fn [p] (Math/abs (residual p))) points))]
+    (is (approx= (Math/sqrt (/ sse (- k 2)))
+                 (fit/err 1.0 1.0 points :square)))
+    (is (approx= (Math/sqrt (* 2.0 (/ sae (- k 2))))
+                 (fit/err 1.0 1.0 points :absolute)))
+    (let [three (take 3 points)
+          sae3 (reduce + (map (fn [p] (Math/abs (residual p))) three))]
+      (is (approx= (Math/sqrt (* 2.0 sae3))
+                   (fit/err 1.0 1.0 three :absolute))))
+    (is (approx= 0.0 (fit/err 1.0 1.0 (take 2 points) :absolute)))
+    (is (approx= 0.0 (fit/err 1.0 1.0 (take 2 points) :square)))))
 
 (deftest too-few-transformed-points-return-nil
   (doseq [vals [[] [nil] [1] [1 nil]]]
