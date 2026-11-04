@@ -1,5 +1,6 @@
 (ns demo.regression
-  "Table of log, asinh, and linear earnings fits for a few earnings vectors.
+  "Table of log, asinh, linear, and return-prct earnings fits for a few
+  earnings vectors.
 
   Each method is shown twice, once with squared residuals and once with
   absolute residuals.
@@ -8,7 +9,8 @@
   (:require [clojure.pprint :as pprint]
             [edgar2.regression.log :as log]
             [edgar2.regression.linear :as linear]
-            [edgar2.regression.asinh :as asinh]))
+            [edgar2.regression.asinh :as asinh]
+            [edgar2.regression.return-prct :as return-prct]))
 
 (def cases
   "Oldest-first annual earnings, labeled as supplied."
@@ -21,7 +23,9 @@
 (def ^:private regressions
   [["log" log/regression log/estimate log/slope-percent]
    ["asinh" asinh/regression asinh/estimate asinh/slope-percent]
-   ["linear" linear/regression linear/estimate linear/slope-percent]])
+   ["linear" linear/regression linear/estimate linear/slope-percent]
+   ["return-prct" return-prct/regression return-prct/estimate
+    return-prct/slope-percent]])
 
 (defn- fit-rows
   [vals]

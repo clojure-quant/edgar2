@@ -2,13 +2,14 @@
   "Dispatcher for the earnings regression fits."
   (:require [edgar2.regression.log :as log]
             [edgar2.regression.linear :as linear]
-            [edgar2.regression.asinh :as asinh]))
+            [edgar2.regression.asinh :as asinh]
+            [edgar2.regression.return-prct :as return-prct]))
 
 (defn- unknown-type
   [regression-type]
   (throw (IllegalArgumentException.
           (str "Unknown :regression-type " regression-type
-               ", expected :log, :linear, or :asinh"))))
+               ", expected :log, :linear, :asinh, or :return-prct"))))
 
 (defn- fit-fn
   [regression-type]
@@ -16,6 +17,7 @@
     :log log/regression
     :linear linear/regression
     :asinh asinh/regression
+    :return-prct return-prct/regression
     (unknown-type regression-type)))
 
 (defn- estimate-fn
@@ -24,6 +26,7 @@
     :log log/estimate
     :linear linear/estimate
     :asinh asinh/estimate
+    :return-prct return-prct/estimate
     (unknown-type regression-type)))
 
 (defn- slope-percent-fn
@@ -32,12 +35,13 @@
     :log log/slope-percent
     :linear linear/slope-percent
     :asinh asinh/slope-percent
+    :return-prct return-prct/slope-percent
     (unknown-type regression-type)))
 
 (defn regression
   "Fit earnings with the regression named by `:regression-type`.
 
-  Takes one map: `{:regression-type :log|:linear|:asinh, :error
+  Takes one map: `{:regression-type :log|:linear|:asinh|:return-prct, :error
   :square|:absolute, :opts ..., :v ...}`. `:error` defaults to `:square`.
   Returns the raw regression map, or nil when the fit has too few points.
   Throws IllegalArgumentException for an unknown or missing
