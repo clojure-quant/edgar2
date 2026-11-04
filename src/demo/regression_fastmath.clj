@@ -36,23 +36,23 @@
 (defn stabilized [{:keys [slope intercept xs]}]
   (+ intercept (* slope (last xs))))
 
-(defn ols-linear [vals]
+(defn trend-linear [vals]
   (let [{:keys [slope y-bar] :as s} (ols vals)]
     (assoc s
-           :model :ols-linear
+           :model :trend-linear
            :stabilized-yoy (/ slope y-bar)
            :stabilized (stabilized s))))
 
-(defn ols-linear-pos [vals]
-  (assoc (ols-linear (filter pos? vals)) :model :ols-linear-pos))
+(defn trend-linear-pos [vals]
+  (assoc (trend-linear (filter pos? vals)) :model :ols-linear-pos))
 
-(defn ols-log [vals]
+(defn trend-log [vals]
   (let [vals (->> vals
                   (filter pos?)
                   (map Math/log))
         {:keys [slope y-bar] :as s} (ols vals)]
     (assoc s
-           :model :ols-log
+           :model :trend-log
            :stabilized-yoy (/ slope y-bar)
            :stabilized (-> s stabilized Math/exp))))
 
@@ -68,7 +68,7 @@
                   (map asinh))
         {:keys [slope y-bar] :as s} (ols vals)]
     (assoc s
-           :model :ols-asinh
+           :model :trend-asinh
            ;:stabilized-yoy (/ slope y-bar)
            ;:stabilized (-> s stabilized Math/exp)
            )))
@@ -76,9 +76,9 @@
 
 (defn- ols-rows
   [[label vals]]
-  [(assoc (ols-linear vals) :ticker label)
-   (assoc (ols-linear-pos vals) :ticker label)
-   (assoc (ols-log vals) :ticker label)
+  [(assoc (trend-linear vals) :ticker label)
+   (assoc (trend-linear-pos vals) :ticker label)
+   (assoc (trend-log vals) :ticker label)
    (assoc (ols-asinh vals) :ticker label)])
 
 (defn- with-two-decimals
