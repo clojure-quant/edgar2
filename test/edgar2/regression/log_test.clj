@@ -43,13 +43,21 @@
     (is (approx= 5.0 (log/estimate result 1)))
     (is (approx= 0.0 (:variation result)))))
 
-(deftest absolute-error-only-changes-variation
-  (let [vals [1 2 4 7 12]
+(deftest absolute-error-fits-least-absolute-deviations
+  (let [vals [1 2 4 7 40]
         square (log/regression {:error :square} vals)
-        absolute (log/regression {:error :absolute} vals)]
-    (is (approx= (:slope square) (:slope absolute)))
-    (is (approx= (:intercept square) (:intercept absolute)))
-    (is (approx= (:n square) (:n absolute)))
+        absolute (log/regression {:error :absolute} vals)
+        sae (fn [fit]
+              (reduce + (map-indexed
+                         (fn [i v]
+                           (Math/abs (- (Math/log (double v))
+                                        (+ (:intercept fit)
+                                           (* (:slope fit) i)))))
+                         vals)))]
+    (is (not (approx= (:slope square) (:slope absolute))))
+    (is (not (approx= (:intercept square) (:intercept absolute))))
+    (is (= (:n square) (:n absolute)))
+    (is (<= (sae absolute) (sae square)))
     (is (not (approx= (:variation square) (:variation absolute))))
     (is (approx= (:variation square)
                  (:variation (log/regression vals))))))

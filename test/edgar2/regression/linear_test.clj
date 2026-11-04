@@ -72,13 +72,20 @@
       (is (nil? (linear/estimate result 0)))
       (is (nil? (linear/slope-percent result))))))
 
-(deftest absolute-error-only-changes-variation
+(deftest absolute-error-fits-least-absolute-deviations
   (let [vals [10 20 31 40]
         square (linear/regression {:error :square} vals)
-        absolute (linear/regression {:error :absolute} vals)]
-    (is (approx= (:slope square) (:slope absolute)))
-    (is (approx= (:intercept square) (:intercept absolute)))
+        absolute (linear/regression {:error :absolute} vals)
+        sae (fn [fit]
+              (reduce + (map-indexed
+                         (fn [i v]
+                           (Math/abs (- v (+ (:intercept fit)
+                                             (* (:slope fit) i)))))
+                         vals)))]
+    (is (not (approx= (:slope square) (:slope absolute))))
+    (is (not (approx= (:intercept square) (:intercept absolute))))
     (is (approx= (:mean square) (:mean absolute)))
+    (is (<= (sae absolute) (sae square)))
     (is (not (approx= (:variation square) (:variation absolute))))
     (is (approx= (:variation square)
                  (:variation (linear/regression vals))))))

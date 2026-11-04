@@ -1,9 +1,6 @@
 (ns edgar2.regression.log
-  "Log-linear earnings fit: E(n) = E(0) * (1 + g)^n.")
-
-(defn- mean
-  [xs]
-  (/ (double (reduce + xs)) (count xs)))
+  "Log-linear earnings fit: E(n) = E(0) * (1 + g)^n."
+  (:require [edgar2.regression.line :as line]))
 
 (defn- positive?
   [v]
@@ -18,16 +15,15 @@
              (str "Unknown :error " error ", expected :square or :absolute")))))
 
 (defn regression
-  "OLS of ln(earnings) on position in an oldest-first vector.
+  "Fit ln(earnings) on position in an oldest-first vector.
 
   Non-positive entries (negatives, zeros, nils) are left out of the fit.
   Their slots still advance n, so a dropped year counts as a year. Needs
   two positive values at different positions, otherwise nil.
 
-  `opts` selects how residuals are measured: `{:error :square}` (default)
-  uses squared residuals, `{:error :absolute}` uses absolute residuals. The
-  fitted slope and intercept are the same OLS fit either way; the choice
-  affects only `:variation`.
+  `opts` selects the line and how residuals are measured: `{:error
+  :square}` (default) fits by least squares, `{:error :absolute}` fits by
+  least absolute deviations. The choice affects the line and `:variation`.
 
   Returns the fit primitives `{:intercept :slope :variation :n}`, where `:n`
   is the last input index. `estimate` turns them back into earnings at an
@@ -41,42 +37,32 @@
   20% off the path."
   ([vals] (regression {:error :square} vals))
   ([opts vals]
-   (let [err-fn (error-fn (or (:error opts) :square))
+   (let [error (or (:error opts) :square)
+         err-fn (error-fn error)
          vals (vec vals)
          points (vec (keep-indexed (fn [i v]
                                      (when (positive? v)
                                        [(double i) (Math/log (double v))]))
                                    vals))]
      (when (>= (count points) 2)
-       (let [ns (mapv first points)
-             ys (mapv second points)
-             n-bar (mean ns)
-             y-bar (mean ys)
-             ss-n (reduce + (map (fn [n]
-                                   (let [d (- n n-bar)]
-                                     (* d d)))
-                                 ns))]
-         (when-not (zero? (double ss-n))
-           (let [slope (/ (reduce + (map (fn [n y]
-                                           (* (- n n-bar) (- y y-bar)))
-                                         ns ys))
-                          ss-n)
-                 intercept (- y-bar (* slope n-bar))
-                 n-last (double (dec (count vals)))
-                 k (count ys)
-                 err (reduce + (map (fn [n y]
-                                      (err-fn (- y (+ intercept (* slope n)))))
-                                    ns ys))
-                 variation (if (or (< k 3) (zero? (double err)))
-                             0.0
-                             (let [s (if (= :absolute (:error opts))
-                                       (/ err (- k 2))
-                                       (Math/sqrt (/ err (- k 2))))]
-                               (* 100.0 (- (Math/exp s) 1.0))))]
-              {:intercept intercept
-               :slope slope
-               :variation variation
-               :n n-last})))))))
+       (when-let [[intercept slope] (if (= :absolute error)
+                                      (line/lad points)
+                                      (line/ols points))]
+         (let [n-last (double (dec (count vals)))
+               k (count points)
+               err (reduce + (map (fn [[n y]]
+                                    (err-fn (- y (+ intercept (* slope n)))))
+                                  points))
+               variation (if (or (< k 3) (zero? (double err)))
+                           0.0
+                           (let [s (if (= :absolute error)
+                                     (/ err (- k 2))
+                                     (Math/sqrt (/ err (- k 2))))]
+                             (* 100.0 (- (Math/exp s) 1.0))))]
+           {:intercept intercept
+            :slope slope
+            :variation variation
+            :n n-last}))))))
 
 (defn estimate
   "Fitted earnings at `offset` periods past the last input index.

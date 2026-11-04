@@ -68,6 +68,17 @@
     (is (approx= 0.0 (asinh/estimate result 0)))
     (is (approx= 0.0 (:variation result)))))
 
+(deftest absolute-error-fits-least-absolute-deviations
+  (let [vals [10 0 -5 20]
+        square (asinh/regression {:error :square} vals)
+        absolute (asinh/regression {:error :absolute} vals)]
+    (is (not (approx= (:slope square) (:slope absolute))))
+    (is (not (approx= (:intercept square) (:intercept absolute))))
+    (is (= (:n square) (:n absolute)))
+    (is (not (approx= (:variation square) (:variation absolute))))
+    (is (approx= (:variation square)
+                 (:variation (asinh/regression vals))))))
+
 (deftest exact-asinh-line-has-known-growth-and-zero-variation
   (let [vals (mapv #(Math/sinh (double %)) [0 1 2 3])
         result (asinh/regression vals)]

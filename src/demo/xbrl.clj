@@ -1,6 +1,5 @@
 (ns demo.xbrl
   (:require
-   [clojure.java.io :as io]
    [clojure.pprint :as pprint]
    [edgar2.filing.xbrl-loader :as xbrl-loader]
    [edgar2.filing.xbrl-facts :as xbrl-facts]

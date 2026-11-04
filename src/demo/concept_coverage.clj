@@ -2,7 +2,6 @@
   "Study: how many listed stocks miss :revenue / :net-income concepts,
   and which alternate XBRL tags they actually file."
   (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as str]
             [edgar.api :as e]
