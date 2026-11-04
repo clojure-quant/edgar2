@@ -21,7 +21,7 @@
 
 (defn- fit
   [label vals]
-  (let [result (log/log-regression vals)]
+  (let [result (log/regression vals)]
     (println label)
     (pprint/pprint result)
     result))

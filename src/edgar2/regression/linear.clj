@@ -1,4 +1,4 @@
-(ns edgar2.financials.regression.linear
+(ns edgar2.regression.linear
   "Linear earnings fit: E(n) = a + b*n.")
 
 (defn- mean
@@ -23,17 +23,19 @@
   `opts` selects how residuals are measured: `{:error :square}` (default)
   uses squared residuals, `{:error :absolute}` uses absolute residuals. The
   fitted slope and intercept are the same OLS fit either way; the choice
-  affects only `:earnings-variation`.
+  affects only `:variation`.
 
-  `:earnings-stabilized-yoy` is 100 * slope / mean absolute earnings over the
-  included values. This is average annual growth relative to the mean absolute
-  earnings level; for a true linear series it approximates compound growth, so
-  it is not the exact exponential rate the log and asinh fits report. It is 0
-  when the mean absolute earnings is 0.
-  `:earnings-stabilized` is the fitted earnings at the last index, the most
-  recent year in the vector.
-  `:earnings-variation` is the residual error as a percent of the mean
-  absolute earnings level. For `:square`, it is
+  Returns the fit primitives
+  `{:intercept :slope :variation :n :mean}`, where `:n` is the last input
+  index and `:mean` is the mean absolute earnings over the included values.
+  `estimate` turns them back into earnings at an offset from that index, and
+  `slope-percent` is 100 * slope / `:mean`. That is average annual growth
+  relative to the mean absolute earnings level; for a true linear series it
+  approximates compound growth, so it is not the exact exponential rate the
+  log and asinh fits report. It is 0 when the mean absolute earnings is 0.
+
+  `:variation` is the residual error as a percent of the mean absolute
+  earnings level. For `:square`, it is
   100 * sqrt(SSE / (k - 2)) / mean-abs-y; for `:absolute`, it is
   100 * (SAE / (k - 2)) / mean-abs-y. An exact line (fewer than 3 points, or
   zero error) is 0, as is a zero mean absolute level."
@@ -73,12 +75,29 @@
                                            (/ err (- k 2))
                                            (Math/sqrt (/ err (- k 2))))
                                          mean-abs-y)))]
-             {:earnings-stabilized-yoy (if (zero? (double mean-abs-y))
-                                         0.0
-                                         (* 100.0 (/ slope mean-abs-y)))
-              :earnings-stabilized (+ intercept (* slope n-last))
-              :earnings-variation variation})))))))
+              {:intercept intercept
+               :slope slope
+               :variation variation
+               :n n-last
+               :mean mean-abs-y})))))))
 
-(def linear-regression
-  "Alias for `regression`."
-  regression)
+(defn estimate
+  "Fitted earnings at `offset` periods past the last input index.
+
+  Offset 0 is the current fitted value, 1 is one period ahead. Nil when
+  `regression` is nil."
+  [regression offset]
+  (when regression
+    (let [{:keys [intercept slope n]} regression]
+      (+ intercept (* slope (+ n offset))))))
+
+(defn slope-percent
+  "Fitted growth as a percent of mean absolute earnings.
+
+  Zero when the mean absolute earnings is zero. Nil when `regression` is nil."
+  [regression]
+  (when regression
+    (let [m (double (:mean regression))]
+      (if (zero? m)
+        0.0
+        (* 100.0 (/ (:slope regression) m))))))

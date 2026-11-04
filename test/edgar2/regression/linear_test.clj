@@ -1,6 +1,6 @@
-(ns edgar2.financials.regression.linear-test
+(ns edgar2.regression.linear-test
   (:require [clojure.test :refer [deftest is]]
-            [edgar2.financials.regression.linear :as linear]))
+            [edgar2.regression.linear :as linear]))
 
 (defn- approx=
   ([a b] (approx= a b 1e-9))
@@ -17,59 +17,68 @@
        (not (Double/isInfinite (double x)))))
 
 (deftest exact-line-has-known-growth-and-zero-variation
-  (let [result (linear/linear-regression [10 20 30 40])]
-    (is (approx= 40.0 (:earnings-stabilized-yoy result)))
-    (is (approx= 40.0 (:earnings-stabilized result)))
-    (is (approx= 0.0 (:earnings-variation result)))))
+  (let [result (linear/regression [10 20 30 40])]
+    (is (approx= 3.0 (:n result)))
+    (is (approx= 10.0 (:intercept result)))
+    (is (approx= 10.0 (:slope result)))
+    (is (approx= 25.0 (:mean result)))
+    (is (approx= 40.0 (linear/slope-percent result)))
+    (is (approx= 40.0 (linear/estimate result 0)))
+    (is (approx= 50.0 (linear/estimate result 1)))
+    (is (approx= 0.0 (:variation result)))))
 
 (deftest negatives-and-zeros-stay-in-fit
-  (let [result (linear/linear-regression [-10 0 10 20])]
+  (let [result (linear/regression [-10 0 10 20])]
     (is (map? result))
     (is (every? finite? (vals result)))
-    (is (approx= 100.0 (:earnings-stabilized-yoy result)))
-    (is (approx= 20.0 (:earnings-stabilized result)))))
+    (is (approx= 100.0 (linear/slope-percent result)))
+    (is (approx= 20.0 (linear/estimate result 0)))))
 
 (deftest symmetric-series-stays-finite
-  (let [result (linear/linear-regression [-10 -5 0 5 10])]
+  (let [result (linear/regression [-10 -5 0 5 10])]
     (is (every? finite? (vals result)))
     (is (approx= (* 100.0 (/ 5.0 6.0))
-                 (:earnings-stabilized-yoy result)))
-    (is (approx= 10.0 (:earnings-stabilized result)))))
+                 (linear/slope-percent result)))
+    (is (approx= 10.0 (linear/estimate result 0)))))
 
 (deftest all-zero-series-is-zero
-  (let [result (linear/linear-regression [0 0 0])]
-    (is (approx= 0.0 (:earnings-stabilized-yoy result)))
-    (is (approx= 0.0 (:earnings-stabilized result)))
-    (is (approx= 0.0 (:earnings-variation result)))))
+  (let [result (linear/regression [0 0 0])]
+    (is (approx= 0.0 (:mean result)))
+    (is (approx= 0.0 (linear/slope-percent result)))
+    (is (approx= 0.0 (linear/estimate result 0)))
+    (is (approx= 0.0 (:variation result)))))
 
 (deftest constant-series-is-zero
-  (let [result (linear/linear-regression [5 5 5])]
-    (is (approx= 0.0 (:earnings-stabilized-yoy result)))
-    (is (approx= 5.0 (:earnings-stabilized result)))
-    (is (approx= 0.0 (:earnings-variation result)))))
+  (let [result (linear/regression [5 5 5])]
+    (is (approx= 0.0 (linear/slope-percent result)))
+    (is (approx= 5.0 (linear/estimate result 0)))
+    (is (approx= 0.0 (:variation result)))))
 
 (deftest nils-skip-but-advance-index
   (let [vals [0.0 1.0 2.0 3.0 4.0]
         with-nil (assoc vals 2 nil)
         collapsed (vec (concat (subvec vals 0 2) (subvec vals 3)))
-        with-nil-result (linear/linear-regression with-nil)
-        collapsed-result (linear/linear-regression collapsed)]
-    (is (approx= 4.0 (:earnings-stabilized with-nil-result)))
-    (is (not (approx= 4.0 (:earnings-stabilized collapsed-result))))))
+        with-nil-result (linear/regression with-nil)
+        collapsed-result (linear/regression collapsed)]
+    (is (approx= 4.0 (:n with-nil-result)))
+    (is (approx= 3.0 (:n collapsed-result)))
+    (is (approx= 4.0 (linear/estimate with-nil-result 0)))
+    (is (not (approx= 4.0 (linear/estimate collapsed-result 0))))))
 
 (deftest too-few-values-return-nil
   (doseq [vals [[] [nil] [1.0] [1.0 nil]]]
-    (is (nil? (linear/linear-regression vals)))))
+    (let [result (linear/regression vals)]
+      (is (nil? result))
+      (is (nil? (linear/estimate result 0)))
+      (is (nil? (linear/slope-percent result))))))
 
 (deftest absolute-error-only-changes-variation
   (let [vals [10 20 31 40]
         square (linear/regression {:error :square} vals)
         absolute (linear/regression {:error :absolute} vals)]
-    (is (approx= (:earnings-stabilized-yoy square)
-                 (:earnings-stabilized-yoy absolute)))
-    (is (approx= (:earnings-stabilized square)
-                 (:earnings-stabilized absolute)))
-    (is (not (approx= (:earnings-variation square)
-                      (:earnings-variation absolute))))
-    (is (approx= (:earnings-variation square)
-                 (:earnings-variation (linear/regression vals))))))
+    (is (approx= (:slope square) (:slope absolute)))
+    (is (approx= (:intercept square) (:intercept absolute)))
+    (is (approx= (:mean square) (:mean absolute)))
+    (is (not (approx= (:variation square) (:variation absolute))))
+    (is (approx= (:variation square)
+                 (:variation (linear/regression vals))))))

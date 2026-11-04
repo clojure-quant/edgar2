@@ -7,7 +7,7 @@
   Run with: clj -X:demo-regression"
   (:require [clojure.pprint :as pprint]
             [edgar2.regression.log :as log]
-            [edgar2.financials.regression.linear :as linear]
+            [edgar2.regression.linear :as linear]
             [edgar2.regression.asinh :as asinh]))
 
 (def cases
@@ -19,20 +19,20 @@
    ["CPA" [247 -607 43 348 514 608 671]]])
 
 (def ^:private regressions
-  [["log" log/regression]
-   ["asinh" asinh/regression]
-   ["linear" linear/regression]])
+  [["log" log/regression log/estimate log/slope-percent]
+   ["asinh" asinh/regression asinh/estimate asinh/slope-percent]
+   ["linear" linear/regression linear/estimate linear/slope-percent]])
 
 (defn- fit-rows
   [vals]
-  (for [[method fit] regressions
+  (for [[method fit estimate slope-percent] regressions
         error [:square :absolute]]
     (let [result (fit {:error error} vals)]
       {:method method
        :error error
-       :stabilized-yoy (:earnings-stabilized-yoy result)
-       :stabilized (:earnings-stabilized result)
-       :variation (:earnings-variation result)})))
+       :stabilized-yoy (slope-percent result)
+       :stabilized (estimate result 0)
+       :variation (:variation result)})))
 
 (defn- fit
   [label vals]

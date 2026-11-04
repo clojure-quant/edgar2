@@ -5,7 +5,7 @@
             [edgar2.financials.derived :as derived]
             [edgar2.financials.calc.concept :as calc-concept]
             [edgar2.financials.calc.quarterly :as calc-q]
-            [edgar2.regression.log :as log]
+            [edgar2.regression.financial :as financial]
             [edgar2.financials.calc.row.dividend-coverage :as div-cov]
             [edgar2.financials.facts-ds :as facts-ds]))
 
@@ -270,8 +270,10 @@
         debt-v-div-ebitda (ratio debt-v ebitda-v)
         debt2ebitda (most-recent debt-v-div-ebitda)
         growth (avg-sales-growth (chron-nums rev) sales-growth-window)
-        earn (log/log-regression
-              (take-last sales-growth-window (reverse ni)))
+        earn-stats (financial/earnings-regression
+                    {:regression-type :log
+                     :error :square}
+                    (take-last sales-growth-window (reverse ni)))
         ni-qoy (calc-q/net-income-change-q-on-y q-ni)
         rev-qoy (calc-q/sales-change-q-on-y q-rev)
         margins (avg-profit-margin ni rev profit-margin-window)
@@ -291,7 +293,7 @@
       (:sales-growth-avg-yoy growth)
       (assoc :sales-growth-avg-yoy (:sales-growth-avg-yoy growth)
              :sales-growth-years (:sales-growth-years growth))
-      earn (merge earn)
+      earn-stats (merge earn-stats)
       (number? ni-qoy) (assoc :net-income-change-q-on-y ni-qoy)
       (number? rev-qoy) (assoc :sales-change-q-on-y rev-qoy)
       (number? rev-score) (assoc :revenue-score rev-score)
