@@ -36,6 +36,7 @@
     (is (= :square (:error @seen)))
     (is (= [[0.0 1.0] [1.0 2.0] [2.0 3.0]] (:points @seen)))
     (is (approx= 0.0 (:e @seen)))
+    (is (approx= 1.0 (:r-squared @seen)))
     (is (approx= 1.0 (:intercept result)))
     (is (approx= 1.0 (:slope result)))
     (is (approx= 2.0 (:n result)))))
@@ -65,15 +66,42 @@
         sse (reduce + (map (fn [p] (let [d (residual p)] (* d d))) points))
         sae (reduce + (map (fn [p] (Math/abs (residual p))) points))]
     (is (approx= (Math/sqrt (/ sse (- k 2)))
-                 (fit/err 1.0 1.0 points :square)))
+                 (:e (fit/err 1.0 1.0 points :square))))
     (is (approx= (Math/sqrt (* 2.0 (/ sae (- k 2))))
-                 (fit/err 1.0 1.0 points :absolute)))
+                 (:e (fit/err 1.0 1.0 points :absolute))))
     (let [three (take 3 points)
           sae3 (reduce + (map (fn [p] (Math/abs (residual p))) three))]
       (is (approx= (Math/sqrt (* 2.0 sae3))
-                   (fit/err 1.0 1.0 three :absolute))))
-    (is (approx= 0.0 (fit/err 1.0 1.0 (take 2 points) :absolute)))
-    (is (approx= 0.0 (fit/err 1.0 1.0 (take 2 points) :square)))))
+                   (:e (fit/err 1.0 1.0 three :absolute)))))
+    (is (approx= 0.0 (:e (fit/err 1.0 1.0 (take 2 points) :absolute))))
+    (is (approx= 0.0 (:e (fit/err 1.0 1.0 (take 2 points) :square))))))
+
+(deftest err-reports-r-squared
+  (let [points [[0.0 1.0] [1.0 3.0] [2.0 2.0] [3.0 5.0]]]
+    (is (approx= 0.6571428571428571
+                 (:r-squared (fit/err 1.0 1.0 points :square))))
+    (is (approx= 0.6571428571428571
+                 (:r-squared (fit/err 1.0 1.0 points :absolute))))
+    (is (approx= 0.5
+                 (:r-squared (fit/err 1.0 1.0 (take 2 points) :square))))
+    (is (approx= 0.0
+                 (:r-squared (fit/err 1.0 1.0 (take 1 points) :square)))))
+  (is (approx= 1.0
+               (:r-squared (fit/err 1.0 1.0
+                                    [[0.0 1.0] [1.0 2.0] [2.0 3.0]]
+                                    :square))))
+  (is (approx= 1.0
+               (:r-squared (fit/err 5.0 0.0
+                                    [[0.0 5.0] [1.0 5.0] [2.0 5.0]]
+                                    :square))))
+  (is (approx= 0.0
+               (:r-squared (fit/err 0.0 0.0
+                                    [[0.0 5.0] [1.0 5.0] [2.0 5.0]]
+                                    :square))))
+  (is (approx= -0.5
+               (:r-squared (fit/err 0.0 0.0
+                                    [[0.0 0.0] [1.0 10.0] [2.0 0.0]]
+                                    :absolute)))))
 
 (deftest too-few-transformed-points-return-nil
   (doseq [vals [[] [nil] [1] [1 nil]]]

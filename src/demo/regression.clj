@@ -36,12 +36,13 @@
        :error error
        :stabilized-yoy (slope-percent result)
        :stabilized (estimate result 0)
-       :variation (:variation result)})))
+       :variation (:variation result)
+       :r-squared (:r-squared result)})))
 
 (defn- fit
   [label vals]
   (println (str "\n=== " label " " (pr-str vals) " ==="))
-  (pprint/print-table [:method :error :stabilized-yoy :stabilized :variation]
+  (pprint/print-table [:method :error :stabilized-yoy :stabilized :variation :r-squared]
                       (fit-rows vals)))
 
 (defn run

@@ -81,17 +81,6 @@
     (throw (IllegalArgumentException.
             (str "Unknown :error " error ", expected :square or :absolute")))))
 
-(base [10.0 15.0 30.0 15.0])
-
-(let [f (error-fn :square)]
-  (->> [-1293.0 4467.0 2475.0 5764.0 8130.0 11264.0 6947.0]
-       (preprocess)
-     (mapv second)
-     f
-       ))
-;;=> {:slope 0.25913206309242637, :e 0.7233664217368604}
-
-
 (defn regression
   "Summarize adjacent percentage returns from an oldest-first price vector.
 
