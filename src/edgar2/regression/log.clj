@@ -1,11 +1,18 @@
 (ns edgar2.regression.log
   "Log-linear earnings fit: E(n) = E(0) * (1 + g)^n."
-  (:require [edgar2.regression.fit :as fit]))
+  (:require [edgar2.regression.fit :as fit]
+            [edgar2.regression.util :as util]))
 
-(defn- preprocess
+(defn- preprocess-value
   [v]
   (when (and (number? v) (pos? (double v)))
     (Math/log (double v))))
+
+(defn preprocess
+  "Transform `vals` into `[[index transformed] ...]`, skipping entries
+  `preprocess-value` rejects."
+  [vals]
+  (util/point-map vals preprocess-value))
 
 (defn- err-normalize ; log
   [{:keys [e]}]

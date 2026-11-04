@@ -2,7 +2,8 @@
   "Asinh earnings fit: asinh(E(n)) = a + b*n.
 
   Unlike the log fit, non-positive earnings stay in the fit."
-  (:require [edgar2.regression.fit :as fit]))
+  (:require [edgar2.regression.fit :as fit]
+            [edgar2.regression.util :as util]))
 
 (defn- asinh
   [x]
@@ -11,10 +12,16 @@
         m (Math/log (+ ax (Math/sqrt (inc (* ax ax)))))]
     (if (neg? x) (- m) m)))
 
-(defn- preprocess
+(defn- preprocess-value
   [v]
   (when (number? v)
     (asinh v)))
+
+(defn preprocess
+  "Transform `vals` into `[[index transformed] ...]`, skipping entries
+  `preprocess-value` rejects."
+  [vals]
+  (util/point-map vals preprocess-value))
 
 (defn- err-normalize ; asinh
   [{:keys [e]}]

@@ -1,15 +1,22 @@
 (ns edgar2.regression.linear
   "Linear earnings fit: E(n) = a + b*n."
-  (:require [edgar2.regression.fit :as fit]))
+  (:require [edgar2.regression.fit :as fit]
+            [edgar2.regression.util :as util]))
 
 (defn- mean
   [xs]
   (/ (double (reduce + xs)) (count xs)))
 
-(defn- preprocess
+(defn- preprocess-value
   [v]
   (when (number? v)
     (double v)))
+
+(defn preprocess
+  "Transform `vals` into `[[index transformed] ...]`, skipping entries
+  `preprocess-value` rejects."
+  [vals]
+  (util/point-map vals preprocess-value))
 
 (defn- err-normalize [{:keys [e points]}]
  ; linear

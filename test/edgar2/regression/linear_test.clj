@@ -16,6 +16,10 @@
        (not (Double/isNaN (double x)))
        (not (Double/isInfinite (double x)))))
 
+(deftest preprocess-drops-non-numbers-and-keeps-indices
+  (is (= [[0.0 1.0] [2.0 3.0]]
+         (linear/preprocess [1 nil 3]))))
+
 (deftest exact-line-has-known-growth-and-zero-variation
   (let [result (linear/regression [10 20 30 40])]
     (is (approx= 3.0 (:n result)))

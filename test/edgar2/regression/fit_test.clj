@@ -1,6 +1,7 @@
 (ns edgar2.regression.fit-test
   (:require [clojure.test :refer [deftest is]]
-            [edgar2.regression.fit :as fit]))
+            [edgar2.regression.fit :as fit]
+            [edgar2.regression.util :as util]))
 
 (defn- approx=
   ([a b] (approx= a b 1e-9))
@@ -11,9 +12,8 @@
          (* tol (max 1.0 (Math/abs a) (Math/abs b)))))))
 
 (defn- number-preprocess
-  [v]
-  (when (number? v)
-    (double v)))
+  [vals]
+  (util/point-map vals (fn [v] (when (number? v) (double v)))))
 
 (defn- constant-summarize
   [_]

@@ -17,6 +17,10 @@
        (not (Double/isNaN (double x)))
        (not (Double/isInfinite (double x)))))
 
+(deftest preprocess-drops-non-numbers-and-keeps-indices
+  (is (= [[0.0 0.0] [2.0 (Math/log (+ 1.0 (Math/sqrt 2.0)))]]
+         (asinh/preprocess [0 nil 1]))))
+
 (deftest positive-series-matches-log-fit
   (let [vals [1034000000 825000000 319000000 699000000]
         log-fit (log/regression vals)

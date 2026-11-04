@@ -10,6 +10,10 @@
      (<= (Math/abs (- a b))
          (* tol (max 1.0 (Math/abs a) (Math/abs b)))))))
 
+(deftest preprocess-drops-non-positive-values-and-keeps-indices
+  (is (= [[0.0 0.0] [2.0 (Math/log 4.0)]]
+         (log/preprocess [1 0 4]))))
+
 (deftest exact-geometric-series-has-known-growth-and-zero-variation
   (let [result (log/regression [1 2 4 8])]
     (is (approx= 3.0 (:n result)))

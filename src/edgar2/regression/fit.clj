@@ -81,29 +81,26 @@
   "Fit transformed earnings on position in an oldest-first vector.
 
   `vals` is the input vector; `preprocess` owns filtering and
-  transformation, receiving each entry and returning the transformed value
-  or nil to skip it. Skipped slots still advance the index, so a missing
-  year counts as a year. Needs two transformed values at different
-  positions, otherwise nil.
+  transformation, receiving the whole vector and returning
+  `[[index transformed] ...]` with rejected entries already dropped.
+  Skipped slots still advance the index, so a missing year counts as a
+  year. Needs two transformed values at different positions, otherwise
+  nil.
 
   `opts` selects the line and how residuals are measured: `{:error
   :square}` (default) fits by least squares, `{:error :absolute}` fits by
   least absolute deviations.
 
-  `summarize` receives `{:error :k :err :ys}` and returns the
-  method-specific fields, such as `:variation`; it must not emit
-  `:intercept`, `:slope`, or `:n`. The result is those fields merged with
-  `{:intercept :slope :n}`, where `:n` is the last input index.
+  `err-normalize` receives the fit result `{:intercept :slope :n :points
+  :error :e}` and returns the method-specific `:variation`. The result is
+  that map with `:variation` added, where `:n` is the last input index.
 
   `:e` is the residual standard-deviation-equivalent from `err`, so both
   error modes report on the same scale."
   [opts vals preprocess err-normalize]
   (let [error (or (:error opts) :square)
         vals (vec vals)
-        points (vec (keep-indexed (fn [i v]
-                                    (when-let [y (preprocess v)]
-                                      [(double i) y]))
-                                  vals))]
+        points (preprocess vals)]
     (when (>= (count points) 2)
       (when-let [[intercept slope] (if (= :absolute error)
                                      (lad points)
