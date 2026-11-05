@@ -23,6 +23,7 @@
   :demo-share-bad {:exec-fn demo.share-bad/run}
   :demo-regression {:exec-fn demo.regression/run}
   :demo-regression-fastmath {:exec-fn demo.regression-fastmath/run}
+  :demo-net-income-model {:exec-fn demo.net-income-model/run}
   :description {:exec-fn edgar2.description/description
                 :exec-args {:ticker "MSFT"}}
   ; download
