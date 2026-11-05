@@ -10,6 +10,7 @@
             [edgar2.web.financials :refer [financials-page]]
             [edgar2.web.ingress :refer [ingress-page]]
             [edgar2.web.industry :refer [industry-page]]
+            [edgar2.web.net-income-model :refer [net-income-model-page]]
             [edgar2.web.ingress-eodhd :refer [ingress-eodhd-page]]
             [edgar2.web.overview :refer [overview-page]]
             [edgar2.web.pairs :refer [pairs-page]]
@@ -106,6 +107,9 @@
    ["/company/chart-nearby/:years" {:name :company-chart-nearby-years
                                     :title "Chart nearby"
                                     :get #'chart-nearby-page}]
+   ["/company/net-income-model" {:name :company-net-income-model
+                                 :title "Net income model"
+                                 :get #'net-income-model-page}]
    ["/financials" {:get #'legacy-financials}]
    ["/financials/:ticker" {:get #'legacy-financials}]
    ["/financials/:ticker/:n" {:get #'legacy-financials}]

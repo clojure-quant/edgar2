@@ -18,7 +18,8 @@
     :company-description
     :company-chart
     :company-chart-nearby
-    :company-chart-nearby-years})
+    :company-chart-nearby-years
+    :company-net-income-model})
 
 (def subnav
   "Second row, shown only on company pages. The value is the route names
@@ -32,7 +33,8 @@
    ["description" :company-description #{:company-description}]
    ["chart" :company-chart #{:company-chart}]
    ["chart-nearby" :company-chart-nearby
-    #{:company-chart-nearby :company-chart-nearby-years}]])
+    #{:company-chart-nearby :company-chart-nearby-years}]
+   ["net-income-model" :company-net-income-model #{:company-net-income-model}]])
 
 (defn- top-link
   [route-name label active? query]
