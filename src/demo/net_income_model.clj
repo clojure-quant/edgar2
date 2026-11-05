@@ -1,14 +1,15 @@
 (ns demo.net-income-model
   "Classify each cached net-income series as stable or trending.
 
-  Reads `data/ni.edn` (written by `demo.net-income/run`), runs
-  `demo.regression-fastmath/stable` on each `:ni` series and, when the
-  series is not stable, fits the linear trend model instead. Writes the
-  resulting models to `data/ni-trend.edn`.
+  Reads `data/ni.edn` (written by `demo.net-income/run`), classifies each
+  `:ni` series with `edgar2.regression.net-income-model/classify-series`
+  (which delegates to `demo.regression-fastmath/stable` and, when the
+  series is not stable, the linear trend model). Writes the resulting
+  models to `data/ni-trend.edn`.
 
   Run with: clj -X:demo-net-income-model"
   (:require [edgar2.download.dataset :as dataset]
-            [demo.regression-fastmath :as rf])
+            [edgar2.regression.net-income-model :as nim])
   (:import [java.time LocalDate]))
 
 (def ni-path "data/ni.edn")
@@ -18,29 +19,13 @@
   "Tickers with fewer valid net-income observations are dropped."
   5)
 
-(def ^:private r-squared-significant
-  "A trend is significant when its `:r-squared` reaches this value."
-  0.8)
-
-(defn classify-series
-  "Stable model for `vals` when it has no trend, otherwise the linear
-  trend model. Nil when `vals` has no observations.
-
-  `data/ni.edn` stores missing years as nil; those are dropped before
-  fitting, since the series carries no year labels to preserve."
-  [vals]
-  (let [vals (remove nil? vals)]
-    (when (seq vals)
-      (let [s (rf/stable vals)]
-        (if (:stable? s) s (rf/trend-linear vals))))))
-
 (defn- classify-row
   "Model map for one `data/ni.edn` row, tagged with :ticker. Nil when the
   row has no ticker or fewer than `min-observations` net-income values."
   [{:keys [ticker ni]}]
   (let [vals (remove nil? ni)]
     (when (and (some? ticker) (>= (count vals) min-observations))
-      (when-let [model (classify-series vals)]
+      (when-let [model (nim/classify-series vals)]
         (assoc model :ticker ticker)))))
 
 (defn classify-ticker
@@ -70,12 +55,6 @@
                   [(ys (first idxs)) (ys (last idxs))]))
               (range 5))))))
 
-(defn- trend-significant?
-  "True when a trend row's fit reaches `r-squared-significant`."
-  [row]
-  (let [r-squared (:r-squared row)]
-    (and (number? r-squared) (<= r-squared-significant (double r-squared)))))
-
 (defn run
   "Classify every series in `ni-path` into `out-path`."
   ([] (run {}))
@@ -85,7 +64,7 @@
      (let [rows (->> in (keep classify-row) vec)
            by-model (group-by :model rows)
            trend-rows (:trend-linear by-model)
-           significant (filter trend-significant? trend-rows)
+           significant (filter nim/trend-significant? trend-rows)
            n-stable (count (:stable by-model))
            n-trend (count trend-rows)
            quintiles (trend-quintile-bounds (map :stabilized-yoy trend-rows))
@@ -108,8 +87,8 @@
 
 (comment
   (run)
-  (classify-series [5 5 5 5 5])
-  (classify-series [1 2 3 4 5])
+  (nim/classify-series [5 5 5 5 5])
+  (nim/classify-series [1 2 3 4 5])
   (classify-ticker "AIR")
   ;
   )

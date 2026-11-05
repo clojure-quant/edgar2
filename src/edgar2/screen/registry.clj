@@ -13,7 +13,8 @@
     edgar2.algo.growth/screen
     edgar2.algo.dividend-yield/screen
     edgar2.algo.lt-breakout/screen
-    edgar2.algo.ltfsr/screen])
+    edgar2.algo.ltfsr/screen
+    edgar2.algo.trend-detector/screen])
 
 (defn all
   "Screen maps, in registry order."
