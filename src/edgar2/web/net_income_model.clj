@@ -47,16 +47,15 @@
   [ds]
   (if ds
     (->> (ds/rows ds {:nil-missing? true})
-         reverse
-         (mapv (fn [r] {:end (str (:end r))
-                        :revenue (:revenue r)
-                        :net-income (:net-income r)})))
+         reverse)
     []))
 
 (defn- dataset-table
   [ds]
   (let [rows (year-rows (facts-ui/format-columns ds))
-        fields [["Revenue" :revenue] ["Net Income" :net-income]]]
+        fields [["Revenue" :revenue]
+                ["Net Income" :net-income]
+                ["EstimateNI" :estimate ]]]
     [:div.table-wrap
      [:table
       [:thead
@@ -70,21 +69,40 @@
           (for [r rows]
             [:td.num {:key (:end r)} (display-value (get r k))])])]]]))
 
+(defn- normalize-future-ends
+  "Return `rows` with numeric future markers in `:end` (\"2\", \"3\", ...)
+  expanded to ISO dates `base+N`, where `base` is the latest ISO year in the
+  rows. ISO dates pass through unchanged, so Vega's temporal axis places
+  future estimates after the historical periods."
+  [rows]
+  (let [iso? #(re-matches #"\d{4}-\d{2}-\d{2}" (str %))
+        marker? #(re-matches #"\d{1,2}" (str %))
+        years (->> rows (map (comp str :end)) (filter iso?)
+                   (map #(parse-long (subs % 0 4))))
+        base (when (seq years) (apply max years))]
+    (mapv (fn [r]
+            (let [e (str (:end r))
+                  n (when (and base (marker? e)) (parse-long e))]
+              (assoc r :end (if n (str (+ base n) "-12-31") e))))
+          rows)))
+
 (defn chart-values
   "Long-form `{:end :series :value}` rows (raw dollars, oldest-first) for a
   model dataset. A nil figure is skipped; an all-nil period is already absent
   from `year-rows`."
   [ds]
-  (let [fields [["Revenue" :revenue] ["Net Income" :net-income]]]
-    (vec (for [r (year-rows ds)
+  (let [fields [["Revenue" :revenue] 
+                ["Net Income" :net-income]
+                ["EstimateNI" :estimate]]]
+    (vec (for [r (normalize-future-ends (year-rows ds))
                [label k] fields
                :let [v (get r k)]
                :when (number? v)]
            {:end (:end r) :series label :value v}))))
 
 (defn chart-spec
-  "Vega-Lite line chart of Revenue (brown) and Net Income (blue) over the
-  fiscal period ends, raw dollars, with a dot per marker."
+  "Vega-Lite line chart of Revenue (brown), Net Income (blue), and EstimateNI
+  (black) over the fiscal period ends, raw dollars, with a dot per marker."
   [ds]
   {:width "container"
    :height 300
@@ -95,8 +113,8 @@
     :y {:field "value" :type "quantitative"
         :axis {:title "USD" :format "$,.3s"}}
     :color {:field "series" :type "nominal"
-            :scale {:domain ["Revenue" "Net Income"]
-                    :range ["#8B4513" "#1f77b4"]}
+            :scale {:domain ["Revenue" "Net Income" "EstimateNI"]
+                    :range ["#8B4513" "#1f77b4" "#000000"]}
             :legend {:title nil}}
     :tooltip [{:field "end" :type "temporal" :format "%Y-%m-%d"}
               {:field "series" :type "nominal"}
@@ -118,7 +136,7 @@
                     :loading [:p (str "Loading net income model for " ticker "…")]
                     :error [:p.error message]
                     :ready (let [model (:model data)
-                                 ds (:ds data)]
+                                 ds (:combined-ds data)]
                              (if (and ds (pos? (ds/row-count ds)))
                                [:div
                                 [:p.fin-header (str "CIK " (:cik data))]
@@ -126,6 +144,8 @@
                                 (dataset-table ds)
                                 (chart-vegalite/chart-vegalite
                                   {:spec (chart-spec ds)})]
-                               [:p (str "No net-income model for " ticker ".")]))
+                               [:p (str "No net-income model for " ticker "."
+                                        "Keys: " (keys data)
+                                        )]))
                     [:p "Enter a ticker."])]))
      :unmount (fn [{:keys [stop]}] (stop))}))

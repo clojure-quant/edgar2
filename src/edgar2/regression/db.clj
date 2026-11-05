@@ -3,10 +3,19 @@
    [edgar2.financials.facts-zip :as z]
    [edgar2.financials.facts-ds :as facts-ds]
    [edgar2.regression.net-income-model :as nim]
-   [edgar2.db.ticker :as t]
-   [tech.v3.dataset :as ds]))
+   [tech.v3.dataset :as ds]
+   [tablecloth.api :as tc]))
 
 (def fz (z/open-facts-zip))
+
+(defn input-dataset [wide]
+  (-> (ds/select-columns wide [:filed :period :end])
+      (ds/add-or-update-column
+       :revenue (facts-ds/calc-concept wide :revenue))
+      (ds/add-or-update-column
+       :net-income (facts-ds/calc-concept wide :net-income))
+      (ds/add-or-update-column
+       :row-index (range (ds/row-count wide)))))
 
 (defn model-dataset
   "Newest-first dataset of `:filed :period :end :revenue :net-income`.
@@ -14,42 +23,91 @@
   Adds `:revenue` and `:net-income` via `calc-concept` to a wide annual
   report-table, drops period-ends where both are non-numeric, and keeps the
   newest 10 rows (report-table is newest-`:end`-first)."
-  [wide]
-  (let [with-cols (-> (ds/select-columns wide [:filed :period :end])
-                      (ds/add-or-update-column
-                       :revenue (facts-ds/calc-concept wide :revenue))
-                      (ds/add-or-update-column
-                       :net-income (facts-ds/calc-concept wide :net-income)))
-        kept (->> (ds/rows with-cols {:nil-missing? true})
-                  (filter #(or (number? (:revenue %))
-                               (number? (:net-income %))))
-                  (take 10)
-                  vec)]
-    (ds/->dataset kept {:dataset-name "ni-model"})))
+  [input-ds n-max]
+  (-> input-ds
+      (ds/filter #(or (number? (:revenue %))
+                      (number? (:net-income %))))
+      (ds/head n-max)))
+
+(defn add-estimate-existing [{:keys [p rows-ni all-ds]}]
+  (let [row-idx-est-dict (->> (map vector rows-ni p)
+                              (into {}))
+        get-est (fn [idx]
+                  (get row-idx-est-dict idx))]
+    (ds/add-or-update-column all-ds :estimate (mapv get-est (ds/column all-ds :row-index)))))
+
+(defn future-estimates-ds
+  [row]
+  (let [estimates (nim/predict-future row 3)]
+    (ds/->dataset {:period   (repeat (count estimates) "future")
+                   :end      (mapv #(str %) (range (count estimates) 0 -1))
+                   :estimate (map double estimates)}
+                  {:dataset-name "future-estimates"})))
+
+
+
+
+(defn combined-ds [row]
+  (ds/concat
+   (future-estimates-ds (:model row))
+   (add-estimate-existing row)))
+
 
 (defn ni-model [cik]
   (try
-    (let [wide (facts-ds/report-table (z/load-dataset fz cik) :y nil)
-          ni (->> (facts-ds/calc-concept wide :net-income)
+    (let [raw (z/load-dataset fz cik)
+          raw (tc/clone raw)
+          wide (facts-ds/report-table raw :y nil)
+          wide (tc/clone wide)
+          all-ds (input-dataset wide)
+          model-ds (model-dataset all-ds 5)
+          ni (->> model-ds
+                  :net-income
+                  (into [])
                   reverse
-                  (take-last 5))]
-      {:cik cik
-       :ds (model-dataset wide)
-       :ni ni
-       :model (nim/classify-series ni)})
-    (catch Exception _ nil)))
+                  (into []))
+          rows-ni (->> model-ds
+                       :row-index
+                       (into [])
+                       reverse
+                       (into []))
+          m  (nim/classify-series ni)
+          p (nim/predict-past m)
+          row {:cik cik
+               :all-ds all-ds
+               :model-ds model-ds
+               :ni ni
+               :model m
+               :p p
+               :rows-ni rows-ni}]
+      (assoc row :combined-ds (combined-ds row)))
+    (catch Exception ex (ex-message ex))))
 
 
-(comment 
+(comment
   (require '[edgar2.db.ticker :as t])
-  (-> (ni-model (t/ticker->cik "MO")) 
-      :model
-      
-      
-      )
-  
-  
-  
+  (-> (ni-model (t/ticker->cik "MSFT"))
+      :model)
+  (-> (ni-model (t/ticker->cik "MSFT"))
+      :model-ds)
+  (-> (ni-model (t/ticker->cik "MSFT"))
+      :p)
+  (-> (ni-model (t/ticker->cik "MSFT"))
+      :rows-ni)
+  (-> (ni-model (t/ticker->cik "MO"))
+      ;keys
+      add-estimate-existing)
+  (-> (ni-model (t/ticker->cik "MO"))
+      :combined-ds)
+
+  (->  (z/load-dataset fz (t/ticker->cik "MO"))
+       (facts-ds/report-table  :y nil)
+       (ds/select-columns [:filed :period  :end "CommonStockDividendsPerShareDeclared"]))
+
+  (-> (ni-model (t/ticker->cik "MO"))
+      :combined-ds)
+
+
  ; 
   )
 

@@ -28,7 +28,7 @@
 (defn open-facts-zip
   "Open data/companyfacts.zip. Caller closes the ZipFile with with-open."
   []
-  (ZipFile. (str dl/companyfacts-zip-path)))
+  (ZipFile. dl/companyfacts-zip-path))
 
 (defn load-dataset
   "Companyfacts dataset for `cik` in open zip `zf`, or nil when the entry

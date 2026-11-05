@@ -237,8 +237,7 @@
      (for [[value label] view/view-choices]
        [:option (cond-> {:key value :value (name value)}
                   (= value view) (assoc :selected true))
-        label])]]
-   [:button {:type "submit"} "Show"]])
+        label])]]])
 
 (defn- take-n-oldest-first
   "Keep the `n` newest period rows (table is newest-first), oldest first."
