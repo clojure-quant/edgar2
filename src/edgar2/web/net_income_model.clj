@@ -7,6 +7,7 @@
             [edgar2.db.ticker :as db-ticker]
             [edgar2.financials.facts-ui :as facts-ui]
             [edgar2.regression.db :as regression-db]
+            [edgar2.web.chart-vegalite :as chart-vegalite]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]))
 
@@ -69,6 +70,38 @@
           (for [r rows]
             [:td.num {:key (:end r)} (display-value (get r k))])])]]]))
 
+(defn chart-values
+  "Long-form `{:end :series :value}` rows (raw dollars, oldest-first) for a
+  model dataset. A nil figure is skipped; an all-nil period is already absent
+  from `year-rows`."
+  [ds]
+  (let [fields [["Revenue" :revenue] ["Net Income" :net-income]]]
+    (vec (for [r (year-rows ds)
+               [label k] fields
+               :let [v (get r k)]
+               :when (number? v)]
+           {:end (:end r) :series label :value v}))))
+
+(defn chart-spec
+  "Vega-Lite line chart of Revenue (brown) and Net Income (blue) over the
+  fiscal period ends, raw dollars, with a dot per marker."
+  [ds]
+  {:width "container"
+   :height 300
+   :data {:values (chart-values ds)}
+   :mark {:type "line" :point {:size 40}}
+   :encoding
+   {:x {:field "end" :type "temporal" :axis {:format "%Y" :title "Year"}}
+    :y {:field "value" :type "quantitative"
+        :axis {:title "USD" :format "$,.3s"}}
+    :color {:field "series" :type "nominal"
+            :scale {:domain ["Revenue" "Net Income"]
+                    :range ["#8B4513" "#1f77b4"]}
+            :legend {:title nil}}
+    :tooltip [{:field "end" :type "temporal" :format "%Y-%m-%d"}
+              {:field "series" :type "nominal"}
+              {:field "value" :type "quantitative" :format "$,.0f"}]}})
+
 (defn net-income-model-page
   [req]
   (h/view
@@ -90,7 +123,9 @@
                                [:div
                                 [:p.fin-header (str "CIK " (:cik data))]
                                 (when (seq model) (model-table model))
-                                (dataset-table ds)]
+                                (dataset-table ds)
+                                (chart-vegalite/chart-vegalite
+                                  {:spec (chart-spec ds)})]
                                [:p (str "No net-income model for " ticker ".")]))
                     [:p "Enter a ticker."])]))
      :unmount (fn [{:keys [stop]}] (stop))}))

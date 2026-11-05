@@ -27,3 +27,21 @@
             {:end "2024-12-31" :revenue 100 :net-income 10}]
            (nim/year-rows ds))))
   (is (= [] (nim/year-rows nil))))
+
+(deftest chart-values-long-form-skips-nils
+  (let [ds (ds/->dataset [{:end "2024-12-31" :revenue 10 :net-income nil}
+                          {:end "2023-12-31" :revenue nil :net-income 5}])]
+    (is (= [{:end "2023-12-31" :series "Net Income" :value 5}
+            {:end "2024-12-31" :series "Revenue" :value 10}]
+           (nim/chart-values ds))))
+  (is (= [] (nim/chart-values nil))))
+
+(deftest chart-spec-lines-colors-and-points
+  (let [ds (ds/->dataset [{:end "2024-12-31" :revenue 10 :net-income 5}])
+        spec (nim/chart-spec ds)]
+    (is (= {:type "line" :point {:size 40}} (:mark spec)))
+    (is (= ["#8B4513" "#1f77b4"]
+           (get-in spec [:encoding :color :scale :range])))
+    (is (= ["Revenue" "Net Income"]
+           (get-in spec [:encoding :color :scale :domain])))
+    (is (= (nim/chart-values ds) (get-in spec [:data :values])))))
