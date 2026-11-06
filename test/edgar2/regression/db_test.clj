@@ -22,8 +22,8 @@
    {:dataset-name "report-table"}))
 
 (deftest model-dataset-drops-empty-periods-and-keeps-newest-ten
-  (let [result (rdb/model-dataset (wide))]
-    (is (= [:filed :period :end :revenue :net-income]
+  (let [result (rdb/model-dataset (rdb/input-dataset (wide)) 10)]
+    (is (= [:filed :period :end :revenue :net-income :row-index]
            (vec (ds/column-names result))))
     (is (= 10 (ds/row-count result)))
     (let [rows (vec (ds/rows result {:nil-missing? true}))

@@ -38,10 +38,27 @@
 
 (deftest chart-spec-lines-colors-and-points
   (let [ds (ds/->dataset [{:end "2024-12-31" :revenue 10 :net-income 5}])
-        spec (nim/chart-spec ds)]
-    (is (= {:type "line" :point {:size 40}} (:mark spec)))
-    (is (= ["#8B4513" "#1f77b4"]
-           (get-in spec [:encoding :color :scale :range])))
-    (is (= ["Revenue" "Net Income"]
-           (get-in spec [:encoding :color :scale :domain])))
+        spec (nim/chart-spec ds)
+        rev-layer (first (:layer spec))
+        ni-layer (second (:layer spec))]
+    (is (= 1200 (:width spec)))
+    (is (= 300 (:height spec)))
+    (is (= {:scale {:y "independent"}} (:resolve spec)))
+    (is (= 2 (count (:layer spec))))
+    (is (every? #(= {:type "line" :point {:size 40}} (:mark %)) (:layer spec)))
+    ;; Both layers share one full color scale so the single legend maps all
+    ;; three series to their colors.
+    (is (= ["#8B4513" "#1f77b4" "#000000"]
+           (get-in rev-layer [:encoding :color :scale :range])))
+    (is (= ["Revenue" "Net Income" "EstimateNI"]
+           (get-in rev-layer [:encoding :color :scale :domain])))
+    (is (= (get-in rev-layer [:encoding :color :scale])
+           (get-in ni-layer [:encoding :color :scale])))
+    ;; Revenue layer on the left Y axis.
+    (is (= [{:filter "datum.series === 'Revenue'"}] (:transform rev-layer)))
+    (is (= "left" (get-in rev-layer [:encoding :y :axis :orient])))
+    ;; Net Income + EstimateNI layer on the right Y axis.
+    (is (= [{:filter "datum.series === 'Net Income' || datum.series === 'EstimateNI'"}]
+           (:transform ni-layer)))
+    (is (= "right" (get-in ni-layer [:encoding :y :axis :orient])))
     (is (= (nim/chart-values ds) (get-in spec [:data :values])))))
