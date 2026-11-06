@@ -109,14 +109,18 @@
    :data {:values (chart-values ds)}
    :mark {:type "line" :point {:size 40}}
    :encoding
-   {:x {:field "end" :type "temporal" :axis {:format "%Y" :title "Year"}}
+   {:x {:field "end" :type "nominal"
+        ; :type "temporal"  ;:axis {:format "%Y" :title "Year"}
+        }
     :y {:field "value" :type "quantitative"
         :axis {:title "USD" :format "$,.3s"}}
     :color {:field "series" :type "nominal"
             :scale {:domain ["Revenue" "Net Income" "EstimateNI"]
                     :range ["#8B4513" "#1f77b4" "#000000"]}
             :legend {:title nil}}
-    :tooltip [{:field "end" :type "temporal" :format "%Y-%m-%d"}
+    :tooltip [{:field "end" :type "nominal"
+               ;:type "temporal"  :format "%Y-%m-%d"
+               }
               {:field "series" :type "nominal"}
               {:field "value" :type "quantitative" :format "$,.0f"}]}})
 
