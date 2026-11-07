@@ -1,6 +1,7 @@
-(ns edgar2.financials.calc.quarterly
+(ns edgar2.financials.calc.current.quarterly
   "Quarterly concept vectors and period-over-period changes."
-  (:require [edgar2.financials.facts-ds :as facts-ds]))
+  (:require [edgar2.financials.facts-ds :as facts-ds]
+            [tablecloth.api :as tc]))
 
 (defn shift-4
   "Newest-first vector shifted by 4 rows (earlier periods move up).
@@ -29,25 +30,16 @@
   `ds-quarterly` is a quarterly report-table. Uses |prior| in the
   denominator so a shrinking loss stays positive."
   [ds-quarterly concept]
-  (let [xs (facts-ds/calc-concept ds-quarterly concept)
+  (let [xs (get ds-quarterly concept)
         prior (shift-4 xs)]
     (->> (map abs-change-pct prior xs)
          (some #(when (number? %) %)))))
 
-(defn net-income-change-q-on-y
-  "Most recent quarter net income vs net income 4 quarters earlier (%).
 
-  `ds-quarterly` is a quarterly report-table. Net income from
-  `facts-ds/calc-concept` `:net-income` (row-aligned; same currency assumed).
-  Compares each period to the value 4 rows later via `shift-4`, then takes
-  the newest pair where both sides are numeric. Uses |prior| in the
-  denominator so negative earnings keep the right sign."
-  [ds-quarterly]
-  (change-q-on-y ds-quarterly :net-income))
-
-(defn sales-change-q-on-y
-  "Most recent quarter revenue vs revenue 4 quarters earlier (%).
-
-  Same comparison as `net-income-change-q-on-y`, on `:revenue`."
-  [ds-quarterly]
-  (change-q-on-y ds-quarterly :revenue))
+(defn calculate-quarterly [q-ds]
+  #_(println "quarterly summary\r\n"
+           (-> q-ds
+               (tc/select-columns [:filed :period :start :end :revenue :net-income])
+               (tc/select-rows (range 10))) ) 
+  {:sales-change-q-on-y (change-q-on-y q-ds :revenue)
+   :net-income-change-q-on-y (change-q-on-y q-ds :net-income)})

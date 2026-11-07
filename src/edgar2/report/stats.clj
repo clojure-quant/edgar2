@@ -1,190 +1,33 @@
 (ns edgar2.report.stats
   "Universe fundamentals from companyfacts.zip: sales growth, margin, ROC."
-  (:require [clojure.java.io :as io]
-            [clojure.pprint :as pprint]
-            [clojure.string :as str]
-            [edgar2.download.facts :as dl]
-            [edgar2.util.core :as ucore]
-            [edgar2.db.price-change :as db-price-change]
-            [edgar2.db.shares :as db-shares]
-            [edgar2.db.sic :as db-sic]
-            [edgar2.db.universe :as db-universe]
-            [edgar2.financials.calc.annual :as annual]
-            [edgar2.financials.calc.valuation :as valuation]
-            [edgar2.financials.facts-ds-converter :as facts-nippy]
-            [edgar2.financials.facts-zip :as facts-zip]
-            [edgar2.financials.shares-outstanding :as shares]
-            [edgar2.util.map-progress :refer [map-progress]]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.pprint :as pprint]
+   [edgar2.download.facts :as dl]
+   [edgar2.util.core :as ucore]
+   [edgar2.db.universe :as db-universe]
+   [edgar2.report.stats.core :as stats]
+   [edgar2.financials.facts-zip :as facts-zip]
+   [edgar2.util.map-progress :refer [map-progress]]))
 
 (def stats-path "data/stats.edn")
-
-(def market-cap-adjusted
-  "Delegates to `valuation/market-cap-adjusted` (web overview)."
-  valuation/market-cap-adjusted)
-
-(defn universe-data
-  "Identity / reporting-currency fields from a universe-facts `row`."
-  [row]
-  (select-keys row [:ticker :exchange :cik :entityName :report-currency]))
-
-(def stats-field-order
-  [:ticker :exchange :cik :entityName :sic :sector :industry :subindustry :price
-   :change50 :change200 :change400
-   :shares :adr-ratio :marketcap :market-cap-adjusted :annual-count
-   :revenue :report-currency
-   :net-profit
-   :earnings-stabilized
-   :eps
-   :assets
-   :return-on-assets
-   :equity
-   :return-on-capital-employed
-   :sales-growth-avg-yoy
-   :earnings-stabilized-yoy
-   :earnings-variation
-   :sales-change-q-on-y
-   :net-income-change-q-on-y
-   :revenue-score
-   :operating-income-score
-   :price-earnings
-   :peg
-   :earnings-yield
-   :earnings-stabilized-yield
-   :earnings-future-3-yield
-   :dividends-paid
-   :dividend-yield
-   :dividend-coverage
-   :stock-repurchase
-   :buyback-yield
-   :dividend-buyback-yield
-   :dividend-buyback-coverage
-   :enterprise-value
-   :ev-ebit
-   :ebit
-   :ebitda
-   :debt
-   :debt2ebitda
-   :cash])
-
-(defn select-fields
-  "Map with `ks` first (present keys only); remaining keys last, sorted."
-  [m ks]
-  (let [seen (set ks)
-        front (mapcat (fn [k] (when (contains? m k) [k (get m k)])) ks)
-        back (->> (keys m)
-                  (remove seen)
-                  sort
-                  (mapcat (fn [k] [k (get m k)])))]
-    (apply array-map (concat front back))))
 
 (defn save-stats!
   [rows]
   (.mkdirs (io/file "data"))
   (let [tmp (str stats-path ".tmp")
-        ordered (mapv #(select-fields % stats-field-order) rows)]
-    (spit tmp (with-out-str (pprint/pprint ordered)))
+        data (into [] rows)]
+    (spit tmp (with-out-str (pprint/pprint data)))
     (.renameTo (io/file tmp) (io/file stats-path))))
 
-(defn fmt-growth
-  [x]
-  (when x (format "%.1f" (double x))))
 
 (defn- stats-progress-line
   [i total st]
-  (format "  %d/%d  %s  growth=%s  margin=%s  roa=%s  roce=%s"
-          i total
-          (or (:ticker st) (:cik st))
-          (fmt-growth (:sales-growth-avg-yoy st))
-          (some-> (:profit-margin st) (* 100) (#(format "%.1f" %)))
-          (some-> (:return-on-assets st) (* 100) (#(format "%.1f" %)))
-          (some-> (:return-on-capital-employed st) (* 100) (#(format "%.1f" %)))))
+  (format "  %d/%d  %s  %s" i total (:ticker st) (:cik st)))
 
-(defn round1
-  [x]
-  (when x (/ (Math/round (* (double x) 10.0)) 10.0)))
-
-(defn round4
-  [x]
-  (when x (/ (Math/round (* (double x) 10000.0)) 10000.0)))
-
-(defn stats-one
-  "One stats row for `cik` from companyfacts dataset `dss` (nil when missing).
-
-  Runs `annual/calculate-annual` (when `dss` is present), market valuation
-  (including ADR ratio), SIC enrichment, and the cached price changes
-  for the ticker. Looks up the universe row by `cik` unless `:row` is
-  passed.   Optional opts for the batch path: `:row`, `:sic-db`,
-  `:shares`. When `:shares` is omitted, the count is `:outstanding` from
-  `edgar2.db.shares/get-shares-cik` (data/share-classes.edn sums every share
-  class). When `:annual-map` is passed, it is used instead of
-  `calculate-annual`."
-  ([dss cik]
-   (stats-one dss cik {}))
-  ([dss cik {:keys [row sic-db shares annual-map] :as opts}]
-   (let [row (or row (db-universe/universe-row-by-cik cik) {:cik (str cik)})
-         sic-db (or sic-db (db-sic/load-sic-index))
-         shares (or shares
-                    (db-shares/get-shares-cik cik))
-         changes (db-price-change/get-change (:ticker row))]
-     (try
-       (let [annual-map (if (contains? opts :annual-map)
-                          (or annual-map {})
-                          (if dss (annual/calculate-annual dss) {}))
-             mc-map (valuation/calculate-marketcap shares row)
-             valuation-map (valuation/calculate-valuation annual-map (:vmcap mc-map))]
-         (merge annual-map
-                (universe-data row)
-                (dissoc mc-map :vmcap)
-                valuation-map
-                (db-sic/sic-data cik sic-db)
-                changes))
-       (catch Exception ex
-         (println (format "  stats-fail %s (%s)"
-                          (or (:ticker row) cik) (.getMessage ex)))
-         (merge (universe-data row) (db-sic/sic-data cik sic-db) changes))))))
 
 (defn stats
-  "From data/universe-facts.edn + companyfacts.zip + prices.edn, write data/stats.edn
-  with 7-year mean YoY sales growth (:sales-growth-avg-yoy, %),
-  earnings regression over the last 7 annual net-income slots
-  (:earnings-stabilized is fitted earnings of the latest year,
-  :earnings-stabilized-yoy is 100 * g from E(n) = E(0) * (1 + g)^n,
-  :earnings-variation is the residual standard error as a percent,
-  100 * (exp(s) - 1);
-  non-positive years are left out of the fit but still count as a year),
-  :net-income-change-q-on-y and :sales-change-q-on-y (latest quarter vs
-  4 quarters earlier, %, |prior| denominator), profit margin, 10-year mean
-  profit margin (Net Income / revenue), return on assets (Net Income / assets),
-  return on capital employed (EBIT / (assets − current liabilities)), plus :shares
-  (calc-concept of :shares-outstanding on the quarterly report table when that
-  row was filed after the annual row, unless the quarterly count is more than
-  100 times smaller), :annual-count (distinct annual periods in companyfacts),
-  :price, :change50, :change200, :change400
-  (close / closeN - 1 from data/price-change.edn, when that ticker is there),
-  :marketcap, :price-sales,
-  :price-earnings (USD market cap / USD Net Income, else USD price / USD EPS),
-  :peg (:price-earnings / :earnings-stabilized-yoy; PE 100 and growth 100 is 1.0;
-  omitted when either is negative or growth is 0),
-  :earnings-yield (100 * Net Income / market cap),
-  :earnings-stabilized-yield (100 * :earnings-stabilized / market cap),
-  :earnings-future-3-yield (:earnings-stabilized-yield * (1 + :earnings-stabilized-yoy / 100) ^ 3),
-  :dividend-yield (USD dividends paid / USD market cap, else USD dividend per share / price),
-  :dividend-coverage (net income / dividends paid; omitted when none was paid),
-  :buyback-yield (USD stock repurchase / USD market cap),
-  :dividend-buyback-yield (dividend yield + buyback yield),
-  :dividend-buyback-coverage (net income / dividends paid + stock repurchase),
-  :enterprise-value (USD market cap + debt + preferred + NCI − cash),
-  :ev-ebit, :ebitda (EBIT + depreciation + amortization),
-  :debt2ebitda (debt / EBITDA), :revenue-score, and :operating-income-score
-  (0–100 share of annual years that did not fall versus the prior year).
-  When operating income is not tagged, a year whose operating expenses were
-  derived uses gross profit minus those expenses.
-  :adr-ratio (ordinary shares per ADR from data/adr-list.edn) when known.
-  :market-cap-adjusted (reporting-currency market cap after ADR) when FX allows.
-  Non-USD or non-1 ADR names use that cap for price-sales, PE, yields, and EV.
-  :sic, :sector, :industry, and :subindustry come from data/universe-fsds.edn.
-
-  Usage: clj -X:stats
+  "Usage: clj -X:stats
          clj -X:stats :limit 25"
   ([] (stats {}))
   ([{:keys [limit force]
@@ -192,149 +35,38 @@
    (ucore/ensure-identity!)
    (let [zip-path (dl/ensure-zip! {:force force})
          all (db-universe/load-universe)
-         sic-db (db-sic/load-sic-index)
          filers (vec (cond->> all limit (take (long limit))))
          total (count filers)]
-     (println (format "stats  %d of %d universe  ← %s"
-                      total (count all) zip-path))
+     (println (format "stats  %d of %d universe  ← %s" total (count all) zip-path))
      (flush)
      (with-open [zf (facts-zip/open-facts-zip)]
-       (let [t-start (System/nanoTime)
-             dataset-ns (volatile! 0)
-             calc-ns (volatile! 0)
-             out (map-progress
+       (let [out (map-progress
                   (fn [i total st]
                     (stats-progress-line i total st))
                   (fn [row]
-                    (let [t0 (System/nanoTime)
-                          dss (try (facts-zip/load-dataset zf (:cik row))
+                    (let [cik (:cik row)
+                          dss (try (facts-zip/load-dataset zf cik)
                                    (catch Exception ex
-                                     (println (format "  skip %s (%s)" (:cik row) (.getMessage ex)))
+                                     (println (format "  skip %s (%s)" cik (.getMessage ex)))
                                      nil))
-                          t1 (System/nanoTime)
-                          st (stats-one dss (:cik row)
-                                        {:row row
-                                         :sic-db sic-db})
-                          t2 (System/nanoTime)]
-                      (vswap! dataset-ns + (- t1 t0))
-                      (vswap! calc-ns + (- t2 t1))
+                          st (try 
+                               (stats/stats-cik cik)
+                               (catch Exception ex 
+                                 (println (format "cik: %s calculate ex: %s" cik (ex-message ex)))
+                                 nil))
+                          st (when st (stats/clean st))]
                       st))
                   filers)
-             mins #(/ (double %) 6.0e10)
-             loop-ns (- (System/nanoTime) t-start)]
-         (println (format "time  json=%.1fm  dataset=%.1fm  calc=%.1fm  loop=%.1fm"
-                          (mins 0) (mins @dataset-ns) (mins @calc-ns) (mins loop-ns)))
+             good (remove nil? out)
+             ]
+         (println "stats calc complete!")
          (flush)
-         (save-stats! out)
-         (println)
-         (pprint/print-table
-          [:ticker :price :marketcap :price-sales :price-earnings
-           :sales-growth-avg-yoy :profit-margin :return-on-assets :return-on-capital-employed]
-          (take 25
-                (map (fn [r]
-                       (-> r
-                           (update :sales-growth-avg-yoy round1)
-                           (update :profit-margin round4)
-                           (update :return-on-assets round4)
-                           (update :return-on-capital-employed round4)
-                           (update :price-sales round4)
-                           (update :price-earnings round4)))
-                     out)))
-         (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  avg-margin=%d  roa=%d  roce=%d  price=%d  chg50=%d  chg200=%d  chg400=%d  mcap=%d  adr=%d  pe=%d  ev=%d  ev-ebit=%d  div-coverage=%d  buyback=%d  rev-score=%d  oi-score=%d  sic=%d)"
-                          stats-path
-                          (count out)
-                          (count (filter :sales-growth-avg-yoy out))
-                          (count (filter :profit-margin out))
-                          (count (filter :avg-profit-margin out))
-                          (count (filter :return-on-assets out))
-                          (count (filter :return-on-capital-employed out))
-                          (count (filter :price out))
-                          (count (filter :change50 out))
-                          (count (filter :change200 out))
-                          (count (filter :change400 out))
-                          (count (filter :marketcap out))
-                          (count (filter :adr-ratio out))
-                          (count (filter :price-earnings out))
-                          (count (filter :enterprise-value out))
-                          (count (filter :ev-ebit out))
-                          (count (filter :dividend-coverage out))
-                          (count (filter :buyback-yield out))
-                          (count (filter :revenue-score out))
-                          (count (filter :operating-income-score out))
-                          (count (filter :sic out))))
-         out)))))
+         (save-stats! good)))
+     nil)))
 
-(defn- shares-from-reports
-  "Share count from quarterly select-data when that row was filed after
-  the annual row, unless the quarterly count is more than 100 times smaller.
-
-  Each dataset is pivoted to the `:shares-outstanding` tags and
-  `calc-concept` supplies the column. Nil when neither dataset has a
-  positive count."
-  [{:keys [y q]}]
-  (:val (shares/choose-shares-outstanding
-         (shares/shares-table-from-selected y)
-         (shares/shares-table-from-selected q))))
-
-(defn- ticker-key
-  [row]
-  (let [t (some-> (:ticker row) str str/trim str/upper-case)]
-    (when (and t (not (str/blank? t)))
-      t)))
-
-(defn stats-nippy
-  "Write data/stats.edn from data/facts.nippy.gz.
-
-  Same calculation as `stats`, reading the frozen annual and quarterly
-  select-data datasets instead of companyfacts.zip. Shares come from
-  those datasets, then the universe row. A ticker missing from the nippy
-  file is still written, without fundamentals.
-
-  Usage: clj -X:stats-nippy"
-  ([] (stats-nippy {}))
-  ([_]
-   (let [t0 (System/nanoTime)
-         facts (facts-nippy/load-facts)
-         load-ns (- (System/nanoTime) t0)
-         all (db-universe/load-universe)
-         sic-db (db-sic/load-sic-index)
-         filers (vec all)
-         total (count filers)
-         mins #(/ (double %) 6.0e10)]
-     (println (format "stats-nippy  %d universe  %d in %s  load=%.1fm"
-                      total (count facts) facts-nippy/facts-path (mins load-ns)))
-     (flush)
-     (let [t1 (System/nanoTime)
-           out (map-progress
-                (fn [i total st]
-                  (stats-progress-line i total st))
-                (fn [row]
-                  (let [ticker (ticker-key row)
-                        reports (get facts ticker)
-                        annual-map (when reports
-                                     (try (annual/calculate-selected reports)
-                                          (catch Exception ex
-                                            (println (format "  stats-fail %s (%s)"
-                                                             ticker (.getMessage ex)))
-                                            nil)))
-                        shares (or (when reports (shares-from-reports reports))
-                                   (:shares-outstanding row))]
-                    (stats-one nil (:cik row)
-                               {:row row
-                                :sic-db sic-db
-                                :shares shares
-                                :annual-map annual-map})))
-                filers)
-           calc-ns (- (System/nanoTime) t1)]
-       (save-stats! out)
-       (println (format "time  load=%.1fm  calc=%.1fm"
-                        (mins load-ns) (mins calc-ns)))
-       (println (format "Wrote %s  (%d companies; growth=%d  margin=%d  roa=%d  roce=%d)"
-                        stats-path
-                        (count out)
-                        (count (filter :sales-growth-avg-yoy out))
-                        (count (filter :profit-margin out))
-                        (count (filter :return-on-assets out))
-                        (count (filter :return-on-capital-employed out))))
-       (flush)
-       out))))
+(comment 
+  (stats {:limit 300})
+  (stats {})
+  
+  ;
+  )

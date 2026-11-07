@@ -7,7 +7,7 @@
             [edgar2.financials.facts-zip :as facts-zip]
             [edgar2.financials.view.core :as view]
             [edgar2.report.screen :as screen]
-            [edgar2.report.stats-category :as stats-cat]
+            [edgar2.report.stats.category :as stats-cat]
             [edgar2.util :as util]
             [edgar2.util.filing :as ufiling]
             [edgar2.util.ticker-info :as ticker-info]

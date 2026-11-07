@@ -16,7 +16,7 @@
             [edgar2.util.core :as ucore]
             [edgar2.download.facts-universe :as universe]
             [edgar2.db.universe :as db-universe]
-            [edgar2.financials.calc.annual :as annual]
+            [edgar2.financials.calc.current :as annual]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
             [edgar2.financials.facts-zip :as facts-zip]

@@ -1,36 +1,72 @@
 (ns demo.concept-calc
   "Demo: calc-concepts on an annual report-table for one ticker."
-  (:require [edgar.api :as e]
-            [edgar2.util :as util]
-            [edgar2.util.core :as ucore]
-            [edgar2.financials.calc.concept :as calc]
-            [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.financials.calc.annual :as annual]))
+  (:require
+   [tech.v3.dataset :as ds]
+   [tablecloth.api :as tc]
+   [edgar.api :as e]
+   [edgar2.util :as util]
+   [edgar2.util.core :as ucore]
+   [edgar2.db.ticker :as t]
+   [edgar2.financials.facts-ds :as facts-ds]
+   [edgar2.financials.facts-zip :as facts-zip]
+   [edgar2.financials.calc.concept :as calc]
+   [edgar2.financials.calc.current.core :as cur]
+   [edgar2.financials.calc.current.growth :as growth]))
 
-(def ticker "AAPL")
-
-(defn load-facts
+(defn load-facts-edgar
   "Companyfacts for `ticker` (XOM via resolve-filer2)."
   [ticker]
+  (ucore/ensure-identity!)
   (e/facts (util/resolve-filer2 ticker)))
 
-(defn annual-concepts
-  "Annual report-table + `calc-concepts` for `ticker`."
-  [ticker]
-  (let [facts (load-facts ticker)
-        table (facts-ds/report-table facts :y annual/annual-fields)]
-    (calc/calc-concepts table)))
+(defn load-facts-zip [cik]
+  (with-open [zf (facts-zip/open-facts-zip)]
+    (facts-zip/load-dataset zf cik)))
+
+
+(def show-columns
+  [:filed :period :end
+   ; :revenue :net-income
+   ;:ebit
+   ;:ebitda 
+   :net-income-margin
+   ;:depreciation-amortization
+   ;:depreciation
+   ;:amortization
+   :roa
+   :roce
+   :dividend-buyback-coverage])
 
 (defn run
   "Load demo ticker facts, print calc-concepts table."
-  ([] (run ticker))
-  ([ticker]
-   (ucore/ensure-identity!)
-   (let [cc (annual-concepts ticker)]
-     (println "\n=== calc-concepts" ticker "===")
-     (println cc)
-     cc)))
+  ([{:keys [ticker cik]}]
+   (let [cik (if cik
+               cik
+               (t/ticker->cik ticker))
+         ticker (if ticker
+                  ticker
+                  (t/primary-ticker-for-cik cik))
+         facts (load-facts-zip cik)
+         a (facts-ds/report-table facts :y nil)
+         cc (calc/calc-concepts a)
 
-(defn -main
-  [& args]
-  (run (or (first args) ticker)))
+         ;cc (growth/calc-growth cc)
+         ]
+     (println "\n ticker: " ticker " cik: " cik "reports: " (tc/row-count a))
+     ;(println cc)
+     (println (ds/select-columns cc show-columns))
+     (println (cur/calculate-annual facts)))))
+
+(comment
+  (run {:ticker "MSFT"})
+
+  (run {:cik "0000055234"}) ; not 7 years of data
+
+  (run {:cik "0000066496"})
+
+  
+
+
+
+  ;
+  )

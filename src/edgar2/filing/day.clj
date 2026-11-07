@@ -3,11 +3,11 @@
 
   Members are stored as ./{accession}.nc. Archive bytes are read through
   edgar2.util.tar."
-  (:require [clojure.java.io :as io]
-            [edgar2.util.tar :as tar]))
+  (:require
+   [clojure.java.io :as io]
+   [edgar2.util.tar :as tar]
+   [edgar2.config :refer [day-path]]))
 
-(def dest
-  "/run/media/florian/26ad683d-44f4-42d8-bbd9-0a5d0b792fe0/sec")
 
 (defn archive-file
   "Finished daily feed for a YYYY-MM-DD filing date, or nil.
@@ -17,7 +17,7 @@
         m (parse-long (subs filing-date 5 7))
         d (subs filing-date 8 10)
         q (inc (quot (dec m) 3))
-        f (io/file dest y (str "QTR" q)
+        f (io/file day-path y (str "QTR" q)
                    (str y (subs filing-date 5 7) d ".nc.tar.gz"))]
     (when (.isFile f) f)))
 

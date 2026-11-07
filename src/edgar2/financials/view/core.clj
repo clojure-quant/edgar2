@@ -5,7 +5,6 @@
     :field     one [taxonomy concept] pair
     :concept   an id from edgar2.financials.concepts, via facts-ds/calc-concept
     :edgarjure a statement label from edgarjure
-    :math      a key in edgar2.financials.math/math
 
   :style and :format are the row background (:background-pl-green,
   :background-balance-active, or :background-balance-passive), written on

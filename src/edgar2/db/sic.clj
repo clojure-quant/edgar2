@@ -45,3 +45,8 @@
   "SIC code for `cik` from data/universe-fsds.edn, or nil."
   [cik]
   (some-> (sic-data cik @sic-index) :sic))
+
+(defn sic-data-for-cik
+  "SIC code for `cik` from data/universe-fsds.edn, or nil."
+  [cik]
+  (sic-data cik @sic-index))

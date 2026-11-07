@@ -53,6 +53,23 @@
   (map (partial predict row)
        (range (+ n n-future -1) (- n 1) -1)))
 
+(defn predict-current [{:keys [n] :as row}]
+  (predict row (- n 1)))
+
+(defn predict-future-3 [{:keys [n] :as row}]
+  (predict row (+ n 2)))
+
+(defn certainity [{:keys [model 
+                          p-value t likelihood
+                          r-squared
+                          ]}]
+  (case model
+    :stable
+    p-value
+    :trend-linear
+  	r-squared
+    ; else
+    0.0))
 
 
 

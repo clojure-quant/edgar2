@@ -167,18 +167,36 @@
     :label "Preferred Stock"
     :data [[:us-gaap :PreferredStockValue]]}
 
+   #_{:id :debt
+      :label "Debt"
+      :data [[:us-gaap :LongTermDebtNoncurrent]
+             [:us-gaap :LongTermDebtCurrent]
+             [:us-gaap :LongTermDebt]
+             [:us-gaap :CommercialPaper]
+             [:us-gaap :ShortTermBorrowings]
+             [:us-gaap :OtherShortTermBorrowings]
+             [:ifrs-full :LongtermBorrowings]
+             [:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]
+             [:ifrs-full :ShorttermBorrowings]
+             [:ifrs-full :Borrowings]
+             ]}
+   
    {:id :debt
     :label "Debt"
-    :data [[:us-gaap :LongTermDebtNoncurrent]
-           [:us-gaap :LongTermDebtCurrent]
-           [:us-gaap :LongTermDebt]
+    :data [[:ifrs-full :Borrowings]]}
+
+   {:id :debt-longterm
+    :label "Debt LongTerm"
+    :data [[:us-gaap :LongTermDebt]
+           [:ifrs-full :LongtermBorrowings]]}
+   
+   {:id :debt-shortterm
+    :label "Debt ShortTerm"
+    :data [[:us-gaap :ShortTermBorrowings]
            [:us-gaap :CommercialPaper]
-           [:us-gaap :ShortTermBorrowings]
            [:us-gaap :OtherShortTermBorrowings]
-           [:ifrs-full :LongtermBorrowings]
-           [:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]
            [:ifrs-full :ShorttermBorrowings]
-           [:ifrs-full :Borrowings]
+           [:ifrs-full :CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings]
            ]}
 
    {:id :shares-outstanding
@@ -195,15 +213,19 @@
            ; ifrs-full:IssuedCapital
            ]}
 
-   {:id :depreciation
-    :label "Depreciation"
+   {:id :depreciation-amortization
+    :label "Depreciation & Amortization"
     :data [[:us-gaap :DepreciationDepletionAndAmortization]
            [:us-gaap :DepreciationAndAmortization]
-           [:us-gaap :DepreciationExpense]
-           [:us-gaap :Depreciation]
-           [:us-gaap :DepreciationNonproduction]
            [:ifrs-full :DepreciationAndAmortisationExpense]
            [:ifrs-full :AdjustmentsForDepreciationAndAmortisationExpense]
+           [:ifrs-full :DepreciationPropertyPlantAndEquipment]]}
+
+   {:id :depreciation
+    :label "Depreciation"
+    :data [[:us-gaap :DepreciationExpense]
+           [:us-gaap :Depreciation]
+           [:us-gaap :DepreciationNonproduction]
            [:ifrs-full :DepreciationPropertyPlantAndEquipment]
            ]}
 
@@ -216,7 +238,6 @@
            [:us-gaap :AdjustmentForAmortization]
            [:ifrs-full :AmortisationIntangibleAssetsOtherThanGoodwill]
            [:ifrs-full :AmortisationExpense]]}
-
    ])
 
 (def concept-dict

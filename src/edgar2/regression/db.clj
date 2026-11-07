@@ -1,10 +1,9 @@
 (ns edgar2.regression.db
   (:require
+   [tech.v3.dataset :as ds]
    [edgar2.financials.facts-zip :as z]
    [edgar2.financials.facts-ds :as facts-ds]
-   [edgar2.regression.net-income-model :as nim]
-   [tech.v3.dataset :as ds]
-   [tablecloth.api :as tc]))
+   [edgar2.regression.net-income-model :as nim]))
 
 (def fz (z/open-facts-zip))
 
@@ -52,14 +51,9 @@
    (future-estimates-ds (:model row))
    (add-estimate-existing row)))
 
-
-(defn ni-model [cik]
+(defn ni-model-calculate [wide]
   (try
-    (let [raw (z/load-dataset fz cik)
-          raw (tc/clone raw)
-          wide (facts-ds/report-table raw :y nil)
-          wide (tc/clone wide)
-          all-ds (input-dataset wide)
+    (let [all-ds (input-dataset wide)
           model-ds (model-dataset all-ds 5)
           ni (->> model-ds
                   :net-income
@@ -73,15 +67,38 @@
                        (into []))
           m  (nim/classify-series ni)
           p (nim/predict-past m)
-          row {:cik cik
-               :all-ds all-ds
+          row {:all-ds all-ds
                :model-ds model-ds
                :ni ni
                :model m
                :p p
-               :rows-ni rows-ni}]
+               :rows-ni rows-ni
+               :earnings-stabilized (nim/predict-current m)
+               :earnings-stabilized-yoy (* 100 (:stabilized-yoy m))
+               :earnings-variation (nim/certainity m)
+               }]
       (assoc row :combined-ds (combined-ds row)))
-    (catch Exception ex (ex-message ex))))
+    (catch Exception ex {:model-error (ex-message ex)})))
+
+(defn ni-model [cik]
+  (try
+    (let [raw (z/load-dataset fz cik)
+          wide (facts-ds/report-table raw :y nil)]
+      (assoc 
+       (ni-model-calculate wide)
+       :cik cik))
+    (catch Exception _ nil)))
+
+(defn ni-model-facts [facts]
+  (let [y (facts-ds/report-table facts :y nil)]
+    (ni-model-calculate y)))
+
+(defn earnings-regression 
+  [opts vals]
+  (when-let [earn (regression/regression opts vals)]
+    {:earnings-stabilized (regression/estimate opts earn 0)
+     :earnings-stabilized-yoy (regression/slope-percent opts earn)
+     :earnings-variation (:variation earn)}))
 
 
 (comment

@@ -20,11 +20,11 @@
   "CIK for `ticker`, then `share-summary-cik`, with `:ticker` added."
   [ticker]
   (ucore/ensure-identity!)
+  (ucore/enable-cache)
   (let [cik (util/resolve-filer2 ticker)]
     (if cik
       (xbrl-shares/share-summary-ticker ticker)
-      {:ticker ticker :error "no cik found for ticker"}
-      )))
+      {:ticker ticker :error "no cik found for ticker"})))
 
 (def share-classes-path
   "Written by `run` when no ticker is passed."
@@ -45,12 +45,13 @@
   "Share summary for every ticker in data/universe-facts.edn.
 
   Progress prints every 100 tickers. The file is written after the last one."
-  []
+  [limit]
   (ucore/ensure-identity!)
   (ucore/enable-cache)
   (let [rows (->> (universe/load-universe)
                   (filter #(not (str/blank? (str (:ticker %)))))
                   vec)
+        rows (if limit (take limit rows) rows)
         n (count rows)]
     (println (format "share classes  %d tickers  → %s" n share-classes-path))
     (flush)
@@ -69,11 +70,26 @@
   "With `:ticker`, print `share-summary-ticker`. 
    summarize every universe ticker into  data/share-classes.edn."
   ([] (run {}))
-  ([{:keys [ticker]}]
+  ([{:keys [ticker limit]}]
    (if ticker
      ; single ticker
      (let [summary (share-summary-ticker (name ticker))]
        (pprint/pprint summary)
        summary)
      ; universe
-     (run-universe))))
+     (let [limit (when limit
+                   (if (string? limit)
+                     (parse-long limit) limit))]
+       (run-universe limit)))))
+
+
+(comment
+
+  (run {:ticker "MSFT"})
+  (run {:ticker "AIR"})
+
+  (run {:limit "5"})
+  (run {:limit 5})
+  
+ ; 
+  )

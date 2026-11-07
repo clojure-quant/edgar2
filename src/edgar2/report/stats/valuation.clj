@@ -1,9 +1,10 @@
-(ns edgar2.financials.calc.valuation
+(ns edgar2.report.stats.valuation
   "Market-cap and valuation ratios from stats fundamentals."
-  (:require [clojure.string :as str]
-            [edgar2.db.adr :as adr]
-            [edgar2.db.price :as db-price]
-            [edgar2.download.fx :as fx]))
+  (:require
+   [clojure.string :as str]
+   [edgar2.db.adr :as adr]
+   [edgar2.db.price :as db-price]
+   [edgar2.download.fx :as fx]))
 
 (defn usd-unit?
   "True for USD or USD/shares (US listing price is in dollars)."
@@ -135,3 +136,14 @@
       ev (assoc :enterprise-value ev)
       (and ev (number? ebit) (not (zero? (double ebit))))
       (assoc :ev-ebit (/ ev (double ebit))))))
+
+
+(defn calculate [shares row]
+  (let [m (calculate-marketcap shares row)]
+    ;(println "valuation shares: " shares " mc: " (:vmcap m))
+    (calculate-valuation row (:vmcap m))))
+
+
+
+
+

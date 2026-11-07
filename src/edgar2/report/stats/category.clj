@@ -1,4 +1,4 @@
-(ns edgar2.report.stats-category
+(ns edgar2.report.stats.category
   "Category membership and display format for the stats and financials pages.
 
   Each entry is [key format] or [key format label]. `:percent` values are

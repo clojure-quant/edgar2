@@ -5,7 +5,8 @@
             [hyper.core :as h]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats :as stats]
-            [edgar2.report.stats-category :as stats-cat]
+            [edgar2.report.stats.category :as stats-cat]
+            [edgar2.financials.calc.current.valuation :as valuation] 
             [edgar2.web.nav :refer [nav]]))
 
 (def groups
@@ -161,7 +162,7 @@
   [row]
   (or (when (number? (:market-cap-adjusted row))
         (double (:market-cap-adjusted row)))
-      (stats/market-cap-adjusted row)))
+      (valuation/market-cap-adjusted row)))
 
 (defn foreign-summary
   "One row per non-USD reporting currency. `:n` is the company count.

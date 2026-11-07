@@ -388,7 +388,7 @@
                    (own-end-by-accn (annual-window-rows dss)))
         wanted (when (some? fields) (set (map field-pair fields)))
         out-cols (into report-period-cols [:taxonomy :concept :label :unit :val
-                                          :fact-filed :fact-form])
+                                           :fact-filed :fact-form])
         fact-rows (->> (ds/rows dss {:nil-missing? true})
                        (keep (fn [fact]
                                (when (or (nil? wanted)
@@ -587,9 +587,6 @@
 (def ^:private edgarjure-chains
   (delay (edgarjure-chain-index)))
 
-(defn- math-var
-  [name]
-  (requiring-resolve (symbol "edgar2.financials.math" name)))
 
 (defn- field-tag-pairs
   "Taxonomy/concept pairs the wide table must contain for one field map."
@@ -598,7 +595,6 @@
     (:field field) [(:field field)]
     (:concept field) (concept-tag-pairs (:concept field))
     (:edgarjure field) (jure-pairs (get @edgarjure-chains (:edgarjure field)))
-    (:math field) (mapcat concept-tag-pairs ((math-var "math-concepts") (:math field)))
     :else []))
 
 (defn- column-metadata
@@ -633,7 +629,6 @@
     (:field field) (column-vec wide (name (second (:field field))))
     (:concept field) (calc-concept wide (:concept field))
     (:edgarjure field) (chain-vals wide (get @edgarjure-chains (:edgarjure field)))
-    (:math field) ((math-var "calculate-math") wide (:math field))
     :else (vec (repeat (ds/row-count wide) nil))))
 
 (defn- period-column
@@ -651,8 +646,7 @@
 
   `:field` is one `[taxonomy concept]` pair. `:concept` is an id from
   `edgar2.financials.concepts`, via `calc-concept`. `:edgarjure` is a
-  statement label resolved through `edgar.api/concepts-for`. `:math` is a
-  key in `edgar2.financials.math/math`."
+  statement label resolved through `edgar.api/concepts-for`. "
   [dss q-or-y fields]
   (let [fields (vec fields)
         pairs (vec (distinct (mapcat field-tag-pairs fields)))
