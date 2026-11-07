@@ -313,3 +313,30 @@
       (is (= (count ends) (ds/row-count empty-concept)))
       (is (every? #(nil? (get % "WeightedAverageNumberOfDilutedSharesOutstanding"))
                   (ds/rows empty-concept {:nil-missing? true}))))))
+
+(deftest report-table-derives-q4-aapl
+  "When the 10-K files only the full year, the quarterly table's Q4 duration
+  cell is derived as FY − (Q1 + Q2 + Q3). An explicit Q4 fact is kept, and a
+  year missing a component stays nil."
+  (let [dss (load-facts "AAPL")
+        table (facts-ds/report-table dss :q [[:us-gaap :NetIncomeLoss]])
+        ni (into {} (map (fn [r] [(str (:period r)) (get r "NetIncomeLoss")])
+                         (ds/rows table {:nil-missing? true})))]
+    (testing "explicit Q4 is preserved, not overwritten"
+      (is (= 1.2673E10 (double (get ni "2020-Q4")))))
+    (testing "recent 10-Ks derive Q4 = FY − (Q1 + Q2 + Q3)"
+      (is (= 2.0551E10 (double (get ni "2021-Q4"))))
+      (is (= 1.4736E10 (double (get ni "2024-Q4"))))
+      (is (= 2.7466E10 (double (get ni "2025-Q4")))))
+    (testing "a year missing a quarter component stays nil"
+      (is (nil? (get ni "2009-Q4"))))))
+
+(deftest report-table-q4-derivation-skips-instants-aapl
+  "Balance-sheet instants already carry their FY-end value on Q4 and must not
+  be turned into FY − (Q1 + Q2 + Q3) nonsense sums."
+  (let [dss (load-facts "AAPL")
+        table (facts-ds/report-table dss :q [[:us-gaap :Assets]])
+        by-period (into {} (map (fn [r] [(str (:period r)) (get r "Assets")])
+                                (ds/rows table {:nil-missing? true})))]
+    (is (= 3.59241E11 (double (get by-period "2025-Q4"))))
+    (is (= 3.6498E11 (double (get by-period "2024-Q4"))))))

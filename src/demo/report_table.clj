@@ -11,30 +11,40 @@
 
 (def demo-fields
   [[:dei :EntityCommonStockSharesOutstanding]
-   [:us-gaap :CostOfGoodsAndServicesSold]
-   [:us-gaap :CommonStockSharesOutstanding]
-   [:ifrs-full :DividendsPaidOrdinarySharesPerShare]
+   ;[:us-gaap :CostOfGoodsAndServicesSold]
+   ;[:us-gaap :CommonStockSharesOutstanding]
+   ;[:ifrs-full :DividendsPaidOrdinarySharesPerShare]
    ;[:us-gaap :PaymentsForRepurchaseOfCommonStock]
-   [:us-gaap :Revenues]
+   ;[:us-gaap :Revenues]
+   [:us-gaap :NetIncomeLoss]
+   [:us-gaap :Assets]
    ])
 
 (comment
   (ucore/ensure-identity!)
+  (ucore/enable-cache)
   
-  (def dss (e/facts (resolve-filer2 "XOM") ))
+  ;(def dss (e/facts (resolve-filer2 "XOM") ))
   
   (def dss (e/facts "MSFT"))
-
-  (def dss (e/facts "SONY"))
+  
+  
 
   ; taxonomy cef
-  (def dss (e/facts "ACP"))
+  ;(def dss (e/facts "ACP"))
   
   (ds/filter dss #(= "cef" (str (:taxonomy %))))
   
-  (def dss (e/facts "TAK"))
+  ;(def dss (e/facts "TAK"))
 
   dss
+
+(-> dss 
+    (tc/select-rows #(= "us-gaap" (:taxonomy %)) )
+    (tc/select-rows #(= "NetIncomeLoss" (:concept %)))
+    (tc/select-columns [:filed :frame :start :end :val])
+    )
+
   (defn f [row]
     (let [s (:concept row)]
       (and (not (nil? s))
@@ -54,6 +64,7 @@
 
   (facts-ds/report-table dss :y demo-fields)
   (facts-ds/report-table dss :q demo-fields)
+  
 
   (facts-ds/annual-periods dss)
   (facts-ds/quarterly-periods dss)

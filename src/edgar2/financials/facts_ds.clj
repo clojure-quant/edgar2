@@ -484,6 +484,89 @@
                   vec)]
     (ds/->dataset wide {:dataset-name "report-table"})))
 
+(defn- duration-concept-names
+  "Local concept names on `dss` that appear as duration facts (non-blank
+  `:start`). Used to keep Q4 derivation off balance-sheet instants."
+  [dss]
+  (->> (ds/rows dss {:nil-missing? true})
+       (filter #(not (str/blank? (str (:start %)))))
+       (map #(str (:concept %)))
+       (remove str/blank?)
+       set))
+
+(defn- report-concept-cols
+  "Concept columns on a wide report: every column that is not a period column."
+  [wide]
+  (let [meta-cols (set (map name report-period-cols))]
+    (remove meta-cols (map name (ds/column-names wide)))))
+
+(defn- rebuild-wide
+  "Rebuild a wide report from updated row maps, preserving column order and
+  column metadata."
+  [wide rows]
+  (ds/new-dataset
+   {:dataset-name "report-table"}
+   (mapv (fn [k]
+           (let [values (mapv #(get % k) rows)]
+             (col/new-column k
+                             (if (empty? values) (make-array Object 0) values)
+                             (meta (ds/column wide k)))))
+         (ds/column-names wide))))
+
+(defn- fill-derived-q4
+  "Fill nil Q4 duration cells with `FY − (Q1 + Q2 + Q3)`.
+
+  `wide` is the quarterly report for `fields`; the annual report supplies the
+  FY value keyed by `:end`, and the Q1–Q3 cells come from `wide` keyed by
+  `:period`. Only duration concepts (present on `dss` with a non-blank
+  `:start`) are derived, so balance-sheet instants — already filled by the
+  FY-end instant — are never summed. A year missing any component stays nil;
+  an explicit Q4 cell is never overwritten. Returns `wide` unchanged when
+  there is no annual report or nothing changed."
+  [dss wide fields]
+  (let [annual (try
+                 (pivot-keeping-periods (select-data dss :y fields) fields)
+                 (catch Exception _ nil))]
+    (if (or (nil? annual) (zero? (ds/row-count annual)))
+      wide
+      (let [duration (duration-concept-names dss)
+            dur-cols (filter duration (report-concept-cols wide))
+            a-by-end (into {} (map (fn [r] [(str (:end r)) r]))
+                           (ds/rows annual {:nil-missing? true}))
+            wide-rows (vec (ds/rows wide {:nil-missing? true}))
+            q-by-period (into {} (map (fn [r] [(str (:period r)) r])) wide-rows)
+            q4-re #"(\d+)-Q4"
+            updated
+            (mapv
+             (fn [row]
+               (if-let [[_ year] (re-matches q4-re (str (:period row)))]
+                 (let [fy (get a-by-end (str (:end row)))
+                       q1 (get q-by-period (str year "-Q1"))
+                       q2 (get q-by-period (str year "-Q2"))
+                       q3 (get q-by-period (str year "-Q3"))]
+                   (if (and fy q1 q2 q3)
+                     (reduce
+                      (fn [r c]
+                        (let [cur (get r c)
+                              f (get fy c)
+                              a (get q1 c)
+                              b (get q2 c)
+                              d (get q3 c)]
+                          (if (and (nil? cur)
+                                   (number? f) (number? a)
+                                   (number? b) (number? d))
+                            (assoc r c (- (double f) (double a)
+                                          (double b) (double d)))
+                            r)))
+                      row
+                      dur-cols)
+                     row))
+                 row))
+             wide-rows)]
+        (if (= updated wide-rows)
+          wide
+          (rebuild-wide wide updated))))))
+
 (defn report-table
   "Wide report for `fields` over annual (`:y`) or quarterly (`:q`) periods.
 
@@ -491,9 +574,16 @@
   with period columns `:filed :period :end` and one column per concept.
   Quarterly tables keep a row for every period end, with empty concept
   columns when nothing attached. Nil `fields` keeps every concept; later
-  `:filed` breaks ties."
+  `:filed` breaks ties.
+
+  On the quarterly table a duration concept's Q4 cell is derived as
+  `FY − (Q1 + Q2 + Q3)` when the 10-K files only the full year; see
+  `fill-derived-q4`."
   [dss q-or-y fields]
-  (pivot-keeping-periods (select-data dss q-or-y fields) fields))
+  (let [wide (pivot-keeping-periods (select-data dss q-or-y fields) fields)]
+    (if (= :q q-or-y)
+      (fill-derived-q4 dss wide fields)
+      wide)))
 
 (defn period-count
   "Distinct `:period` values on a `select-data` dataset."

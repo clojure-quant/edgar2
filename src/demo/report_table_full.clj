@@ -17,19 +17,23 @@
             [tech.v3.dataset :as ds]))
 
 (def fields
-  [{:field [:us-gaap :Revenues]
-    :label "Revenue tag"
+  [{:field [:us-gaap :NetIncomeLoss]
+    :label "NetIncome tag"
     :style :background-pl-green
     :section :income}
-   {:concept :revenue
+   {:field [:us-gaap :Assets]
+    :label "Assets tag"
+    :style :background-pl-green
+    :section :income}
+   #_{:concept :revenue
     :label "Revenue"
     :style :background-pl-green
     :section :income}
-   {:edgarjure "Interest Expense"
+   #_{:edgarjure "Interest Expense"
     :label "Interest Expense"
     :style :background-pl-green
     :section :income}
-   {:math :operating-income
+   #_{:math :operating-income
     :label "Operating Income"
     :style :background-pl-green
     :section :income}])
@@ -114,3 +118,8 @@
                   (facts-ds/report-table-full dss :q shown)
                   shown)
      nil)))
+
+(comment 
+  (run {:ticker "MSFT"})
+  ;
+  )
