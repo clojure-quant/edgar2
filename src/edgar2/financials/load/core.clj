@@ -7,29 +7,29 @@
             [edgar2.financials.load.ixbrl :as xbrl]
             ))
 
-(defn load-facts-api [cik]
+(defn load-facts-facts-api [cik]
   (u/ensure-identity!)
   (u/enable-cache)
   (e/facts cik))
 
-(defn load-filings-api [cik]
+(defn load-facts-filing-api [cik]
   (u/ensure-identity!)
   (u/enable-cache)
   (xbrl/download-filings->ds cik))
 
-(defn load-filings 
+(defn load-facts
   ([cik]
-   (load-filings cik :facts-api))
+   (load-facts cik :facts-api))
   ([cik source]
    (case source
-     :facts-api (load-facts-api cik)
-     :filings-api (load-filings-api cik)
+     :facts-api (load-facts-facts-api cik)
+     :filings-api (load-facts-filing-api cik)
      )))
 
 (comment 
   ;"SNPMF"
-  (load-facts-api "0001123658")
-  (load-filings-api "0001123658")
+  (load-facts "0001123658" :facts-api)
+  (load-facts "0001123658" :filings-api)
 
   
   

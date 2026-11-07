@@ -151,7 +151,8 @@
         f (cache-file form cik accessionNumber doc)]
     (cond
       (.isFile f) (slurp f :encoding "UTF-8")
-      :else (let [html (ec/edgar-get (ef/filing-doc-url filing doc) :raw? true)]
+      :else (let [_ (println "downloading filing: " filing " doc: " doc)
+                  html (ec/edgar-get (ef/filing-doc-url filing doc) :raw? true)]
               (.mkdirs (.getParentFile f))
               (spit f html :encoding "UTF-8")
               html))))
@@ -299,6 +300,13 @@
   [filing]
   (annual-statement-facts (facts-from-docs filing (annual-doc-names filing))))
 
+(defn get-yearly-filings [cik]
+  (concat 
+   (e/filings cik :form "10-K" :include-amends? true :limit 1000)
+   (e/filings cik :form "20-F" :include-amends? true :limit 1000)
+   (e/filings cik :form "40-F" :include-amends? true :limit 1000)))
+
+
 (defn download-filings->ds
   "Companyfacts plus inline XBRL from annual reports that never fully
   landed in companyfacts.
@@ -308,7 +316,7 @@
   20-F itself was filed without XBRL. A failure leaves `dss` unchanged."
   [cik]
   (try
-    (let [pending  (e/filings cik :include-amends? true :limit 1000)
+    (let [pending  (get-yearly-filings cik)
           extra (mapcat (fn [filing]
                           (try
                             (annual-filing-facts filing)
@@ -320,3 +328,9 @@
         nil))
     (catch Exception _
       nil)))
+
+(comment 
+  (e/filings "0001123658" :include-amends? true :limit 10)
+  (get-yearly-filings "0001123658")
+  ;
+  )

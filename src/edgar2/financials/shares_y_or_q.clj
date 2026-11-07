@@ -129,3 +129,14 @@
   [dss]
   (let [{:keys [y q]} (shares-outstanding-tables dss)]
     (choose-shares-outstanding y q)))
+
+(comment 
+  (require '[edgar2.financials.load.core :refer [load-facts]])
+  
+  (def facts-ds (load-facts "0001123658" :facts-api))
+  facts-ds
+  (shares-outstanding-obs facts-ds)  
+  
+  )
+
+

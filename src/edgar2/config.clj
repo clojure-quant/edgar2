@@ -12,4 +12,4 @@
   )
 
 (def filing-dir 
-  "/home/florian/drives/samsung/sec/edgar-cache/filings")
+  "/home/florian/drives/samsung/sec/filings")
