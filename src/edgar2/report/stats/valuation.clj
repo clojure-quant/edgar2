@@ -88,7 +88,7 @@
   [stats-map market-cap]
   (let [vmcap (when (number? market-cap) market-cap)
         rev (when (number? (:revenue stats-map)) (:revenue stats-map))
-        ni (when (number? (:net-profit stats-map)) (:net-profit stats-map))
+        ni (when (number? (:net-income stats-map)) (:net-income stats-map))
         eavg (when (number? (:earnings-stabilized stats-map))
                (:earnings-stabilized stats-map))
         egrowth (when (number? (:earnings-stabilized-yoy stats-map))
@@ -139,9 +139,11 @@
 
 
 (defn calculate [shares row]
-  (let [m (calculate-marketcap shares row)]
+  (let [m (calculate-marketcap shares row)
+        v (calculate-valuation row (:vmcap m))]
     ;(println "valuation shares: " shares " mc: " (:vmcap m))
-    (calculate-valuation row (:vmcap m))))
+    (merge m v)
+    ))
 
 
 

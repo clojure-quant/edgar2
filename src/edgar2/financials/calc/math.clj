@@ -165,9 +165,9 @@
  
 
   (tc/column-names ds-dep-a)
-  (contains-col ds-dep-a :a)
-  (contains-col ds-dep-a :depreciation)
-  (contains-cols ds-dep-a [:depreciation :amortization])
+  (u/contains-col ds-dep-a :a)
+  (u/contains-col ds-dep-a :depreciation)
+  (u/contains-cols ds-dep-a [:depreciation :amortization])
 
 ;
   )

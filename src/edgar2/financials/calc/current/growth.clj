@@ -104,9 +104,9 @@
                       {:a 1.0}]))
   d
 
-  (direction-score d 7 :a)
+  (direction-score d :a 7)
   (growth d 7 :a)
-  (growth-most-recent d 7 :a)
+  (growth-most-recent d :a 7)
   (prior-col (:a d))
   (map-cur-prior d :a (fn [p c] (println "prior: " p "cur: " c)))
   (most-recents d 4)

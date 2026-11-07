@@ -3,6 +3,7 @@
   (:require [clojure.string :as str]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats :as stats]
+            [edgar2.util.format :as format]
             [edgar2.web.nav :refer [nav]]
             [edgar2.web.ticker :as ticker]
             [edgar2.web.overview :as overview]))
@@ -73,8 +74,8 @@
     :price (or (fmt (:price row) 2) "")
     :mc (if (number? (:marketcap row)) (str (screen/millions (:marketcap row))) "")
     :ev (if (number? (:enterprise-value row)) (str (screen/millions (:enterprise-value row))) "")
-    :pe (or (some-> (:price-earnings row) stats/round1 str) "")
-    :ev-ebit (or (some-> (:ev-ebit row) stats/round1 str) "")))
+    :pe (or (some-> (:price-earnings row) format/round1 str) "")
+    :ev-ebit (or (some-> (:ev-ebit row) format/round1 str) "")))
 
 (defn- foreign-cell
   [col row]

@@ -93,13 +93,6 @@
   (let [y (facts-ds/report-table facts :y nil)]
     (ni-model-calculate y)))
 
-(defn earnings-regression 
-  [opts vals]
-  (when-let [earn (regression/regression opts vals)]
-    {:earnings-stabilized (regression/estimate opts earn 0)
-     :earnings-stabilized-yoy (regression/slope-percent opts earn)
-     :earnings-variation (:variation earn)}))
-
 
 (comment
   (require '[edgar2.db.ticker :as t])

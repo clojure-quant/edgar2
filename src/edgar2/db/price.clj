@@ -35,3 +35,11 @@
   [ticker]
   (when-let [t (ticker-key ticker)]
     (get @by-ticker t)))
+
+
+(comment 
+  (get-price "MSFT")
+  (get-price "AIR")
+  
+ ; 
+  )

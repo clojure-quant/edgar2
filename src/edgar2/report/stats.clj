@@ -67,6 +67,7 @@
 (comment 
   (stats {:limit 300})
   (stats {})
+  (stats {:limit 10})
   
   ;
   )

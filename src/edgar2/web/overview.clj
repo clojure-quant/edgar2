@@ -6,7 +6,7 @@
             [edgar2.report.screen :as screen]
             [edgar2.report.stats :as stats]
             [edgar2.report.stats.category :as stats-cat]
-            [edgar2.financials.calc.current.valuation :as valuation] 
+            [edgar2.report.stats.valuation :as valuation] 
             [edgar2.web.nav :refer [nav]]))
 
 (def groups
