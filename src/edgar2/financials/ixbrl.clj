@@ -13,10 +13,12 @@
             [edgar.core :as ec]
             [edgar.filing :as ef]
             [edgar2.financials.facts-ds :as facts-ds]
-            [tech.v3.dataset :as ds])
+            [tech.v3.dataset :as ds]
+            [edgar2.config :refer [filing-dir]]
+            )
   (:import [java.math BigDecimal]))
 
-(def ^:private filing-dir "data/filings")
+
 
 (defn- flag-on?
   "SEC submissions store flags as 1/0. nil when the field is absent."

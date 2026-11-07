@@ -27,7 +27,7 @@
         rows (tc/row-count a)
         g (growth/calc-growth a)]
     (-> a-most-recent
-        (assoc :n rows)
+        (assoc :annual-count rows)
         (merge g)
         (merge (q/calculate-quarterly q)))))
 

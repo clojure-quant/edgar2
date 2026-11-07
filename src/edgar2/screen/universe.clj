@@ -43,8 +43,10 @@
 
 (defn stats-universe-all
   "Every ticker in data/stats.edn."
-  []
-  (mapv :ticker (report/load-stats)))
+  ([]
+   (mapv :ticker (report/load-stats)))
+  ([_]
+   (stats-universe-all)))
 
 (defn calculate-stats
   "Rows for `tickers`, looked up in a dictionary built from

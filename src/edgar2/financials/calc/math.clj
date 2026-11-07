@@ -139,6 +139,7 @@
        {:roce (u/divide concept-math-ds :net-income :capital-employed)
         :net-income-margin (u/divide concept-math-ds :net-income :revenue)
         :roa (u/divide concept-math-ds :net-income :assets)
+        :debt2ebitda (u/divide concept-math-ds :debt :ebitda)
         :dividend-coverage (u/divide concept-math-ds :net-income :dividends-paid-abs)
         :buyback-coverage (u/divide concept-math-ds :net-income :stock-repurchase-abs)
         :dividend-buyback-coverage (u/divide concept-math-ds :net-income :dividend-buyback)

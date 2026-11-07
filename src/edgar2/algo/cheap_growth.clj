@@ -62,10 +62,10 @@
         g-cut (when (seq with-g)
                 (cutoff/cutoff-min-top
                  (cutoff/numeric :sales-growth-avg-yoy with-g) growth-fraction))
-        with-roa (filterv #(number? (:return-on-assets %)) after-mc)
+        with-roa (filterv #(number? ( :roa %)) after-mc)
         roa-cut (when (seq with-roa)
                   (cutoff/cutoff-min-top
-                   (cutoff/numeric :return-on-assets with-roa) roa-fraction))]
+                   (cutoff/numeric  :roa with-roa) roa-fraction))]
     (if-not (and k-cut g-cut roa-cut)
       {:rows []
        :lines [(format "no positive %s" (metric-label k))]}
@@ -90,7 +90,7 @@
                    {:label (format "return-on-assets >= %.2f%% (top %d%%)"
                                    (* 100.0 (double roa-cut))
                                    (cutoff/pct-label roa-fraction))
-                    :pred (util/at-least :return-on-assets roa-cut)}])
+                    :pred (util/at-least :roa roa-cut)}])
             result (util/apply-and-pipeline rows steps)
             hits (sort-by (juxt k (comp - :sales-growth-avg-yoy))
                           (:tickers result))]

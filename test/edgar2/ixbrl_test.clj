@@ -23,7 +23,7 @@
        :val))
 
 (deftest june-2026-quarter-from-cached-6k
-  (when (.isDirectory (io/file "data/filings/6-K/0001988894/0001988894-26-000085"))
+  (when (.isDirectory (io/file "test/filings/6-K/0001988894/0001988894-26-000085"))
     (let [facts (ixbrl/filing-facts as-q2)]
       (is (= 1632600000.0 (revenue facts "2026-04-01" "2026-06-30")))
       (is (= 10227200000.0

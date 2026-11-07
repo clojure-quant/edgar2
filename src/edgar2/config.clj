@@ -10,3 +10,6 @@
   "/home/florian/drives/samsung/sec/edgar-cache"
   ;"/run/media/florian/26ad683d-44f4-42d8-bbd9-0a5d0b792fe0/edgar-cache"
   )
+
+(def filing-dir 
+  "/home/florian/drives/samsung/sec/edgar-cache/filings")

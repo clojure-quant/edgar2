@@ -13,7 +13,7 @@
                 :ev-ebit 20
                 :ebit 10
                 :sales-growth-avg-yoy 50
-                :return-on-assets 0.50
+                :roa 0.50
                 :marketcap 200e6}
                overrides)})
 
@@ -26,7 +26,7 @@
                   {:price-earnings pe
                    :ev-ebit pe
                    :sales-growth-avg-yoy growth
-                   :return-on-assets (/ growth 100.0)})))
+                   :roa (/ growth 100.0)})))
         (range 10)))
 
 (defn- calculate
