@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is]]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.financials.ixbrl :as ixbrl]
+            [edgar2.financials.load.ixbrl :as ixbrl]
             [tech.v3.dataset :as ds]))
 
 (def as-q2

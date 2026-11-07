@@ -5,7 +5,7 @@
             [edgar2.download.facts :as dl]
             [edgar2.util.core :as ucore]
             [edgar2.db.universe :as db-universe]
-            [edgar2.financials.facts-zip :as facts-zip]
+            [edgar2.financials.load.zip :as facts-zip]
             [edgar2.report.stats :as stats]
             [edgar2.util.map-progress :refer [map-progress]]))
 

@@ -1,4 +1,4 @@
-(ns edgar2.financials.facts-zip
+(ns edgar2.financials.load.zip
   "One companyfacts JSON from data/companyfacts.zip."
   (:require [edgar.xbrl :as xbrl]
             [edgar2.download.facts :as dl]

@@ -1,6 +1,6 @@
 (ns demo.net-income
   (:require
-   [edgar2.financials.facts-zip :as z]
+   [edgar2.financials.load.zip :as z]
    [edgar2.financials.facts-ds :as facts-ds]
    [edgar2.download.dataset :as dataset]
    [edgar2.db.ticker :refer [primary-ticker-for-cik]])

@@ -9,7 +9,7 @@
             [clojure.test :refer [deftest is testing]]
             [edgar.xbrl :as xbrl]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.financials.shares-outstanding :as shares]
+            [edgar2.financials.shares-y-or-q :as shares]
             [jsonista.core :as json]
             [tech.v3.dataset :as ds])
   (:import [java.time LocalDate]))

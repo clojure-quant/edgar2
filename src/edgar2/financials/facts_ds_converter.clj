@@ -12,7 +12,7 @@
             [edgar2.util.core :as ucore]
             [edgar2.download.facts :as dl]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.financials.facts-zip :as facts-zip]
+            [edgar2.financials.load.zip :as facts-zip]
             [edgar2.util.map-progress :refer [map-progress]])
   (:import [java.io DataInputStream DataOutputStream]
            [java.util.zip GZIPInputStream GZIPOutputStream]))

@@ -56,7 +56,7 @@
    {:concept :shares-outstanding
     :label "Shares Outstanding"
     :section :income}
-   {:math :dividends-paid ; MATH
+   {:math :dividends-paid-abs ; MATH
     :label "Dividends Paid"
     :section :income
     :style :background-pl-green}

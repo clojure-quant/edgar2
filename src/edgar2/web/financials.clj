@@ -4,7 +4,7 @@
             [hyper.effects :as effects]
             [edgar2.db.ticker :as db-ticker]
             [edgar2.financials.facts-ui :as facts-ui]
-            [edgar2.financials.facts-zip :as facts-zip]
+            [edgar2.financials.load.zip :as facts-zip]
             [edgar2.financials.view.core :as view]
             [edgar2.report.screen :as screen]
             [edgar2.report.stats.category :as stats-cat]

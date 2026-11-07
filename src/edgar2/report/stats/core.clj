@@ -5,7 +5,7 @@
    [edgar2.db.price-change :as db-price-change]
    [edgar2.db.shares :as db-shares]
    [edgar2.db.sic :as db-sic]
-   [edgar2.financials.facts-zip :as facts-zip]
+   [edgar2.financials.load.zip :as facts-zip]
    [edgar2.financials.calc.current.core :as cur]
    [edgar2.report.stats.valuation :as valuation] 
    [edgar2.regression.db :as regression]

@@ -1,7 +1,7 @@
 (ns edgar2.regression.db
   (:require
    [tech.v3.dataset :as ds]
-   [edgar2.financials.facts-zip :as z]
+   [edgar2.financials.load.zip :as z]
    [edgar2.financials.facts-ds :as facts-ds]
    [edgar2.regression.net-income-model :as nim]))
 

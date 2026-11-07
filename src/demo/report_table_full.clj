@@ -9,12 +9,13 @@
          clj -X:demo-table-full :ticker MSFT :show shares
          clj -X:demo-table-full :ticker GP :show shares :ixbrl true"
   (:require [clojure.string :as str]
+            [tech.v3.dataset :as ds]
             [edgar.api :as e]
             [edgar2.util :as util]
             [edgar2.util.core :as ucore]
-            [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.financials.ixbrl :as ixbrl]
-            [tech.v3.dataset :as ds]))
+            [edgar2.financials.facts-ds :as facts-ds] 
+            [edgar2.financials.shares-y-or-q :as shares]
+            ))
 
 (def fields
   [{:field [:us-gaap :NetIncomeLoss]
@@ -99,27 +100,29 @@
 
 (defn run
   "Load `:ticker` (default XOM) and print every annual and quarterly row.
-
-  `:show` is \"default\" (income sample) or \"shares\" (the three share tags).
-  `:ixbrl` true reads inline XBRL for annual reports whose statements are
-  missing from companyfacts. Otherwise the table is companyfacts only."
+  `:show` is \"default\" (income sample) or \"shares\" (the three share tags)."
   ([] (run {}))
-  ([{:keys [ticker show ixbrl]}]
+  ([{:keys [ticker show]}]
    (ucore/ensure-identity!)
    (let [ticker (ticker-name ticker)
          shown (fields-for show)
          cik (util/resolve-filer2 ticker)
-         dss (cond-> (e/facts cik)
-               (ixbrl? ixbrl) (ixbrl/with-pending-annual-ixbrl cik))]
+         dss  (e/facts cik)]
      (print-table (str ticker " annual")
                   (facts-ds/report-table-full dss :y shown)
                   shown)
      (print-table (str ticker " quarterly")
                   (facts-ds/report-table-full dss :q shown)
                   shown)
+     (println "shares: " (shares/shares-outstanding-obs dss))
      nil)))
 
 (comment 
   (run {:ticker "MSFT"})
+
+  (run {:ticker "SNPMF"})
+  (util/resolve-filer2 "SNPMF")
+  ;;=> "0001123658"
+
   ;
   )

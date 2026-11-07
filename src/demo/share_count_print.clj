@@ -16,7 +16,7 @@
             [edgar2.util.ticker-info :as ticker-info]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
-            [edgar2.financials.facts-zip :as facts-zip]
+            [edgar2.financials.load.zip :as facts-zip]
             [tech.v3.dataset :as ds]))
 
 (def n-periods

@@ -1,4 +1,4 @@
-(ns edgar2.financials.ixbrl
+(ns edgar2.financials.load.ixbrl
   "Inline XBRL facts from a filing companyfacts has not ingested yet.
 
   Contexts often live in the cover HTML and the statement numbers in an
@@ -299,19 +299,16 @@
   [filing]
   (annual-statement-facts (facts-from-docs filing (annual-doc-names filing))))
 
-(defn with-pending-annual-ixbrl
+(defn download-filings->ds
   "Companyfacts plus inline XBRL from annual reports that never fully
   landed in companyfacts.
 
   GreenPower's 2026 20-F is one of these. Its comparative column is the
   year ended 2025-03-31, which companyfacts does not have, and the 2025
   20-F itself was filed without XBRL. A failure leaves `dss` unchanged."
-  [dss cik]
+  [cik]
   (try
-    (let [rows (when dss (vec (ds/rows dss {:nil-missing? true})))
-          pending (pending-annual-filings
-                   (e/filings cik :include-amends? true :limit 1000)
-                   rows)
+    (let [pending  (e/filings cik :include-amends? true :limit 1000)
           extra (mapcat (fn [filing]
                           (try
                             (annual-filing-facts filing)
@@ -319,8 +316,7 @@
                               [])))
                         pending)]
       (if (seq extra)
-        (ds/->dataset (concat rows extra)
-                      {:dataset-name "facts-with-annual-ixbrl"})
-        dss))
+        (ds/->dataset extra {:dataset-name "facts-with-annual-ixbrl"})
+        nil))
     (catch Exception _
-      dss)))
+      nil)))

@@ -7,7 +7,7 @@
    [edgar2.util.core :as ucore]
    [edgar2.db.universe :as db-universe]
    [edgar2.report.stats.core :as stats]
-   [edgar2.financials.facts-zip :as facts-zip]
+   [edgar2.financials.load.zip :as facts-zip]
    [edgar2.util.map-progress :refer [map-progress]]))
 
 (def stats-path "data/stats.edn")

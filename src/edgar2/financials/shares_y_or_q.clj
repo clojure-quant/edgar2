@@ -1,13 +1,13 @@
-(ns edgar2.financials.shares-outstanding
+(ns edgar2.financials.shares-y-or-q
   "Shares outstanding from annual and quarterly report tables.
 
   `report-table-full` is run for `:y` and `:q` over every tag on the
   `:shares-outstanding` concept. `calc-concept` then adds a
   `:shares-outstanding` column to both datasets."
-  (:require [edgar2.financials.concepts :as concepts]
-            [edgar2.financials.facts-ds :as facts-ds]
-            [tech.v3.dataset :as ds]
-            [tech.v3.dataset.column :as col]))
+  (:require [tech.v3.dataset :as ds]
+            [tech.v3.dataset.column :as col]
+            [edgar2.financials.concepts :as concepts]
+            [edgar2.financials.facts-ds :as facts-ds]))
 
 (defn- make-column
   [name values metadata]
@@ -105,9 +105,9 @@
                                     (pos? (compare (str (:filed quarterly))
                                                    (str (:filed annual)))))
         quarterly-too-small? (and quarterly annual
-                                 (> (/ (double (:val annual))
-                                       (double (:val quarterly)))
-                                    100.0))
+                                  (> (/ (double (:val annual))
+                                        (double (:val quarterly)))
+                                     100.0))
         [q-or-y chosen] (cond
                           (and quarterly (nil? annual))
                           [:q quarterly]
