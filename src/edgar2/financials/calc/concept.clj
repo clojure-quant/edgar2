@@ -9,7 +9,13 @@
 ;; concepts
 
 (def concept-ids
-  "Concept :ids whose per-period vectors are added by `calc-concepts`."
+  "Concept :ids whose per-period vectors are added by `calc-concepts`.
+
+  The income-statement inputs `:operating-expenses`, `:pretax-income`,
+  `:nonoperating-income`, and `:asset-gains` are included so
+  `calc.math/calculate-math` can derive the operating lines. After
+  `calculate-math`, `:operating-expenses` and `:operating-income` are
+  reported-else-derived (see `calc.math`)."
   [; pl
    :revenue :cost-of-revenue :gross-profit
    :operating-income
@@ -20,6 +26,8 @@
    :amortization
    :interest-expense
    :income-tax
+   ; pl derivation inputs
+   :operating-expenses :pretax-income :nonoperating-income :asset-gains
    ; assets/liabilities
    :assets :assets-current :liabilities-current
    :total-equity :debt-longterm :debt-shortterm
@@ -43,7 +51,10 @@
   entry in `concept-ids` (column name = concept `:id`). Values are
   newest-first, same row order as `ds-annual`. `:dividends-paid` and
   `:stock-repurchase` are absolute (positive) amounts. `:ebit` prefers
-  operating income, else net income + interest + tax."
+  operating income, else net income + interest + tax. `:operating-expenses`
+  is the reported tag else the income-statement identity, and
+  `:operating-income` is the reported tag else gross profit minus a derived
+  operating-expenses (see `calc.math/calculate-math`)."
   [annual-ds]
   (let [concept-ds (calc-concept-ds annual-ds)]
     (-> concept-ds

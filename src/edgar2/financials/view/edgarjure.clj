@@ -99,15 +99,27 @@
     "Net Interest Income" "Net Interest Income After Provision"
     "Premiums Earned"})
 
+(def ^:private per-share-labels
+  "Per-share lines stay in raw dollars; everything else is scaled."
+  #{"EPS Basic" "EPS Diluted"})
+
 (defn- with-style
   [field]
   (if (pl-green-labels (:label field))
     (assoc field :style :background-pl-green)
     field))
 
+(defn- with-format
+  [field]
+  (if (per-share-labels (:label field))
+    field
+    (assoc field :format :millions)))
+
 (defn- income-field
   [label]
-  (with-style {:edgarjure label :label label :section :income}))
+  (-> {:edgarjure label :label label :section :income}
+      with-style
+      with-format))
 
 (defn edgarjure-income-industry
   "Income field maps for `industry` (:standard, :bank, :insurance, :reit).
@@ -115,3 +127,94 @@
   One `:edgarjure` line per label in `income-labels`, in display order."
   [industry]
   (mapv income-field (or (get income-labels industry) [])))
+
+(def ^:private balance-fields
+  "edgarjure balance-sheet rows, scaled to millions. `:style` only; no
+  `:format :background-*` — `:format` is a value format."
+  [; ASSETS / ACTIVE
+   {:concept :cash
+    :label "Cash"
+    :section :balance
+    :style :background-balance-active
+    :format :millions}
+   {:edgarjure "Accounts Receivable"
+    :label "Accounts Receivable"
+    :section :balance
+    :style :background-balance-active
+    :format :millions}
+   {:edgarjure "Inventory"
+    :label "Inventory"
+    :section :balance
+    :style :background-balance-active
+    :format :millions}
+   {:concept :assets-current
+    :label "Current Assets"
+    :section :balance
+    :style :background-balance-active
+    :format :millions}
+   {:edgarjure "PP&E Net"
+    :label "PP&E Net"
+    :section :balance
+    :style :background-balance-active
+    :format :millions}
+   {:edgarjure "Total Assets"
+    :label "Total Assets"
+    :section :balance
+    :style :background-balance-active
+    :format :millions}
+   ; LIABILITIES / PASSIVE
+   {:edgarjure "Accounts Payable"
+    :label "Accounts Payable"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:edgarjure "Current Debt"
+    :label "Current Debt"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:edgarjure "Current Portion of Long-Term Debt"
+    :label "Current Portion of Long-Term Debt"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:edgarjure "Short-Term Borrowings"
+    :label "Short-Term Borrowings"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:concept :liabilities-current
+    :label "Current Liabilities"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:edgarjure "Long-Term Debt"
+    :label "Long-Term Debt"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:edgarjure "Total Liabilities"
+    :label "Total Liabilities"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:edgarjure "Stockholders Equity"
+    :label "Stockholders Equity"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:edgarjure "Total Equity"
+    :label "Total Equity"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}
+   {:edgarjure "Total Liabilities and Equity"
+    :label "Total Liabilities and Equity"
+    :section :balance
+    :style :background-balance-passive
+    :format :millions}])
+
+(defn edgarjure-views
+  "All edgarjure field rows for `industry`: income labels + balance sheet."
+  [industry]
+  (vec (concat (edgarjure-income-industry industry) balance-fields)))

@@ -14,7 +14,6 @@
             [edgar2.util :as util]
             [edgar2.util.core :as ucore]
             [edgar2.financials.facts-ds-full :as facts-ds-full] 
-            [edgar2.financials.shares-y-or-q :as shares]
             ))
 
 (def fields
@@ -34,7 +33,7 @@
     :label "Interest Expense"
     :style :background-pl-green
     :section :income}
-   #_{:math :operating-income
+   #_{:our :operating-income
     :label "Operating Income"
     :style :background-pl-green
     :section :income}])
@@ -113,8 +112,7 @@
                   shown)
      (print-table (str ticker " quarterly")
                   (facts-ds-full/report-table-full dss :q shown)
-                  shown)
-     (println "shares: " (shares/shares-outstanding-obs dss))
+                  shown) 
      nil)))
 
 (comment 

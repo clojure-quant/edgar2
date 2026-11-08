@@ -33,6 +33,58 @@
 #_(defn deprecion-amortization [concept-ds]
   (add concept-ds :depreciation :amortization))
 
+(defn- derived-operating-expenses
+  "Operating expenses from the income-statement identity, for one row:
+
+  revenue + non-operating income + asset gains − pre-tax income
+  − cost of revenue − interest.
+
+  Nil when revenue or pre-tax income is missing. This is the identity
+  result only; `operating-expenses` prefers a reported tag."
+  [{:keys [revenue pretax-income nonoperating-income asset-gains
+           cost-of-revenue interest-expense]}]
+  (when (and (number? revenue) (number? pretax-income))
+    (- (+ (double revenue)
+          (double (or nonoperating-income 0))
+          (double (or asset-gains 0)))
+       (double pretax-income)
+       (double (or cost-of-revenue 0))
+       (double (or interest-expense 0)))))
+
+(defn- operating-expenses
+  "Per-row operating expenses: reported `:operating-expenses` else the
+  income-statement identity.
+
+  Returns `[values derived?]`; `derived?` marks the rows filled from the
+  identity rather than a reported tag, and is the mask `operating-income`
+  needs."
+  [concept-ds]
+  (u/assert-cols concept-ds [:operating-expenses :pretax-income
+                             :nonoperating-income :asset-gains
+                             :revenue :cost-of-revenue :interest-expense])
+  (let [rows (ds/mapseq-reader concept-ds)
+        reported (mapv :operating-expenses rows)
+        derived (mapv derived-operating-expenses rows)]
+    [(mapv (fn [r d] (if (number? r) r d)) reported derived)
+     (mapv (fn [r d] (and (not (number? r)) (number? d))) reported derived)]))
+
+(defn- operating-income
+  "Per-row operating income: reported `:operating-income`, else gross profit
+  minus operating expenses only where operating expenses was derived."
+  [concept-1-ds derived?]
+  (u/assert-cols concept-1-ds [:operating-income :gross-profit :operating-expenses])
+  (mapv (fn [row d?]
+          (let [reported (:operating-income row)]
+            (if (number? reported)
+              reported
+              (when (and d?
+                         (number? (:gross-profit row))
+                         (number? (:operating-expenses row)))
+                (- (double (:gross-profit row))
+                   (double (:operating-expenses row)))))))
+        (ds/mapseq-reader concept-1-ds)
+        derived?))
+
 #_(defn calc-operating-expenses
     "Operating expenses from the income-statement identity.
 
@@ -115,11 +167,13 @@
 ;; concept-math-ds
 
 (defn calculate-math [concept-ds]
-  (let [concept-1-ds (tc/add-or-replace-columns
+  (let [[opex opex-derived?] (operating-expenses concept-ds)
+        concept-1-ds (tc/add-or-replace-columns
                       concept-ds
                       {:gross-profit (gross-profit concept-ds)
                        :depreciation-amortization (deprecion-amortization concept-ds)
                        :ebit (ebit concept-ds)
+                       :operating-expenses opex
                        :dividends-paid-abs (absolute-concept concept-ds :dividends-paid)       
                        :stock-repurchase-abs (absolute-concept concept-ds :stock-repurchase)
                        })]
@@ -130,6 +184,7 @@
           :debt (interest-bearing-debt concept-1-ds)
           :capital-employed (capital-employed concept-1-ds)
           :dividend-buyback (u/add concept-1-ds :dividends-paid-abs :stock-repurchase-abs)
+          :operating-income (operating-income concept-1-ds opex-derived?)
           }))))
 
 

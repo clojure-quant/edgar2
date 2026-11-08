@@ -5,26 +5,27 @@
     :field     one [taxonomy concept] pair
     :concept   an id from edgar2.financials.concepts, via facts-ds/calc-concept
     :edgarjure a statement label from edgarjure
+    :our       a column key from calc.concept/calc-concepts
 
-  :style and :format are the row background (:background-pl-green,
+  :style is the row background (:background-pl-green,
   :background-balance-active, or :background-balance-passive), written on
-  the field map and carried as column metadata. :section is :income or
-  :balance.
+  the field map and carried as column metadata. :format is the value format
+  (:millions, :percent, :dec2, ...) and :section is :income, :balance, or
+  :ratio.
 
-  Views: :default (static P&L plus balance sheet), :all (every concept on
-  a wide report-table), :edgarjure-standard / :edgarjure-insurance /
-  :edgarjure-bank / :edgarjure-reit (pure edgarjure income labels plus
-  the shared balance-sheet lines).
+  Views: :default (Our rows: P&L + balance sheet + ratios), :all (every
+  concept on a wide report-table), :edgarjure-standard / :edgarjure-insurance
+  / :edgarjure-bank / :edgarjure-reit (pure edgarjure income labels plus
+  that view's own balance-sheet lines).
 
   Each view's rows are a static vector of field maps, already in display
   order."
   (:require [clojure.string :as str]
-            [edgar2.financials.view.balance :as balance]
             [edgar2.financials.view.edgarjure :as edgarjure]
-            [edgar2.financials.view.pl :as pl]))
+            [edgar2.financials.view.our :as our]))
 
 (def view-choices
-  [[:default "Current"]
+  [[:default "Our"]
    [:all "All fields"]
    [:edgarjure-standard "edgarjure Standard"]
    [:edgarjure-insurance "edgarjure Insurance"]
@@ -45,21 +46,17 @@
 (defn view-label
   [view]
   (or (second (first (filter #(= (parse-view view) (first %)) view-choices)))
-      "Current"))
-
-(defn- edgarjure-view-fields
-  [industry]
-  (vec (concat (edgarjure/edgarjure-income-industry industry)
-               balance/balance-fields)))
+      "Our"))
 
 (defn view-fields
-  "Field specs for `view`. `industry` is unused for :default (fixed P&L)
-  and for :edgarjure-* (that view's industry labels). :all has no specs."
+  "Field specs for `view`. `industry` is unused for :default (Our rows) and
+  for :all. :edgarjure-* uses that view's industry labels plus its own copy
+  of the balance-sheet lines."
   [view industry]
   (case (parse-view view)
     :all []
-    :edgarjure-standard (edgarjure-view-fields :standard)
-    :edgarjure-insurance (edgarjure-view-fields :insurance)
-    :edgarjure-bank (edgarjure-view-fields :bank)
-    :edgarjure-reit (edgarjure-view-fields :reit)
-    (vec (concat pl/pl-fields balance/balance-fields))))
+    :edgarjure-standard (edgarjure/edgarjure-views :standard)
+    :edgarjure-insurance (edgarjure/edgarjure-views :insurance)
+    :edgarjure-bank (edgarjure/edgarjure-views :bank)
+    :edgarjure-reit (edgarjure/edgarjure-views :reit)
+    (our/our-view)))

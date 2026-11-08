@@ -31,8 +31,13 @@
       5))
 
 (defn- cell
-  [v]
-  (if (nil? v) "" (str v)))
+  "Render one cell. `:percent` rows already hold the ×100 value, so append
+  a `%`; other rows are plain strings."
+  [fmt v]
+  (cond
+    (nil? v) ""
+    (and (= fmt :percent) (number? v)) (str v "%")
+    :else (str v)))
 
 (def sum-line
   "Last addend → the total drawn under the double rule.
@@ -42,15 +47,15 @@
    "Depreciation" "Operating Expenses"})
 
 (defn- row-class
-  "Background from the field `:format`, plus the double-rule borders."
-  [field format rule? below?]
+  "Background from the field `:style`, plus the double-rule borders."
+  [field style rule? below?]
   (let [classes (cond-> []
                   rule? (conj "fin-above-rule")
                   (and below? (= field "Gross Profit")) (conj "fin-gross")
                   (and below? (= field "Operating Expenses")) (conj "fin-below-rule")
-                  (= format :background-pl-green) (conj "fin-result")
-                  (= format :background-balance-active) (conj "fin-asset")
-                  (= format :background-balance-passive) (conj "fin-passive"))]
+                  (= style :background-pl-green) (conj "fin-result")
+                  (= style :background-balance-active) (conj "fin-asset")
+                  (= style :background-balance-passive) (conj "fin-passive"))]
     (when (seq classes)
       (str/join " " classes))))
 
@@ -73,7 +78,7 @@
 (defn- header-text
   "Units note for the statement table."
   []
-  "($ millions; EPS in $)")
+  "($ millions; per-share in $; ratios in %)")
 
 (def ratio-groups
   "Ratio columns, grouped from `stats-category/categories`."
@@ -145,14 +150,14 @@
                 rule? (and (some? next-field)
                            (= (get sum-line field) next-field))
                 below? (= (get sum-line prev-field) field)
-                style (or (:style row) (:format row))
+                style (:style row)
                 class (row-class field style rule? below?)]
             (cond-> [[:tr (cond-> {:key i}
                             class (assoc :class class))
                       (for [col columns]
                         [:td {:key (str col)
                               :class (when-not (= col :field) "num")}
-                         (cell (get row col))])]]
+                         (cell (:format row) (get row col))])]]
               rule? (conj [:tr.fin-double-rule {:key (str "rule-" i)}
                            [:td {:colspan (count columns)}]]))))
         (map-indexed vector rows))]]]))

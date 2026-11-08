@@ -26,17 +26,21 @@
       (long v)
       v)))
 
-(defn- eps-column?
-  [name]
-  (boolean (re-find #"(?i)eps|per\s*share" (str name))))
-
 (defn- scale-display
-  "USD and share counts → millions. Per-share amounts stay in dollars."
-  [name v]
+  "Apply a column's value `:format` to one value.
+
+  `:millions` → ÷1e6 as a long. `:percent` → the stored fraction ×100,
+  1 decimal. `:dec2` / `:dec1` → that many decimals. Nil or unknown
+  formats render the raw value. Non-numbers stay nil."
+  [fmt v]
   (when (number? v)
-    (if (eps-column? name)
-      (double v)
-      (long (/ (double v) 1.0e6)))))
+    (let [d (double v)]
+      (case fmt
+        :millions (long (/ d 1.0e6))
+        :percent (/ (Math/round (* 1000.0 d)) 10.0)
+        :dec2 (/ (Math/round (* 100.0 d)) 100.0)
+        :dec1 (/ (Math/round (* 10.0 d)) 10.0)
+        v))))
 
 (defn- field-column-names
   [ds]
@@ -51,18 +55,21 @@
     (col/new-column name data metadata)))
 
 (defn format-columns
-  "Scale every field column on a wide statement dataset to millions.
+  "Apply each field column's value `:format` on a wide statement dataset.
 
-  Leaves `:filed :period :end` alone. EPS / per-share columns stay in
-  dollars. Column metadata is kept."
+  `:millions` scales to millions, `:percent` shows a stored fraction ×100,
+  `:dec2` / `:dec1` round. Missing or unknown formats leave the value raw.
+  Values stay numeric. Leaves `:filed :period :end` alone; column metadata
+  is kept."
   [ds]
   (let [columns (mapv (fn [name]
                         (let [c (ds/column ds name)
-                              metadata (dissoc (meta c) :name :datatype :n-elems)]
+                              metadata (dissoc (meta c) :name :datatype :n-elems)
+                              fmt (:format metadata)]
                           (if (contains? period-col-names name)
                             (make-column name (vec c) metadata)
                             (make-column name
-                                         (mapv #(scale-display name %) c)
+                                         (mapv #(scale-display fmt %) c)
                                          metadata))))
                       (ds/column-names ds))]
     (ds/new-dataset {:dataset-name (or (ds/dataset-name ds) "report-table")}
@@ -72,9 +79,8 @@
   "Transpose a wide period-row statement into a field-row table.
 
   Period `:end` values become column names in row order (`:field` first).
-  Field column order is unchanged. Adds `:style` (from column `:style` or
-  `:format`), plus `:section` and `:format` when present. Keeps all-nil
-  field rows."
+  Field column order is unchanged. Adds `:style` (from column `:style`),
+  plus `:section` and `:format` when present. Keeps all-nil field rows."
   [ds]
   (let [rows (vec (ds/rows ds {:nil-missing? true}))
         ends (mapv #(str (:end %)) rows)
@@ -83,7 +89,7 @@
         (mapv (fn [name]
                 (let [c (ds/column ds name)
                       metadata (meta c)
-                      style (or (:style metadata) (:format metadata))
+                      style (:style metadata)
                       period-vals (mapv (fn [row] (as-number (get row name))) rows)]
                   (cond-> (into {:field (str name)}
                                 (map vector ends period-vals))

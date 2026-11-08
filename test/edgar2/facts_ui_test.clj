@@ -52,21 +52,27 @@
                            (view/view-fields :edgarjure-bank :standard)))
         insurance (into {} (map (juxt :label identity)
                                 (view/view-fields :edgarjure-insurance :standard)))]
-    (is (= :operating-income (:math (get default "Operating Income"))))
-    (is (= :operating-expenses (:math (get default "Operating Expenses"))))
-    (is (= :revenue (:concept (get default "Revenue"))))
-    (is (= :depreciation (:concept (get default "Depreciation"))))
-    (is (= "Net Income" (:edgarjure (get default "Net Income"))))
+    (is (= :operating-income (:our (get default "Operating Income"))))
+    (is (= :operating-expenses (:our (get default "Operating Expenses"))))
+    (is (= :revenue (:our (get default "Revenue"))))
+    (is (= :depreciation (:our (get default "Depreciation"))))
+    (is (= :net-income (:our (get default "Net Income"))))
     (is (= :background-pl-green (:style (get default "Net Income"))))
     (is (= :background-pl-green (:style (get default "Gross Profit"))))
     (is (= :background-pl-green (:style (get default "Dividends Paid"))))
-    (is (= :dividends-paid (:math (get default "Dividends Paid"))))
+    (is (= :dividends-paid-abs (:our (get default "Dividends Paid"))))
     (is (= :background-balance-active (:style (get default "Total Assets"))))
     (is (= :background-balance-passive (:style (get default "Total Liabilities"))))
     (is (= :background-balance-passive (:style (get default "Total Equity"))))
+    (is (= :millions (:format (get default "Cash"))))
+    (is (= :percent (:format (get default "Net Income Margin"))))
+    (is (= :percent (:format (get default "ROCE"))))
+    (is (= :dec2 (:format (get default "Debt/EBITDA"))))
     (is (= :background-pl-green (:style (get bank "Net Interest Income"))))
     (is (= "Net Interest Income" (:edgarjure (get bank "Net Interest Income"))))
-    (is (nil? (:math (get bank "Net Interest Income"))))
+    (is (nil? (:our (get bank "Net Interest Income"))))
+    (is (= :millions (:format (get bank "Interest Income"))))
+    (is (nil? (:format (get bank "EPS Basic"))))
     (is (= :background-pl-green (:style (get insurance "Premiums Earned"))))))
 
 (deftest statement-current-and-all-sw
@@ -129,7 +135,7 @@
                  :label "Interest Expense"
                  :style :background-pl-green
                  :section :income}
-                {:math :operating-income
+                {:our :operating-income
                  :label "Operating Income"
                  :style :background-pl-green
                  :section :income}]

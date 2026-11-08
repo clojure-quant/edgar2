@@ -1,6 +1,7 @@
 (ns edgar2.financials.facts-ds-full
   "Field-map wide reports built on `edgar2.financials.facts-ds`."
   (:require [edgar.api :as e]
+            [edgar2.financials.calc.concept :as calc-concept]
             [edgar2.financials.concepts :as concepts]
             [edgar2.financials.facts-ds :as facts-ds]
             [tech.v3.dataset :as ds]
@@ -88,11 +89,14 @@
           (ds/rows wide {:nil-missing? true}))))
 
 (defn- field-values
-  [wide field]
+  [wide calc-ds field]
   (cond
     (:field field) (column-vec wide (name (second (:field field))))
     (:concept field) (facts-ds/calc-concept wide (:concept field))
     (:edgarjure field) (chain-vals wide (get @edgarjure-chains (:edgarjure field)))
+    (:our field) (if (and calc-ds (ds/has-column? calc-ds (:our field)))
+                   (mapv as-number (ds/column calc-ds (:our field)))
+                   (vec (repeat (ds/row-count wide) nil)))
     :else (vec (repeat (ds/row-count wide) nil))))
 
 (defn- period-column
@@ -110,15 +114,25 @@
 
   `:field` is one `[taxonomy concept]` pair. `:concept` is an id from
   `edgar2.financials.concepts`, via `calc-concept`. `:edgarjure` is a
-  statement label resolved through `edgar.api/concepts-for`. "
+  statement label resolved through `edgar.api/concepts-for`. `:our` names a
+  column of the precalculated `calc.concept/calc-concepts` dataset (e.g.
+  `:net-income`, `:gross-profit`, `:ebitda`, `:net-income-margin`).
+
+  When at least one field has `:our`, the wide table carries every concept
+  (`facts-ds/report-table` with nil fields) and `calc-concepts` runs on it;
+  `:our` columns are read from that result. Otherwise only the tags the
+  fields need are selected."
   [dss q-or-y fields]
   (let [fields (vec fields)
-        pairs (vec (distinct (mapcat field-tag-pairs fields)))
+        any-our? (boolean (some :our fields))
+        pairs (when-not any-our?
+                (vec (distinct (mapcat field-tag-pairs fields))))
         wide (facts-ds/report-table dss q-or-y pairs)
+        calc-ds (when any-our? (calc-concept/calc-concepts wide))
         columns (into (mapv #(period-column wide %) facts-ds/report-period-cols)
                       (map (fn [field]
                              (make-column (:label field)
-                                          (field-values wide field)
+                                          (field-values wide calc-ds field)
                                           (column-metadata field)))
                            fields))]
     (ds/new-dataset {:dataset-name "report-table"} columns)))
