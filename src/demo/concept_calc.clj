@@ -8,21 +8,10 @@
    [edgar2.util.core :as ucore]
    [edgar2.db.ticker :as t]
    [edgar2.financials.facts-ds :as facts-ds]
-   [edgar2.financials.load.zip :as facts-zip]
+   [edgar2.financials.load.core :refer [load-facts]]
    [edgar2.financials.calc.concept :as calc]
    [edgar2.financials.calc.current.core :as cur]
    [edgar2.financials.calc.current.growth :as growth]))
-
-(defn load-facts-edgar
-  "Companyfacts for `ticker` (XOM via resolve-filer2)."
-  [ticker]
-  (ucore/ensure-identity!)
-  (e/facts (util/resolve-filer2 ticker)))
-
-(defn load-facts-zip [cik]
-  (with-open [zf (facts-zip/open-facts-zip)]
-    (facts-zip/load-dataset zf cik)))
-
 
 (def show-columns
   [:filed :period :end
@@ -36,8 +25,7 @@
    :roa
    :roce
    :dividend-buyback-coverage
-   :dividends-paid
-   ])
+   :dividends-paid])
 
 (defn run
   "Load demo ticker facts, print calc-concepts table."
@@ -48,7 +36,7 @@
          ticker (if ticker
                   ticker
                   (t/primary-ticker-for-cik cik))
-         facts (load-facts-zip cik)
+         facts (load-facts cik)
          a (facts-ds/report-table facts :y nil)
          cc (calc/calc-concepts a)
 
@@ -65,10 +53,10 @@
   (run {:cik "0000055234"}) ; not 7 years of data
 
   (run {:cik "0000066496"})
- (run {:ticker "SNPMF"})
-  
+  (run {:ticker "SNPMF"})
 
-  
+
+
 
 
 

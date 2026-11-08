@@ -51,7 +51,7 @@
   "Share count from annual and quarterly report tables.
 
   `dss` is a companyfacts dataset (`edgar.xbrl/facts->dataset`).
-  Both frequencies run `report-table-full` over the
+  Both frequencies run `report-table` over the
   `:shares-outstanding` tags, then `calc-concept` adds
   `:shares-outstanding`. The quarterly row is used when it was filed
   after the annual row, unless it is more than 100 times smaller.

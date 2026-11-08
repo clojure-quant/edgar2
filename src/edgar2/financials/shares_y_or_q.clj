@@ -1,7 +1,7 @@
 (ns edgar2.financials.shares-y-or-q
   "Shares outstanding from annual and quarterly report tables.
 
-  `report-table-full` is run for `:y` and `:q` over every tag on the
+  `report-table` is run for `:y` and `:q` over every tag on the
   `:shares-outstanding` concept. `calc-concept` then adds a
   `:shares-outstanding` column to both datasets."
   (:require [tech.v3.dataset :as ds]
@@ -15,16 +15,10 @@
         data (if (empty? values) (make-array Object 0) values)]
     (col/new-column name data metadata)))
 
-(defn shares-outstanding-fields
-  "One `:field` map per tag on the `:shares-outstanding` concept.
-
-  `:label` is the concept local name, which is the column `calc-concept`
-  reads."
+(defn shares-outstanding-tags
+  "Tag pairs [taxonomy concept] on the `:shares-outstanding` concept."
   []
-  (mapv (fn [[taxonomy concept]]
-          {:field [taxonomy concept]
-           :label (name concept)})
-        (or (:data (concepts/get-concept-id :shares-outstanding)) [])))
+  (vec (or (:data (concepts/get-concept-id :shares-outstanding)) [])))
 
 (defn with-shares-outstanding
   "Copy of a wide report table with a `:shares-outstanding` column.
@@ -40,41 +34,31 @@
 
 (defn- report-or-nil
   "Nil when `q-or-y` has no periods."
-  [dss q-or-y fields]
+  [dss q-or-y tags]
   (try
-    (facts-ds/report-table-full dss q-or-y fields)
+    (facts-ds/report-table dss q-or-y tags)
     (catch Exception _
       nil)))
 
 (defn shares-outstanding-tables
   "Annual and quarterly report tables for every `:shares-outstanding` tag.
 
-  Keys are `:y` and `:q`. Each table is `report-table-full` over
-  `shares-outstanding-fields`, plus a `:shares-outstanding` column from
+  Keys are `:y` and `:q`. Each table is `report-table` over
+  `shares-outstanding-tags`, plus a `:shares-outstanding` column from
   `calc-concept`. A frequency with no periods is nil."
   [dss]
-  (let [fields (shares-outstanding-fields)]
+  (let [tags (shares-outstanding-tags)]
     (into {}
           (map (fn [q-or-y]
                  [q-or-y (when dss
-                           (some-> (report-or-nil dss q-or-y fields)
+                           (some-> (report-or-nil dss q-or-y tags)
                                    with-shares-outstanding))]))
           [:y :q])))
-
-(defn shares-table-from-selected
-  "Wide `:shares-outstanding` table from a long `select-data` dataset.
-
-  Same columns as `shares-outstanding-tables`: one per concept tag, plus
-  `:shares-outstanding` from `calc-concept`. Nil when `selected` is empty."
-  [selected]
-  (when (and selected (pos? (ds/row-count selected)))
-    (-> (facts-ds/report-table-selected selected (mapv :field (shares-outstanding-fields)))
-        with-shares-outstanding)))
 
 (defn latest-shares-row
   "Newest row of `table` whose `:shares-outstanding` is a positive number.
 
-  Tables from `report-table-full` are newest `:end` first."
+  Tables from `report-table` are newest `:end` first."
   [table]
   (when (and table
              (pos? (ds/row-count table))

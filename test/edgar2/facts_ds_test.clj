@@ -211,15 +211,19 @@
     (is (= 75923198 (:val obs)))))
 
 (deftest shares-outstanding-tables-add-calc-concept-aapl
-  "Both frequencies carry every :shares-outstanding tag, then calc-concept."
+  "Both frequencies carry :shares-outstanding columns, then calc-concept."
   (let [dss (load-facts "AAPL")
         {:keys [y q]} (shares/shares-outstanding-tables dss)
         chosen (shares/choose-shares-outstanding y q)
-        labels (set (map :label (shares/shares-outstanding-fields)))]
+        period-cols (set (map name facts-ds/report-period-cols))
+        tag-labels (set (map (comp name second) (shares/shares-outstanding-tags)))]
     (doseq [table [y q]]
       (is (pos? (ds/row-count table)))
       (is (ds/has-column? table :shares-outstanding))
-      (is (set/subset? labels (set (map str (ds/column-names table)))))
+      (is (every? #(or (contains? period-cols (name %))
+                       (= "shares-outstanding" (name %))
+                       (contains? tag-labels (name %)))
+                  (ds/column-names table)))
       (is (= (vec (ds/column table :shares-outstanding))
              (facts-ds/calc-concept table :shares-outstanding))))
     (is (#{:y :q} (:q-or-y chosen)))
@@ -227,14 +231,9 @@
     (let [winning (if (= :q (:q-or-y chosen)) q y)
           row (->> (ds/rows winning {:nil-missing? true})
                    (filter #(= (str (:end chosen)) (str (:end %))))
-                   first)
-          from-selected (shares/shares-table-from-selected
-                         (facts-ds/select-data dss (:q-or-y chosen)
-                                               (mapv :field (shares/shares-outstanding-fields))))]
+                   first)]
       (is (= (:val chosen) (:shares-outstanding row)))
-      (is (= (:period chosen) (str (:period row))))
-      (is (= (vec (ds/column winning :shares-outstanding))
-             (vec (ds/column from-selected :shares-outstanding)))))))
+      (is (= (:period chosen) (str (:period row)))))))
 
 (defn- long-val
   [v]
