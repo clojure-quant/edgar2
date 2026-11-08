@@ -4,7 +4,7 @@
             [clojure.test :refer [deftest is]]
             [edgar.api :as e]
             [edgar.xbrl :as xbrl]
-            [edgar2.financials.facts-ds :as facts-ds]
+            [edgar2.financials.facts-ds-full :as facts-ds-full]
             [edgar2.financials.facts-ui :as facts-ui]
             [edgar2.financials.view.core :as view]
             [edgar2.financials.view.edgarjure :as edgarjure]
@@ -133,7 +133,7 @@
                  :label "Operating Income"
                  :style :background-pl-green
                  :section :income}]
-        table (facts-ds/report-table-full dss :y fields)
+        table (facts-ds-full/report-table-full dss :y fields)
         reported (vec (ds/column table "Operating Income reported"))
         income (vec (ds/column table "Operating Income"))]
     (is (= {:style :background-pl-green :section :income}

@@ -8,7 +8,7 @@
             [edgar2.util :as util]
             [edgar2.util.core :as ucore]
             [edgar2.financials.concepts :as concepts]
-            [edgar2.financials.facts-ds :as facts-ds]
+            [edgar2.financials.facts-ds-full :as facts-ds-full]
             [tech.v3.dataset :as ds]))
 
 (def fields
@@ -44,7 +44,7 @@
    (let [ticker (ticker-name ticker)
          dss (e/facts (util/resolve-filer2 ticker))]
      (print-table (str ticker " annual")
-                  (facts-ds/report-table-full dss :y fields))
+                  (facts-ds-full/report-table-full dss :y fields))
      (print-table (str ticker " quarterly")
-                  (facts-ds/report-table-full dss :q fields))
+                  (facts-ds-full/report-table-full dss :q fields))
      nil)))

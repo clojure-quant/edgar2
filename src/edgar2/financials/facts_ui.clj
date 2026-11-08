@@ -6,6 +6,7 @@
   `to-presentable`, and `remove-presentable-empty` prepare it for the
   financials page and CLI."
   (:require [edgar2.financials.facts-ds :as facts-ds]
+            [edgar2.financials.facts-ds-full :as facts-ds-full]
             [edgar2.financials.view.core :as view]
             [tech.v3.dataset :as ds]
             [tech.v3.dataset.column :as col]))
@@ -126,4 +127,4 @@
   (let [view (view/parse-view view)]
     (if (= view :all)
       (facts-ds/report-table dss q-or-y nil)
-      (facts-ds/report-table-full dss q-or-y (view/view-fields view industry)))))
+      (facts-ds-full/report-table-full dss q-or-y (view/view-fields view industry)))))

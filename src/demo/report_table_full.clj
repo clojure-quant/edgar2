@@ -13,7 +13,7 @@
             [edgar.api :as e]
             [edgar2.util :as util]
             [edgar2.util.core :as ucore]
-            [edgar2.financials.facts-ds :as facts-ds] 
+            [edgar2.financials.facts-ds-full :as facts-ds-full] 
             [edgar2.financials.shares-y-or-q :as shares]
             ))
 
@@ -109,10 +109,10 @@
          cik (util/resolve-filer2 ticker)
          dss  (e/facts cik)]
      (print-table (str ticker " annual")
-                  (facts-ds/report-table-full dss :y shown)
+                  (facts-ds-full/report-table-full dss :y shown)
                   shown)
      (print-table (str ticker " quarterly")
-                  (facts-ds/report-table-full dss :q shown)
+                  (facts-ds-full/report-table-full dss :q shown)
                   shown)
      (println "shares: " (shares/shares-outstanding-obs dss))
      nil)))
