@@ -3,7 +3,7 @@
 
   Reads `data/ni.edn` (written by `demo.net-income/run`), classifies each
   `:ni` series with `edgar2.regression.net-income-model/classify-series`
-  (which delegates to `demo.regression-fastmath/stable` and, when the
+  (which delegates to `edgar2.regression.fastmath/stable` and, when the
   series is not stable, the linear trend model). Writes the resulting
   models to `data/ni-trend.edn`.
 

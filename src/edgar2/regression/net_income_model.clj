@@ -1,6 +1,6 @@
 (ns edgar2.regression.net-income-model
   "Net-income series classification: stable vs. linear trend."
-  (:require [demo.regression-fastmath :as rf]
+  (:require [edgar2.regression.fastmath :as rf]
             [tech.v3.dataset :as ds]))
 
 (def ^:private r-squared-significant

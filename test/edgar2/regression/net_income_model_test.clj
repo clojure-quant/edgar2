@@ -11,6 +11,12 @@
   (let [result (nim/classify-series [1 2 3 4 5])]
     (is (= :trend-linear (:model result)))))
 
+(deftest loss-to-recovery-turnaround-has-positive-growth
+  (let [result (nim/classify-series
+                [-4653142000 1337137000 581550000 977445000 1463561000])]
+    (is (= :trend-linear (:model result)))
+    (is (pos? (:stabilized-yoy result)))))
+
 (deftest empty-series-has-no-model
   (is (nil? (nim/classify-series [])))
   (is (nil? (nim/classify-series nil)))
