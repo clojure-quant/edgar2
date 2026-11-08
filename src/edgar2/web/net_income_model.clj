@@ -101,9 +101,10 @@
            {:end (:end r) :series label :value v}))))
 
 (defn chart-spec
-  "Vega-Lite dual-Y-axis line chart: Revenue (brown) on the left axis and Net
-  Income (blue) plus EstimateNI (black) on the right axis, over the fiscal
-  period ends in raw dollars, with a dot per marker."
+  "Vega-Lite dual-Y-axis chart: Revenue (brown line) on the left axis and Net
+  Income plus EstimateNI (black line) on the right axis, over the fiscal period
+  ends in raw dollars. Net Income is drawn as a zero-anchored bar, green when
+  positive and red when negative; EstimateNI keeps a dot per marker."
   [ds]
   {:width 1200
    :height 300
@@ -127,23 +128,41 @@
                  }
                 {:field "series" :type "nominal"}
                 {:field "value" :type "quantitative" :format "$,.0f"}]}}
-    {:transform [{:filter "datum.series === 'Net Income' || datum.series === 'EstimateNI'"}]
-     :mark {:type "line" :point {:size 40}}
-     :encoding
-     {:x {:field "end" :type "nominal"
-          ; :type "temporal"  ;:axis {:format "%Y" :title "Year"}
-          }
-      :y {:field "value" :type "quantitative"
-          :axis {:title "Net Income / EstimateNI (USD)" :format "$,.3s" :orient "right"}}
-      :color {:field "series" :type "nominal"
-              :scale {:domain ["Revenue" "Net Income" "EstimateNI"]
-                      :range ["#8B4513" "#1f77b4" "#000000"]}
-              :legend {:title nil}}
-      :tooltip [{:field "end" :type "nominal"
-                 ;:type "temporal"  :format "%Y-%m-%d"
-                 }
-                {:field "series" :type "nominal"}
-                {:field "value" :type "quantitative" :format "$,.0f"}]}}]})
+    {:layer
+     [{:transform [{:filter "datum.series === 'Net Income'"}]
+       :mark {:type "bar" :size 10 :opacity 0.75}
+       :encoding
+       {:x {:field "end" :type "nominal"
+            ; :type "temporal"  ;:axis {:format "%Y" :title "Year"}
+            }
+        :y {:field "value" :type "quantitative"
+            :axis {:title "Net Income / EstimateNI (USD)" :format "$,.3s" :orient "right"}}
+        :y2 {:datum 0}
+        :fill {:condition {:test "datum.value > 0" :value "#2ca02c"}
+               :value "#d62728"}
+        :tooltip [{:field "end" :type "nominal"
+                   ;:type "temporal"  :format "%Y-%m-%d"
+                   }
+                  {:field "series" :type "nominal"}
+                  {:field "value" :type "quantitative" :format "$,.0f"}]}}
+      {:transform [{:filter "datum.series === 'EstimateNI'"}]
+       :mark {:type "line" :point {:size 40}}
+       :encoding
+       {:x {:field "end" :type "nominal"
+            ; :type "temporal"  ;:axis {:format "%Y" :title "Year"}
+            }
+        :y {:field "value" :type "quantitative"
+            :axis {:title "Net Income / EstimateNI (USD)" :format "$,.3s" :orient "right"}}
+        :color {:field "series" :type "nominal"
+                :scale {:domain ["Revenue" "Net Income" "EstimateNI"]
+                        :range ["#8B4513" "#1f77b4" "#000000"]}
+                :legend {:title nil}}
+        :tooltip [{:field "end" :type "nominal"
+                   ;:type "temporal"  :format "%Y-%m-%d"
+                   }
+                  {:field "series" :type "nominal"}
+                  {:field "value" :type "quantitative" :format "$,.0f"}]}}]
+     :resolve {:scale {:y "shared"}}}]})
 
 (defn net-income-model-page
   [req]

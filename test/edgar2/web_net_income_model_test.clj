@@ -40,25 +40,37 @@
   (let [ds (ds/->dataset [{:end "2024-12-31" :revenue 10 :net-income 5}])
         spec (nim/chart-spec ds)
         rev-layer (first (:layer spec))
-        ni-layer (second (:layer spec))]
+        ni-group (second (:layer spec))
+        bar-layer (first (:layer ni-group))
+        est-layer (second (:layer ni-group))
+        color-scale {:domain ["Revenue" "Net Income" "EstimateNI"]
+                     :range ["#8B4513" "#1f77b4" "#000000"]}]
     (is (= 1200 (:width spec)))
     (is (= 300 (:height spec)))
     (is (= {:scale {:y "independent"}} (:resolve spec)))
     (is (= 2 (count (:layer spec))))
-    (is (every? #(= {:type "line" :point {:size 40}} (:mark %)) (:layer spec)))
-    ;; Both layers share one full color scale so the single legend maps all
-    ;; three series to their colors.
-    (is (= ["#8B4513" "#1f77b4" "#000000"]
-           (get-in rev-layer [:encoding :color :scale :range])))
-    (is (= ["Revenue" "Net Income" "EstimateNI"]
-           (get-in rev-layer [:encoding :color :scale :domain])))
-    (is (= (get-in rev-layer [:encoding :color :scale])
-           (get-in ni-layer [:encoding :color :scale])))
-    ;; Revenue layer on the left Y axis.
+    ;; Revenue layer: line with points on the left Y axis.
+    (is (= {:type "line" :point {:size 40}} (:mark rev-layer)))
     (is (= [{:filter "datum.series === 'Revenue'"}] (:transform rev-layer)))
     (is (= "left" (get-in rev-layer [:encoding :y :axis :orient])))
-    ;; Net Income + EstimateNI layer on the right Y axis.
-    (is (= [{:filter "datum.series === 'Net Income' || datum.series === 'EstimateNI'"}]
-           (:transform ni-layer)))
-    (is (= "right" (get-in ni-layer [:encoding :y :axis :orient])))
+    ;; Both the Revenue layer and the EstimateNI layer carry one full color
+    ;; scale so the single legend maps all three series to their colors.
+    (is (= color-scale (get-in rev-layer [:encoding :color :scale])))
+    (is (= color-scale (get-in est-layer [:encoding :color :scale])))
+    ;; Net Income + EstimateNI share the right Y scale via a nested layer group.
+    (is (= {:scale {:y "shared"}} (:resolve ni-group)))
+    (is (= 2 (count (:layer ni-group))))
+    ;; Net Income is a zero-anchored bar, green when positive, red when negative.
+    (is (= {:type "bar" :size 10 :opacity 0.75} (:mark bar-layer)))
+    (is (= [{:filter "datum.series === 'Net Income'"}] (:transform bar-layer)))
+    (is (= {:datum 0} (get-in bar-layer [:encoding :y2])))
+    (is (= "right" (get-in bar-layer [:encoding :y :axis :orient])))
+    (is (= {:condition {:test "datum.value > 0" :value "#2ca02c"}
+            :value "#d62728"}
+           (get-in bar-layer [:encoding :fill])))
+    ;; EstimateNI stays a line with points on the right Y axis.
+    (is (= {:type "line" :point {:size 40}} (:mark est-layer)))
+    (is (= [{:filter "datum.series === 'EstimateNI'"}] (:transform est-layer)))
+    (is (= "right" (get-in est-layer [:encoding :y :axis :orient])))
+    (is (= {:title nil} (get-in est-layer [:encoding :color :legend])))
     (is (= (nim/chart-values ds) (get-in spec [:data :values])))))
